@@ -8,7 +8,7 @@ export const mockTutors = [
     hourlyRate: 280,
     location: 'Quezon City',
     credentials: 'Summa Cum Laude Alumni "23, Lead Data Analyst at MetricLab',
-    bio: 'Experienced computer science tutor specializing in algorithms and data structures.',
+    bio: 'Experienced computer sciencetutor specializing in algorithms and data structures.',
     availability: ['Monday, 4:00 PM', 'Wednesday, 6:00 PM'],
     availableToday: true,
     image: null,
