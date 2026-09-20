@@ -2,11 +2,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 
-export default function TutorCard({ tutor, onPress }) {
+export default function TutorCard({ tutor, handlePress }) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable style={styles.card} onPress={handlePress}>
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{tutor.name.charAt(0)}</Text>
+        <Text style={styles.avatarText}>{tutor.name}</Text>
       </View>
 
       <View style={styles.details}>
