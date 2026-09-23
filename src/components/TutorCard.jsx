@@ -1,10 +1,17 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import AntDesign from '@expo/vector-icons/AntDesign';
 
 export default function TutorCard({ tutor, handlePress }) {
   return (
-    <Pressable style={styles.card} onPress={handlePress}>
+    <Pressable style={({ pressed }) => [
+      styles.card,
+      {
+        opacity: pressed ? 0.75 : 1,
+      }
+    ]}
+      onPress={handlePress}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{tutor.name}</Text>
       </View>
@@ -13,7 +20,8 @@ export default function TutorCard({ tutor, handlePress }) {
         <Text style={styles.name}>{tutor.name}</Text>
         <Text style={styles.subject}>{tutor.subject}</Text>
         <Text style={styles.rating}>
-          {tutor.rating} stars ({tutor.reviewCount} reviews)
+          <AntDesign name="star" size={13} color="gold" />
+          <Text style={{color: 'gold'}}> {tutor.rating} stars</Text> ({tutor.reviewCount} reviews)
         </Text>
         <Text style={styles.rate}>₱{tutor.hourlyRate}/hour</Text>
       </View>
