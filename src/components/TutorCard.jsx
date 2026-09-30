@@ -13,8 +13,15 @@ export default function TutorCard({ tutor, handlePress }) {
     ]}
       onPress={handlePress}>
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{tutor.name}</Text>
-      </View>
+      <Text style={styles.avatarText}>
+        {tutor.initials ||
+          tutor.name
+            .split(' ')
+            .map((part) => part[0])
+            .join('')
+            .slice(0, 2)}
+      </Text>
+    </View>
 
       <View style={styles.details}>
         <Text style={styles.name}>{tutor.name}</Text>
