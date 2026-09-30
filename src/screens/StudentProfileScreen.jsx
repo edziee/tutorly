@@ -282,7 +282,7 @@ export default function StudentProfileScreen() {
         <View style={styles.tutorCta}>
           <View style={styles.earnTag}>
             <Ionicons name="flash" size={12} color="#006F69" />
-            <Text style={styles.earnText}>Earn $28 - $42/hr</Text>
+            <Text style={styles.earnText}>Earn ₱200 - ₱300/hr</Text>
           </View>
           <Ionicons name="school-outline" size={23} color={colors.secondary} style={styles.schoolIcon} />
           <Text style={styles.ctaTitle}>Qualified to Peer Tutor?</Text>
