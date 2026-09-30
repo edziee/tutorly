@@ -9,6 +9,8 @@ export default function AppInput({
   placeholder,
   error,
   secureTextEntry = false,
+  keyboardType = 'default',
+  autoCapitalize = 'sentences',
 }) {
   return (
     <View style={styles.container}>
@@ -19,6 +21,8 @@ export default function AppInput({
         onChangeText={handleChangeText}
         placeholder={placeholder}
         secureTextEntry={secureTextEntry}
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize}
         style={[styles.input, error && styles.errorInput]}
       />
 
