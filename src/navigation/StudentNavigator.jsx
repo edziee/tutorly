@@ -7,6 +7,7 @@ import PlaceholderScreen from '../screens/PlaceholderScreen';
 import { TutorsScreen } from '../screens/TutorsScreen';
 import ScheduleScreen from '../screens/ScheduleScreen';
 import TutorProfileScreen from '../screens/TutorProfileScreen';
+import StudentProfileScreen from '../screens/StudentProfileScreen';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
@@ -67,7 +68,7 @@ export default function StudentNavigator() {
       </Tab.Screen>
 
       <Tab.Screen name="Profile" options={{ title: 'Profile' }}>
-        {() => <PlaceholderScreen title="Profile" />}
+        {() => <StudentProfileScreen />}
       </Tab.Screen>
 
       <Tab.Screen name="Schedule" options={{ title: 'Schedule' }}>

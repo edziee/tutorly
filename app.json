@@ -7,7 +7,14 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "plugins": [
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Tutorly to use a photo for your profile picture.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true
