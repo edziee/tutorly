@@ -1,13 +1,14 @@
 // src/screens/PlaceholderScreen.jsx
 import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 
 export default function PlaceholderScreen({ title }) {
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={[]} style={styles.container}>
       <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>This screen is under development.</Text>
-    </View>
+      <Text style={styles.subtitle}>Coming soon.</Text>
+    </SafeAreaView>
   );
 }
 

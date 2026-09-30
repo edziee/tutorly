@@ -34,13 +34,15 @@ export const TutorsScreen = () => { //place tutors prop later
     }
 
     const appInputConfig = {
-        placeholder: "Search Subjects, Course Codes, or Tutors",
+        placeholder: "Search subjects or tutors",
     }
 
     const styles = StyleSheet.create({
         container: {
+            flex: 1,
             borderWidth: 15,
-            borderColor: 'rgba(158, 150, 150, 0)'
+            borderColor: 'rgba(158, 150, 150, 0)',
+            backgroundColor: colors.background,
         },
 
         appInput: {
@@ -110,8 +112,8 @@ export const TutorsScreen = () => { //place tutors prop later
     //Change CSS styling later
     //NOTE: Implement selectedId for FlatList
     return (
-        <View style={styles.container}>
-            <SafeAreaView edges={['top']} style={styles.headerContainer}>
+        <SafeAreaView edges={[]} style={styles.container}>
+            <View style={styles.headerContainer}>
                 <View style={{ display: 'flex', flexDirection: 'row' }}>
                     <Text style={styles.header}>Tutors</Text>
 
@@ -130,8 +132,8 @@ export const TutorsScreen = () => { //place tutors prop later
                     />
                 </View>
 
-            </SafeAreaView>
-            <SafeAreaView edges={[]}>
+            </View>
+            <View style={{ flex: 1 }}>
                 <View style={styles.categories}>
                     <FlatList data={courseCategories}
                         renderItem={({ item }) =>
@@ -163,8 +165,8 @@ export const TutorsScreen = () => { //place tutors prop later
                     keyExtractor={item => item.id}
                     showsVerticalScrollIndicator={false}
                 />
-            </SafeAreaView>
-        </View>
+            </View>
+        </SafeAreaView>
 
     );
 }

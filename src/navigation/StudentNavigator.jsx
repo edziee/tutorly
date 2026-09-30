@@ -1,6 +1,8 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
+import { AppHeaderActions, AppHeaderBrand } from '../components/AppHeader';
+import ChatScreen from '../screens/ChatScreen';
 import PlaceholderScreen from '../screens/PlaceholderScreen';
 import { TutorsScreen } from '../screens/TutorsScreen';
 import ScheduleScreen from '../screens/ScheduleScreen';
@@ -17,12 +19,28 @@ const tabConfig = {
   Chat: { icon: 'chatbubble', inactiveIcon: 'chatbubble-outline' },
 };
 
+const headerTitles = {
+  Tutors: 'Tutors',
+  Profile: 'Profile',
+  Schedule: 'Schedule',
+  TutorProfile: 'Tutor Profile',
+  Chat: 'Messages',
+};
+
 export default function StudentNavigator() {
   return (
     <Tab.Navigator
       initialRouteName="Tutors"
       screenOptions={({ route }) => ({
-        headerShown: false,
+        headerShown: true,
+        headerTitleAlign: 'left',
+        headerTitle: () => <AppHeaderBrand title={headerTitles[route.name]} />,
+        headerRight: () => <AppHeaderActions />,
+        headerStyle: {
+          backgroundColor: colors.background,
+          height: 68,
+        },
+        headerShadowVisible: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
         tabBarStyle: {
@@ -61,7 +79,7 @@ export default function StudentNavigator() {
       </Tab.Screen>
 
       <Tab.Screen name="Chat" options={{ title: 'Chat' }}>
-        {() => <PlaceholderScreen title="Chat" />}
+        {() => <ChatScreen />}
       </Tab.Screen>
     </Tab.Navigator>
   );

@@ -1,16 +1,22 @@
 export const mockConversations = [
   {
     id: 'conversation-1',
-    tutorName: 'Marcus Reynolds',
-    lastMessage: 'I reviewed your assignment and left comments.',
+    name: 'Marcus Reynolds',
+    role: 'Tutor',
+    category: 'Active Tutors',
+    course: 'CS 240: Algorithms',
+    preview: 'I reviewed your assignment and left comments.',
     time: '10:42 AM',
-    unreadCount: 1,
+    unread: true,
   },
   {
     id: 'conversation-2',
-    tutorName: 'Prof. Henderson',
-    lastMessage: 'Office hours are confirmed for Thursday at 3 PM.',
+    name: 'Prof. Henderson',
+    role: 'Professor',
+    category: 'Faculty / Profs',
+    course: 'Office Hours',
+    preview: 'Office hours are confirmed for Thursday at 3 PM.',
     time: 'Yesterday',
-    unreadCount: 1,
+    unread: true,
   },
 ];
