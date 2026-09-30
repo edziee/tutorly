@@ -1,33 +1,20 @@
-// src/navigation/StudentNavigator.jsx
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
 import PlaceholderScreen from '../screens/PlaceholderScreen';
+import { TutorsScreen } from '../screens/TutorsScreen';
+import ScheduleScreen from '../screens/ScheduleScreen';
+import TutorProfileScreen from '../screens/TutorProfileScreen';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
 
 const tabConfig = {
-  Tutors: {
-    icon: 'people',
-    inactiveIcon: 'people-outline',
-  },
-  Profile: {
-    icon: 'person',
-    inactiveIcon: 'person-outline',
-  },
-  Schedule: {
-    icon: 'calendar',
-    inactiveIcon: 'calendar-outline',
-  },
-  TutorProfile: {
-    icon: 'school',
-    inactiveIcon: 'school-outline',
-  },
-  Chat: {
-    icon: 'chatbubble',
-    inactiveIcon: 'chatbubble-outline',
-  },
+  Tutors: { icon: 'people', inactiveIcon: 'people-outline' },
+  Profile: { icon: 'person', inactiveIcon: 'person-outline' },
+  Schedule: { icon: 'calendar', inactiveIcon: 'calendar-outline' },
+  TutorProfile: { icon: 'school', inactiveIcon: 'school-outline' },
+  Chat: { icon: 'chatbubble', inactiveIcon: 'chatbubble-outline' },
 };
 
 export default function StudentNavigator() {
@@ -57,38 +44,23 @@ export default function StudentNavigator() {
         },
       })}
     >
-      <Tab.Screen
-        name="Tutors"
-        options={{ title: 'Tutors' }}
-      >
-        {() => <TutorsScreen title="Tutors" />}
+      <Tab.Screen name="Tutors" options={{ title: 'Tutors' }}>
+        {() => <TutorsScreen />}
       </Tab.Screen>
 
-      <Tab.Screen
-        name="Profile"
-        options={{ title: 'Profile' }}
-      >
+      <Tab.Screen name="Profile" options={{ title: 'Profile' }}>
         {() => <PlaceholderScreen title="Profile" />}
       </Tab.Screen>
 
-      <Tab.Screen
-        name="Schedule"
-        options={{ title: 'Schedule' }}
-      >
+      <Tab.Screen name="Schedule" options={{ title: 'Schedule' }}>
         {() => <ScheduleScreen />}
       </Tab.Screen>
 
-      <Tab.Screen
-        name="TutorProfile"
-        options={{ title: 'Tutor Profile' }}
-      >
+      <Tab.Screen name="TutorProfile" options={{ title: 'Tutor Profile' }}>
         {() => <TutorProfileScreen />}
       </Tab.Screen>
 
-      <Tab.Screen
-        name="Chat"
-        options={{ title: 'Chat' }}
-      >
+      <Tab.Screen name="Chat" options={{ title: 'Chat' }}>
         {() => <PlaceholderScreen title="Chat" />}
       </Tab.Screen>
     </Tab.Navigator>
