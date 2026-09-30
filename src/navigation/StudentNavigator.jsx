@@ -3,8 +3,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
 import PlaceholderScreen from '../screens/PlaceholderScreen';
-import ScheduleScreen from '../screens/ScheduleScreen';
-import TutorProfileScreen from '../screens/TutorProfileScreen';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
@@ -63,7 +61,7 @@ export default function StudentNavigator() {
         name="Tutors"
         options={{ title: 'Tutors' }}
       >
-        {() => <PlaceholderScreen title="Tutors" />}
+        {() => <TutorsScreen title="Tutors" />}
       </Tab.Screen>
 
       <Tab.Screen

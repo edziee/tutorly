@@ -5,7 +5,7 @@ import { spacing } from '../theme/spacing';
 export default function AppInput({
   label,
   value,
-  onChangeText,
+  handleChangeText,
   placeholder,
   error,
   secureTextEntry = false,
@@ -16,7 +16,7 @@ export default function AppInput({
 
       <TextInput
         value={value}
-        onChangeText={onChangeText}
+        onChangeText={handleChangeText}
         placeholder={placeholder}
         secureTextEntry={secureTextEntry}
         style={[styles.input, error && styles.errorInput]}
