@@ -151,7 +151,7 @@ export const TutorsScreen = () => { //place tutors prop later
     //Change CSS styling later
     //NOTE: Implement selectedId for FlatList
     return (
-        <SafeAreaView edges={["top"]} style={styles.container}>
+        <SafeAreaView edges={[]} style={styles.container}>
             <View style={styles.headerContainer}>
                 <View style={styles.appInput}>
                     <Feather style={styles.searchIcon} name="search" size={20} color="black" />
