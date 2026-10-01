@@ -24,7 +24,10 @@ import { typography } from '../theme/typography';
 
 const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-export default function StudentProfileScreen() {
+export default function StudentProfileScreen({
+  profileImageUri,
+  onProfileImageChange,
+}) {
   const [streakRemindersEnabled, setStreakRemindersEnabled] = useState(true);
   const [meetingPreference, setMeetingPreference] = useState('campus');
   const [profile, setProfile] = useState({
@@ -36,8 +39,6 @@ export default function StudentProfileScreen() {
   });
   const [profileDraft, setProfileDraft] = useState(profile);
   const [editVisible, setEditVisible] = useState(false);
-  const [profileImageUri, setProfileImageUri] = useState(null);
-
   const showProfileMessage = (message) => Alert.alert('Student Profile', message);
   const pickProfileImage = async () => {
     try {
@@ -49,7 +50,7 @@ export default function StudentProfileScreen() {
       });
 
       if (!result.canceled && result.assets?.[0]?.uri) {
-        setProfileImageUri(result.assets[0].uri);
+        onProfileImageChange(result.assets[0].uri);
       }
     } catch {
       Alert.alert('Unable to open photos', 'Please try selecting your profile picture again.');

@@ -150,33 +150,7 @@ export default function ChatScreen() {
   }
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <View style={styles.header}>
-        <View style={styles.brand}>
-          <View style={styles.logo}>
-            <Ionicons name="school" size={17} color={colors.primary} />
-          </View>
-          <Text style={styles.brandName}>Tutorly</Text>
-          <Text style={styles.divider}>|</Text>
-          <Text style={styles.headerTitle}>Messages</Text>
-        </View>
-
-        <View style={styles.headerActions}>
-          <Pressable
-            accessibilityLabel="Notifications"
-            hitSlop={8}
-            onPress={() => Alert.alert('Notifications', 'No new notifications.')}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={21}
-              color={colors.text}
-            />
-          </Pressable>
-          <Avatar initials="E" color="#C8CBD0" size={30} online />
-        </View>
-      </View>
-
+    <SafeAreaView edges={[]} style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -314,47 +288,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    minHeight: 54,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  brand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logo: {
-    width: 25,
-    height: 25,
-    borderRadius: 6,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  brandName: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  divider: {
-    color: colors.mutedText,
-    marginHorizontal: spacing.xs,
-  },
-  headerTitle: {
-    color: colors.text,
-    fontSize: 12,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
   },
   content: {
     paddingHorizontal: spacing.md,

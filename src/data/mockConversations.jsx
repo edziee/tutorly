@@ -1,16 +1,5 @@
 export const mockConversations = [
   {
-    id: 'conversation-1',
-    tutorId: 'tutor-1',
-    role: 'Alumni',
-    roleColor: '#DED9FF',
-    course: 'CS 240',
-    preview: 'Say your first message!',
-    time: 'Oct 18',
-    category: 'All Messages',
-    unread: false,
-  },
-  {
     id: 'conversation-2',
     tutorId: 'tutor-1',
     role: 'Peer Tutor',

@@ -1,29 +1,58 @@
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { BottomTabBar, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from 'react';
 
-import PlaceholderScreen from '../screens/PlaceholderScreen';
+import AppHeader from '../components/AppHeader';
+import StudentAvatar from '../components/StudentAvatar';
 import { TutorsScreen } from '../screens/TutorsScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ScheduleScreen from '../screens/ScheduleScreen';
+import StudentProfileScreen from '../screens/StudentProfileScreen';
 import TutorProfileScreen from '../screens/TutorProfileScreen';
+import { mockStudentProfile } from '../data/mockStudentProfile';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
 
 const tabConfig = {
-  Tutors: { icon: 'people', inactiveIcon: 'people-outline' },
-  Profile: { icon: 'person', inactiveIcon: 'person-outline' },
-  Schedule: { icon: 'calendar', inactiveIcon: 'calendar-outline' },
-  TutorProfile: { icon: 'school', inactiveIcon: 'school-outline' },
-  Chat: { icon: 'chatbubble', inactiveIcon: 'chatbubble-outline' },
+  Tutors: { icon: 'people', inactiveIcon: 'people-outline', title: 'Tutors' },
+  Profile: { icon: 'person', inactiveIcon: 'person-outline', title: 'Profile' },
+  Schedule: { icon: 'calendar', inactiveIcon: 'calendar-outline', title: 'Schedule' },
+  TutorProfile: { icon: 'school', inactiveIcon: 'school-outline', title: 'Tutor Profile' },
+  Chat: { icon: 'chatbubble', inactiveIcon: 'chatbubble-outline', title: 'Messages' },
 };
 
+const studentInitials = mockStudentProfile.name
+  .split(' ')
+  .map((part) => part[0])
+  .join('')
+  .slice(0, 2);
+
 export default function StudentNavigator() {
+  const [profileImageUri, setProfileImageUri] = useState(null);
+
   return (
     <Tab.Navigator
       initialRouteName="Tutors"
+      tabBar={(props) => (
+        <SafeAreaView edges={['bottom']} style={styles.tabBarSafeArea}>
+          <BottomTabBar
+            {...props}
+            insets={{ ...props.insets, bottom: 0 }}
+          />
+        </SafeAreaView>
+      )}
       screenOptions={({ route }) => ({
-        headerShown: false,
+        headerShown: true,
+        header: ({ navigation }) => (
+          <AppHeader
+            title={tabConfig[route.name].title}
+            initials={studentInitials}
+            imageUri={profileImageUri}
+            onProfilePress={() => navigation.navigate('Profile')}
+          />
+        ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
         tabBarStyle: {
@@ -41,6 +70,16 @@ export default function StudentNavigator() {
           const config = tabConfig[route.name];
           const iconName = focused ? config.icon : config.inactiveIcon;
 
+          if (route.name === 'Profile') {
+            return (
+              <StudentAvatar
+                imageUri={profileImageUri}
+                initials={studentInitials}
+                size={size}
+              />
+            );
+          }
+
           return <Ionicons name={iconName} size={size} color={color} />;
         },
       })}
@@ -50,7 +89,12 @@ export default function StudentNavigator() {
       </Tab.Screen>
 
       <Tab.Screen name="Profile" options={{ title: 'Profile' }}>
-        {() => <PlaceholderScreen title="Profile" />}
+        {() => (
+          <StudentProfileScreen
+            profileImageUri={profileImageUri}
+            onProfileImageChange={setProfileImageUri}
+          />
+        )}
       </Tab.Screen>
 
       <Tab.Screen name="Schedule" options={{ title: 'Schedule' }}>
@@ -65,3 +109,9 @@ export default function StudentNavigator() {
     </Tab.Navigator>
   );
 }
+
+const styles = {
+  tabBarSafeArea: {
+    backgroundColor: colors.surface,
+  },
+};

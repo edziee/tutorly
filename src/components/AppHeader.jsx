@@ -1,6 +1,8 @@
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import StudentAvatar from './StudentAvatar';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 
@@ -19,7 +21,11 @@ export function AppHeaderBrand({ title }) {
   );
 }
 
-export function AppHeaderActions() {
+export function AppHeaderActions({
+  initials,
+  imageUri,
+  onProfilePress,
+}) {
   return (
     <View style={styles.actions}>
       <Pressable
@@ -34,15 +40,54 @@ export function AppHeaderActions() {
           color={colors.text}
         />
       </Pressable>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>E</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open student profile"
+        hitSlop={8}
+        onPress={onProfilePress}
+        style={styles.avatarButton}
+      >
+        <StudentAvatar imageUri={imageUri} initials={initials} size={30} />
         <View style={styles.onlineDot} />
-      </View>
+      </Pressable>
     </View>
   );
 }
 
+export default function AppHeader({
+  title,
+  initials,
+  imageUri,
+  onProfilePress,
+}) {
+  return (
+    <SafeAreaView edges={['top']} style={styles.safeArea}>
+      <View style={styles.header}>
+        <AppHeaderBrand title={title} />
+        <AppHeaderActions
+          initials={initials}
+          imageUri={imageUri}
+          onProfilePress={onProfilePress}
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
+  safeArea: {
+    backgroundColor: colors.surface,
+  },
+  header: {
+    minHeight: 54,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -76,18 +121,12 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingRight: spacing.md,
   },
-  avatar: {
+  avatarButton: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#C8CBD0',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: '700',
   },
   onlineDot: {
     position: 'absolute',
