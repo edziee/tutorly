@@ -18,6 +18,8 @@ export const TutorsScreen = () => { //place tutors prop later
     const [textInput, setTextInput] = useState("");
     const [courseCategory, setCourseCategory] = useState("");
     const [tierCategory, setTierCategory] = useState("");
+    const [courses, setCourses] = useState(courseCategories);
+    const [tiers, setTiers] = useState(tierCategories);
     const { width, height } = Dimensions.get('window');
 
     const categories = {
@@ -35,10 +37,24 @@ export const TutorsScreen = () => { //place tutors prop later
     }
 
     const handleCoursePress = (item) => {
+        const changedCourses = courses.map( course => {
+            if (course.id == item.id) {
+                return {...course, isSelected: true};
+            }
+            return {...course, isSelected: false};
+        })
+        setCourses(changedCourses);
         setCourseCategory(item.keyword);
     }
 
     const handleTierPress = (item) => {
+        const changedTiers = tiers.map(tier => {
+            if (tier.id == item.id) {
+                return {...tier, isSelected: true};
+            }
+            return {...tier, isSelected: false};
+        })
+        setTiers(changedTiers);
         setTierCategory(item.keyword);
     }
 
@@ -85,7 +101,6 @@ export const TutorsScreen = () => { //place tutors prop later
             borderRadius: 20,
             padding: spacing.sm,
             marginRight: 4,
-            backgroundColor: colors.secondary,
         },
 
         headerContainer: {
@@ -150,20 +165,18 @@ export const TutorsScreen = () => { //place tutors prop later
             </View>
             <View style={{ flex: 1 }}>
                 <View style={styles.categories}>
-                    <FlatList data={courseCategories}
+                    <FlatList data={courses}
                         renderItem={({ item }) =>
                             <Pressable underlayColor={colors.primary}
                                 uppercase={false}
                                 onPress={() => handleCoursePress(item)}
                                 color={"black"}
-                                style={({ pressed }) => [
-                                    styles.categoryButton,
+                                style={[styles.categoryButton,
                                     {
-                                        backgroundColor: pressed ? "#1A146B" : "#ECEEF0",
-                                        color: pressed ? "white" : "black",
-                                    },
+                                        backgroundColor: item.isSelected ? "#1A146B" : "#F2F4F6",
+                                    }
                                 ]}>
-                                <Text>{item.label}</Text>
+                                <Text style={{color: item.isSelected ? "white" : "black"}}>{item.label}</Text>
                             </Pressable>}
                         keyExtractor={item => item.id}
                         horizontal={true}
@@ -176,19 +189,16 @@ export const TutorsScreen = () => { //place tutors prop later
 
                     <View style={styles.tiers}>
                         <View style={{ flexDirection: 'row' }}>
-                            <FlatList data={tierCategories}
+                            <FlatList data={tiers}
                                 renderItem={({ item }) =>
                                     <Pressable underlayColor={colors.primary}
                                         uppercase={false}
                                         onPress={() => handleTierPress(item)}
                                         color={"black"}
                                         style={{ marginRight: 15 }}>
-                                        <Text style={({ pressed }) => [
-                                            {
-                                                color: pressed ? "white" : "black",
-                                                marginRight: 20,
-                                            },
-                                        ]}>{item.label}</Text>
+                                        <Text style={{color: item.isSelected ? "#1A146B" : "black",
+                                                        fontWeight: item.isSelected ? "bold" : "normal",
+                                        }}>{item.label}</Text>
                                     </Pressable>}
                                 keyExtractor={item => item.id}
                                 horizontal={true}
