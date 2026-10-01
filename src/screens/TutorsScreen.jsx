@@ -185,7 +185,7 @@ export const TutorsScreen = () => { //place tutors prop later
 
                 <View style={styles.tiersContainer}>
                     <Octicons name="stack" size={20} color="black" style={{ marginRight: 7 }} />
-                    <Text style={{ color: colors.mutedText, marginRight: 20 }}>TIER:</Text>
+                    <Text style={{ color: colors.mutedText, marginRight: 0 }}>TIER:</Text>
 
                     <View style={styles.tiers}>
                         <View style={{ flexDirection: 'row' }}>
@@ -195,7 +195,7 @@ export const TutorsScreen = () => { //place tutors prop later
                                         uppercase={false}
                                         onPress={() => handleTierPress(item)}
                                         color={"black"}
-                                        style={{ marginRight: 15 }}>
+                                        style={{ marginRight: 10 }}>
                                         <Text style={{color: item.isSelected ? "#1A146B" : "black",
                                                         fontWeight: item.isSelected ? "bold" : "normal",
                                         }}>{item.label}</Text>
