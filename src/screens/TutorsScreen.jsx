@@ -42,7 +42,7 @@ export const TutorsScreen = () => { //place tutors prop later
             flex: 1,
             borderWidth: 15,
             borderColor: 'rgba(158, 150, 150, 0)',
-            backgroundColor: colors.background,
+            backgroundColor: 'white',
         },
 
         appInput: {
@@ -53,7 +53,7 @@ export const TutorsScreen = () => { //place tutors prop later
             marginBottom: spacing.md,
             alignItems: 'center',
             width: '100%',
-            backgroundColor: colors.white,
+            backgroundColor: '#F2F4F6',
         },
 
         searchIcon: {
@@ -95,13 +95,13 @@ export const TutorsScreen = () => { //place tutors prop later
             borderRadius: 10,
             padding: spacing.md,
             fontSize: 16,
-            backgroundColor: colors.white,
+            backgroundColor: "#F2F4F6",
             flex: 1,
         },
 
         tutorListContainer: {
             borderRadius: 20,
-            backgroundColor: colors.placeholder,
+            backgroundColor: "white",
             padding: 10,
         },
     });
@@ -140,11 +140,12 @@ export const TutorsScreen = () => { //place tutors prop later
                             <Pressable underlayColor={colors.primary}
                                 uppercase={false}
                                 onPress={() => handleCategoryPress(item)}
-                                color={colors.white}
+                                color={"black"}
                                 style={({ pressed }) => [
                                     styles.categoryButton,
                                     {
-                                        backgroundColor: pressed ? colors.primary : colors.secondary,
+                                        backgroundColor: pressed ? "#1A146B" : "#ECEEF0",
+                                        color: pressed ? "white" : "black" ,
                                     },
                                 ]}>
                                 <Text>{item.label}</Text>
