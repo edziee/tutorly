@@ -91,7 +91,10 @@ export const TutorsScreen = () => { //place tutors prop later
         },
 
         categoryList: {
-            margin: '0 10 10 0',
+            marginRight: 10,
+            marginBottom: 10,
+            marginLeft: 0,
+            marginTop: 0,
         },
 
         categoryButton: {
