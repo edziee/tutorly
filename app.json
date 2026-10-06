@@ -14,7 +14,8 @@
           "photosPermission": "Allow Tutorly to use a photo for your profile picture.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": true
