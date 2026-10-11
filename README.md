@@ -65,6 +65,7 @@ npm start
 ```
 
 Then press `a` for Android, `i` for iOS, or `w` for the web, or scan the QR code with Expo Go. The same can be started directly with `npm run android`, `npm run ios` or `npm run web`.
+create a new branch when creating something new
 
 Known limits when running:
 

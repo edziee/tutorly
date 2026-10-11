@@ -62,10 +62,10 @@ The four members split the work by area. Member 3 builds the screens and customi
 
 | Member | Area | Main responsibilities |
 | --- | --- | --- |
-| Member 1 | Firebase setup, logins for all roles, security | Firebase project, Authentication logic for students, tutors, professional tutors (professors and alumni) and the hidden admin login, role-based access, profile data, verification document upload (Storage), eligibility check, connecting the professional tutor dashboard to Firestore, security rules, mock data in login, profiles and that dashboard |
-| Member 2 | Student features, booking, payment and geolocation | Tutors list search and filter logic, booking flow, schedule, payment, Firestore booking data, geolocation in Week 3 (location permission, tutors on the map, nearby tutors, campus proximity check-in), mock data in these features |
-| Member 3 | Front end and UI customization | Fully customizing the UI to match Figma (theme, colors, fonts, reusable components), building the screens for all four user types, the Figma designs for the four new screens, loading, empty and error states, final UI polish and the Figma comparison |
-| Member 4 | In-app notifications, chat and admin | Chat and notification data and logic, real-time chat, notification triggers and preferences, admin dashboard data (users, verification approvals), mock data in chat, notifications and admin, plus final documentation and demo |
+| Member 1  (Marcus)| Firebase setup, logins for all roles, security | Firebase project, Authentication logic for students, tutors, professional tutors (professors and alumni) and the hidden admin login, role-based access, profile data, verification document upload (Storage), eligibility check, connecting the professional tutor dashboard to Firestore, security rules, mock data in login, profiles and that dashboard |
+| Member 2  (Adrian)| Student features, booking, payment and geolocation | Tutors list search and filter logic, booking flow, schedule, payment, Firestore booking data, geolocation in Week 3 (location permission, tutors on the map, nearby tutors, campus proximity check-in), mock data in these features |
+| Member 3  (Edrian)| Front end and UI customization | Fully customizing the UI to match Figma (theme, colors, fonts, reusable components), building the screens for all four user types, the Figma designs for the four new screens, loading, empty and error states, final UI polish and the Figma comparison |
+| Member 4  (Michael)| In-app notifications, chat and admin | Chat and notification data and logic, real-time chat, notification triggers and preferences, admin dashboard data (users, verification approvals), mock data in chat, notifications and admin, plus final documentation and demo |
 
 ## What each member should do
 
@@ -105,7 +105,7 @@ The four members split the work by area. Member 3 builds the screens and customi
 - Replace mock data in your own area as you build it, and do not add new mock data.
 - Tell the team early if you are blocked, especially Members 2 to 4 waiting on Member 1's Firebase setup.
 
-## Week 1 (Oct 10 to 18): Foundation and core screens
+## Week 1 (Oct 10 to 15): Foundation and core screens
 
 Week 1 sets up Firebase and the shared data structure first, because everything else depends on it. Member 3 starts the shared UI and designs the four new Figma screens, and the other members build their logic with temporary data. The team also lists every place in the repo that uses mock data.
 
@@ -123,7 +123,7 @@ Week 1 sets up Firebase and the shared data structure first, because everything 
 | Tutors list logic with search and filters (temporary data is fine for now) | Member 2 | In progress (search and filters exist on mock data) |
 | Firestore data and logic for chat and notifications | Member 4 | Not started |
 
-## Week 2 (Oct 19 to 25): Firebase features
+## Week 2 (Oct 16 to 22): Firebase features
 
 Week 2 connects each area to real Firebase data and builds the two new logins and dashboards. Member 3 builds the remaining screens, and each member replaces the mock data in their own area.
 
@@ -146,7 +146,7 @@ Week 2 connects each area to real Firebase data and builds the two new logins an
 | Connect the admin dashboard to Firestore (users list, approve or reject tutor and professional verification, bookings overview) | Member 4 | Not started |
 | Replace mock data in chat, notifications and the admin dashboard | Member 4 | Not started |
 
-## Week 3 (Oct 26 to Nov 1): Integration, polish and submission
+## Week 3 (Oct 23 to Oct 28): Integration, polish and submission
 
 Week 3 adds payment and geolocation, locks down Firebase for each role, finishes the UI polish, removes any mock data that is left, and leaves time for testing and the demo.
 
