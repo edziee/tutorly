@@ -13,14 +13,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import AppButton from '../components/AppButton';
-import AppInput from '../components/AppInput';
-import ScreenContainer from '../components/ScreenContainer';
-import { mockStudentProfile } from '../data/mockStudentProfile';
-import { colors } from '../theme/colors';
-import { radius } from '../theme/spacing';
-import { spacing } from '../theme/spacing';
-import { typography } from '../theme/typography';
+import AppButton from '../../components/AppButton';
+import AppInput from '../../components/AppInput';
+import ScreenContainer from '../../components/ScreenContainer';
+import { mockStudentProfile } from '../../data/mockStudentProfile';
+import { colors } from '../../theme/colors';
+import { radius } from '../../theme/spacing';
+import { spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 
 const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 

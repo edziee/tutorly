@@ -1,15 +1,15 @@
 import { View, FlatList, StyleSheet, Text, TextInput, Pressable, Button, TouchableHighlight, ScrollView, TouchableOpacity } from "react-native";
-import { mockTutors } from "../data/mockTutors"
+import { mockTutors } from "../../data/mockTutors"
 import { useEffect, useState } from "react";
-import TutorCard from "../components/TutorCard"
+import TutorCard from "../../components/TutorCard"
 import { SafeAreaView } from "react-native-safe-area-context";
 import Feather from '@expo/vector-icons/Feather';
-import { colors } from '../theme/colors'
-import { spacing } from '../theme/spacing'
-import { courseCategories } from "../data/courseCategories";
+import { colors } from '../../theme/colors'
+import { spacing } from '../../theme/spacing'
+import { courseCategories } from "../../data/courseCategories";
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { Dimensions } from 'react-native';
-import { tierCategories } from "../data/tierCategories";
+import { tierCategories } from "../../data/tierCategories";
 import Octicons from '@expo/vector-icons/Octicons';
 
 

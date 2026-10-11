@@ -15,7 +15,13 @@
           "microphonePermission": false
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Tutorly to use your location to show tutors near you and to check you in at campus."
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true

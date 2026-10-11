@@ -4,8 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import StudentNavigator from './src/navigation/StudentNavigator';
-import OnboardingScreen from './src/components/OnboardingScreen';
-import SplashScreen from './src/components/SplashScreen';
+import OnboardingScreen from './src/screens/onboarding/OnboardingScreen';
+import SplashScreen from './src/screens/onboarding/SplashScreen';
 
 export default function App() {
   const [onboardingPage, setOnboardingPage] = useState(null);
