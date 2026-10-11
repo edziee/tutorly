@@ -17,10 +17,10 @@ import * as Calendar from 'expo-calendar';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import ScreenContainer from '../components/ScreenContainer';
-import { mockSchedules } from '../data/mockSchedules';
-import { colors } from '../theme/colors';
-import styles from '../theme/scheduleScreenStyles';
+import ScreenContainer from '../../components/ScreenContainer';
+import { mockSchedules } from '../../data/mockSchedules';
+import { colors } from '../../theme/colors';
+import styles from '../../theme/scheduleScreenStyles';
 
 const initialDate = new Date();
 const storageKey = 'tutorly.schedule.sessions.v3';

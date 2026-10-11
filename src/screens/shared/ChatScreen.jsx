@@ -11,10 +11,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { mockTutors } from '../data/mockTutors';
-import { mockConversations } from '../data/mockConversations';
-import { colors } from '../theme/colors';
-import { spacing } from '../theme/spacing';
+import { mockTutors } from '../../data/mockTutors';
+import { mockConversations } from '../../data/mockConversations';
+import { colors } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
 
 const filters = ['All Messages', 'Active Tutors', 'Faculty / Profs'];
 const accent = colors.secondary;

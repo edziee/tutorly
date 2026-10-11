@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Cloud Storage security rules for Tutorly. Owner: Member 1 (Week 3).
+// Only needed if the team uses Storage, which needs the paid Blaze plan (see
+// "Decision: Firebase Storage" in docs/members/MEMBER_1_FIREBASE_AND_AUTH.md).
+//
+// LOCKED on purpose: it allows nothing until real rules replace it.
+//
+// What the real rules must do:
+//   verification/{uid}/{fileName}   only the owner uploads and reads; admins
+//                                   read. Limit the file size and type.
+//   avatars/{uid}.jpg               the owner uploads; any logged-in user reads.
+//   everything else                 denied.
+//
+// Docs: https://firebase.google.com/docs/storage/security/start
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -5,11 +5,11 @@ import { useState } from 'react';
 
 import AppHeader from '../components/AppHeader';
 import StudentAvatar from '../components/StudentAvatar';
-import { TutorsScreen } from '../screens/TutorsScreen';
-import ChatScreen from '../screens/ChatScreen';
-import ScheduleScreen from '../screens/ScheduleScreen';
-import StudentProfileScreen from '../screens/StudentProfileScreen';
-import TutorProfileScreen from '../screens/TutorProfileScreen';
+import { TutorsScreen } from '../screens/student/TutorsScreen';
+import ChatScreen from '../screens/shared/ChatScreen';
+import ScheduleScreen from '../screens/student/ScheduleScreen';
+import StudentProfileScreen from '../screens/student/StudentProfileScreen';
+import TutorProfileScreen from '../screens/tutor/TutorProfileScreen';
 import { mockStudentProfile } from '../data/mockStudentProfile';
 import { colors } from '../theme/colors';
 
