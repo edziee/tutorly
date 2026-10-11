@@ -12,11 +12,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 
-import AppButton from '../components/AppButton';
-import ScreenContainer from '../components/ScreenContainer';
-import { mockMentorApplication } from '../data/mockMentorApplication';
-import { colors } from '../theme/colors';
-import styles from '../theme/tutorProfileScreenStyles';
+import AppButton from '../../components/AppButton';
+import ScreenContainer from '../../components/ScreenContainer';
+import { mockMentorApplication } from '../../data/mockMentorApplication';
+import { colors } from '../../theme/colors';
+import styles from '../../theme/tutorProfileScreenStyles';
 
 const gradeOptions = ['1.00', '1.25', '1.50'];
 const minimumPhilosophyLength = 80;

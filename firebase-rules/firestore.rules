@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// Firestore security rules for Tutorly. Owner: Member 1 (Week 3).
+//
+// This file is LOCKED on purpose: it allows nothing. If someone publishes it as
+// it is, the app cannot read or write any data, which is safe but useless. That
+// is better than a file that is open by accident.
+//
+// During Weeks 1 and 2 the team builds in the console's "test mode", which
+// allows everything for a limited time. Before submission, replace the lines
+// below with real rules and publish them (Firebase console > Firestore Database
+// > Rules). Test every rule in the Rules Playground in the same page.
+//
+// What the real rules must do (see docs/FIRESTORE_SCHEMA.md for the fields):
+//   users/{uid}           the owner reads and edits their own document, but can
+//                         never change `role`. Nobody can create a user with
+//                         role 'admin' from the app. Admins can read all.
+//   tutors/{uid}          the owner edits their own profile but not
+//                         `verificationStatus`. Logged-in students read tutors
+//                         whose verificationStatus is 'approved'. Only admins
+//                         change verification fields.
+//   bookings/{id}         only the student and the tutor of that booking read
+//                         it; only the student creates it; only the tutor
+//                         accepts or rejects it. Admins can read all.
+//   conversations/{id}    only the two people in `participantIds`, and the same
+//   and messages          for the messages inside.
+//   notifications/{id}    a user reads and marks as read only their own.
+//   everything else       denied.
+//
+// A rule can read another document with get(), for example to find the caller's
+// role in users/{request.auth.uid}. Docs: https://firebase.google.com/docs/firestore/security/get-started
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

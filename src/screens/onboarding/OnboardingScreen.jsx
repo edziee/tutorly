@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import AppButton from './AppButton';
-import { colors } from '../theme/colors';
-import { spacing } from '../theme/spacing';
+import AppButton from '../../components/AppButton';
+import { colors } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
 
 const pages = [
   {

@@ -25,15 +25,15 @@ Some sample values are typed into the screens instead of coming from `src/data/`
 
 | Where | Value | Notes |
 | --- | --- | --- |
-| `src/screens/ChatScreen.jsx` | Tutor name "Marcus" in a switcher | Should come from the logged-in user's tutor list |
-| `src/screens/TutorProfileScreen.jsx` | Rate "₱250.00" and "+ ₱50.00 / hr" overtime | Should come from the tutor's own rate |
-| `src/screens/StudentProfileScreen.jsx` | "Earn ₱200 - ₱300/hr" | Marketing text, may stay |
+| `src/screens/shared/ChatScreen.jsx` | Tutor name "Marcus" in a switcher | Should come from the logged-in user's tutor list |
+| `src/screens/tutor/TutorProfileScreen.jsx` | Rate "₱250.00" and "+ ₱50.00 / hr" overtime | Should come from the tutor's own rate |
+| `src/screens/student/StudentProfileScreen.jsx` | "Earn ₱200 - ₱300/hr" | Marketing text, may stay |
 | `src/components/TutorCard.jsx` | "+₱50/hr overtime option" | Should come from tutor data |
-| `src/screens/StudentProfileScreen.jsx` | Study space preference and automated reminder settings | Check whether these are saved anywhere |
+| `src/screens/student/StudentProfileScreen.jsx` | Study space preference and automated reminder settings | Check whether these are saved anywhere |
 
 ## Local storage that is not mock data
 
-`ScheduleScreen` saves the session list on the device with AsyncStorage. After bookings move to Firestore, this should become only a cache or be removed so the device and the database do not disagree.
+`src/screens/student/ScheduleScreen.jsx` saves the session list on the device with AsyncStorage. After bookings move to Firestore, this should become only a cache or be removed so the device and the database do not disagree.
 
 ## Final sweep checklist (Week 3)
 
