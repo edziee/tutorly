@@ -32,4 +32,5 @@ export const ROUTES = {
   ADMIN_USERS: 'AdminUsers',
   ADMIN_VERIFICATIONS: 'AdminVerifications',
   ADMIN_BOOKINGS: 'AdminBookings',
+  ADMIN_REVIEW_HISTORY: 'AdminReviewHistory',
 };

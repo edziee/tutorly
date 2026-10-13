@@ -96,7 +96,7 @@ export default function LoginScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
         >
           <AuthHeader
-            subtitle="Sign in to access verified faculty, alumni, and top peer tutoring or manage your scheduled sessions."
+            subtitle="Find trusted tutors, manage sessions, or teach on campus."
             onLogoLongPress={() => navigation.navigate(ROUTES.ADMIN_LOGIN)}
           />
 
@@ -186,7 +186,10 @@ export default function LoginScreen({ navigation, route }) {
             />
           </Card>
 
-          <Text style={styles.footer}>Terms of Service  •  Privacy Policy  •  FERPA Disclosures</Text>
+          <Pressable onPress={() => navigation.navigate(ROUTES.ADMIN_LOGIN)} hitSlop={10}>
+            <Text style={styles.adminLink}>Admin access</Text>
+          </Pressable>
+          <Text style={styles.footer}>Terms of Service  •  Privacy Policy</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -245,5 +248,12 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     fontSize: 11,
     textAlign: 'center',
+  },
+  adminLink: {
+    marginTop: spacing.lg,
+    color: colors.mutedText,
+    fontSize: 10,
+    textAlign: 'center',
+    opacity: 0.55,
   },
 });

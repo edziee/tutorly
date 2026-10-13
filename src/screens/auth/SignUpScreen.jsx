@@ -137,7 +137,7 @@ export default function SignUpScreen({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <AuthHeader subtitle="Create your account to book verified tutors, or apply to teach on campus." />
+          <AuthHeader subtitle="Create an account to learn or teach on campus." />
 
           <SegmentedControl
             options={modeOptions}
@@ -147,7 +147,7 @@ export default function SignUpScreen({ navigation, route }) {
             }}
           />
 
-          <Text style={styles.sectionLabel}>SELECT ACADEMIC PORTAL ROLE</Text>
+          <Text style={styles.sectionLabel}>CHOOSE YOUR ROLE</Text>
           <View style={styles.roleRow}>
             <RoleCard
               title="Student"

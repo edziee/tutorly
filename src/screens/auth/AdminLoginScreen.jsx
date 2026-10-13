@@ -8,8 +8,69 @@
 // Member 3 and Member 1 agree on how the team reaches it, for example a
 // long press on the logo. Hiding the screen is not security: the real
 // protection is the role check in signInAdmin and the Firestore rules.
-import PlaceholderScreen from '../shared/PlaceholderScreen';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function AdminLoginScreen() {
-  return <PlaceholderScreen title="Admin login" />;
+import AppButton from '../../components/AppButton';
+import AppInput from '../../components/AppInput';
+import AuthHeader from '../../components/AuthHeader';
+import Card from '../../components/Card';
+import { signInAdmin } from '../../services/authService';
+import { colors } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
+import { getAuthErrorMessage } from '../../utils/errors';
+import { validateEmail, validatePasswordPresent } from '../../utils/validation';
+
+export default function AdminLoginScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    const emailError = validateEmail(email);
+    const passwordError = validatePasswordPresent(password);
+    if (emailError || passwordError) {
+      setError(emailError || passwordError);
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await signInAdmin(email.trim(), password);
+    } catch (failure) {
+      setError(getAuthErrorMessage(failure));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <AuthHeader subtitle="Restricted access for Tutorly reviewers." />
+          <Card style={styles.card}>
+            <Text style={styles.title}>Admin sign in</Text>
+            <Text style={styles.helper}>Review tutor applications and history.</Text>
+            <AppInput label="Admin email" value={email} handleChangeText={setEmail} placeholder="admin@tutorly.edu" keyboardType="email-address" autoCapitalize="none" error={error && !email ? error : ''} />
+            <AppInput label="Password" value={password} handleChangeText={setPassword} placeholder="Your password" secureTextEntry autoCapitalize="none" error={error && email ? error : ''} />
+            <AppButton title="Sign in" onPress={submit} loading={submitting} />
+            <Text onPress={() => navigation.goBack()} style={styles.back}>Back to sign in</Text>
+          </Card>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  content: { padding: spacing.lg },
+  card: { padding: spacing.lg },
+  title: { color: colors.heading, fontSize: 18, fontWeight: '700' },
+  helper: { marginTop: spacing.xs, marginBottom: spacing.lg, color: colors.mutedText, fontSize: 12 },
+  back: { marginTop: spacing.lg, color: colors.primary, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+});
