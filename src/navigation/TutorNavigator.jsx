@@ -10,6 +10,7 @@ import { ROUTES } from '../constants/routes';
 import TutorWorkspaceProfileScreen from '../screens/tutor/TutorWorkspaceProfileScreen';
 import TutorScheduleScreen from '../screens/tutor/TutorScheduleScreen';
 import TutorChatScreen from '../screens/tutor/TutorChatScreen';
+import AppHeader from '../components/AppHeader';
 import { colors } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -32,7 +33,12 @@ function TutorTabs() {
       )}
       screenOptions={({ route }) => ({
         headerShown: true,
-        title: tabs[route.name].title,
+        header: () => (
+          <AppHeader
+            title={tabs[route.name].title}
+            initials="MC"
+          />
+        ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
         tabBarStyle: styles.tabBar,

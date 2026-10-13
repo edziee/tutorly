@@ -62,7 +62,7 @@ The four members split the work by area. Member 3 builds the screens and customi
 
 | Member | Area | Main responsibilities |
 | --- | --- | --- |
-| Member 1  (Marcus)| Firebase setup, logins for all roles, security | Firebase project, Authentication logic for students, tutors, professional tutors (professors and alumni) and the hidden admin login, role-based access, profile data, verification document upload (Storage), eligibility check, connecting the professional tutor dashboard to Firestore, security rules, mock data in login, profiles and that dashboard |
+| Member 1  (Marcus)| Firebase setup, logins for all roles, security | Firebase project on the free Spark plan, Authentication logic for students, tutors, professional tutors (professors and alumni) and the hidden admin login, role-based access, profile data, verification proof metadata and approved external URLs, eligibility check, connecting the professional tutor dashboard to Firestore, Firestore security rules, mock data in login, profiles and that dashboard |
 | Member 2  (Adrian)| Student features, booking, payment and geolocation | Tutors list search and filter logic, booking flow, schedule, payment, Firestore booking data, geolocation in Week 3 (location permission, tutors on the map, nearby tutors, campus proximity check-in), mock data in these features |
 | Member 3  (Edrian)| Front end and UI customization | Fully customizing the UI to match Figma (theme, colors, fonts, reusable components), building the screens for all four user types, the Figma designs for the four new screens, loading, empty and error states, final UI polish and the Figma comparison |
 | Member 4  (Michael)| In-app notifications, chat and admin | Chat and notification data and logic, real-time chat, notification triggers and preferences, admin dashboard data (users, verification approvals), mock data in chat, notifications and admin, plus final documentation and demo |
@@ -71,8 +71,8 @@ The four members split the work by area. Member 3 builds the screens and customi
 
 ### Member 1: Firebase setup, logins for all roles and security
 
-- **Week 1:** create the Firebase project, turn on Authentication, Firestore and Storage, and share the config with everyone. Agree with the team on the collections (users, tutors, bookings, messages, notifications) and on a role field for each user: student, tutor, professional or admin. Build the sign-up and login logic for students and tutors. Make the list of every place in the repo that uses mock data.
-- **Week 2:** build the professional tutor login logic (professors and alumni) and the hidden admin login, and make each role open its own dashboard. Save profiles to Firestore, let tutors upload verification documents, and build the eligibility check. Connect the professional tutor dashboard (built by Member 3) to Firestore. Replace the mock data in the login, profile and professional dashboard screens.
+- **Week 1:** create the Firebase project on the free Spark plan, turn on Authentication and Firestore, and share the config with everyone. Do not enable Storage or add Cloud Functions. Agree with the team on the collections (users, tutors, bookings, messages, notifications) and on a role field for each user: student, tutor, professional or admin. Build the sign-up and login logic for students and tutors. Make the list of every place in the repo that uses mock data.
+- **Week 2:** build the professional tutor login logic (professors and alumni) and the hidden admin login, and make each role open its own dashboard. Save profiles to Firestore, let tutors submit structured verification details and an approved external proof URL, and build the eligibility check. Connect the professional tutor dashboard (built by Member 3) to Firestore. Replace the mock data in the login, profile and professional dashboard screens.
 - **Week 3:** write the security rules so each role can only reach its own data, and coordinate the final mock-data sweep.
 - **Done when:** all four roles can log in and land on the right dashboard, profiles and the professional dashboard use Firestore data, and no mock data is left in those screens.
 
@@ -130,7 +130,7 @@ Week 2 connects each area to real Firebase data and builds the two new logins an
 | Task | Owner | Status |
 | --- | --- | --- |
 | Student and tutor profiles save to and load from Firestore | Member 1 | Not started |
-| Tutor verification uploads and eligibility check | Member 1 | Not started (the eligibility screen exists but stores nothing) |
+| Tutor verification proof metadata/URL and eligibility check | Member 1 | Not started (the eligibility screen exists but stores nothing) |
 | Build the professional tutor login logic (professors and alumni) with its verification documents | Member 1 | Not started |
 | Build the hidden admin login (no public sign-up; admin accounts created by the team in Firebase) | Member 1 | Not started |
 | Role-based access: each role (student, tutor, professional tutor, admin) opens its own dashboard | Member 1 | Not started |
@@ -159,7 +159,7 @@ Week 3 adds payment and geolocation, locks down Firebase for each role, finishes
 | Compare the finished app to the Figma design and fix mismatches | Member 3 (with everyone) | Not started |
 | Notification preferences and read/unread states | Member 4 | Not started |
 | Notify tutors in the app when an admin approves or rejects their verification | Member 4 | Not started |
-| Security rules for Firestore and Storage so each role only reaches its own data (admin data only for admins) | Member 1 | Not started |
+| Firestore security rules so each role only reaches its own data (admin data only for admins) | Member 1 | Not started |
 | Final mock-data sweep: search the whole repo for mock or sample data files and fake values, delete them, and confirm every screen loads real Firestore data | Everyone (Member 1 coordinates) | Not started |
 | Full app testing with accounts for all four roles (student, tutor, professional tutor, admin) and bug fixes | Everyone | Not started |
 | Documentation, demo script and submission | Member 4 (coordinates) | Not started |

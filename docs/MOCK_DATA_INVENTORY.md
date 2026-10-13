@@ -12,7 +12,7 @@ The collection names below come from the plan (users with a role field, tutors, 
 | `mockSchedules.jsx` | Sample sessions with date, time, status, location, total, payment status | `ScheduleScreen` | `bookings` | Member 2 |
 | `mockConversations.jsx` | Chat conversations linked to tutors | `ChatScreen` | `messages` | Member 4 |
 | `mockStudentProfile.jsx` | Student name, contact, campus, streak, level, study hours, leaderboard, honors | `StudentProfileScreen`, `StudentNavigator` (header initials) | `users` | Member 1 |
-| `mockMentorApplication.jsx` | Tutor application: credentials, preferred days, courses with grades and proof file names, philosophy | `TutorProfileScreen` | `users` (tutor profile) and Storage for proof files | Member 1 |
+| `mockMentorApplication.jsx` | Tutor application: credentials, preferred days, courses with grades and proof file names, philosophy | `TutorProfileScreen` | `users`/`tutors` profile data with proof metadata and an optional approved external URL | Member 1 |
 | `mockNotifications.jsx` | Two sample notifications | Nothing yet | `notifications` | Member 4 |
 | `courseCategories.jsx` | Subject filter chips | `TutorsScreen` | Can stay as app configuration, or be built from the subjects in `tutors` | Member 2 |
 | `tierCategories.jsx` | Tier filter chips (All, Professors, Alumni, ...) | `TutorsScreen` | Same as above | Member 2 |

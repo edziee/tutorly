@@ -4,10 +4,8 @@
 // Plan tasks: "Build the UI for login and sign-up" (Member 3, Week 1) and
 // "Sign-up and login logic for students and tutors" (Member 1, Week 1).
 //
-// What this screen does: it validates the form and calls
-// authService.signIn(email, password). It does not navigate after a successful
-// login. AuthContext notices the new user and AppNavigator switches to the
-// screens for that user's role (see "Switching on login" in docs/ARCHITECTURE.md).
+// While screens are being reviewed, Sign In creates a local demo user for the
+// selected portal role. No account or credentials are required.
 //
 // The Student / Tutor cards only choose the wording on the screen. Tutors and
 // professional tutors both choose "Tutor", and the account's own role decides
@@ -40,11 +38,9 @@ import RoleCard from '../../components/RoleCard';
 import SegmentedControl from '../../components/SegmentedControl';
 import { ROLES } from '../../constants/roles';
 import { ROUTES } from '../../constants/routes';
-import { signIn } from '../../services/authService';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
-import { getAuthErrorMessage } from '../../utils/errors';
-import { validateEmail, validatePasswordPresent } from '../../utils/validation';
+import { useAuth } from '../../context/AuthContext';
 
 const modeOptions = [
   { value: 'signIn', label: 'Sign In' },
@@ -62,26 +58,15 @@ export default function LoginScreen({ navigation, route }) {
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { signInDemo } = useAuth();
 
   const isStudent = portal === ROLES.STUDENT;
 
-  const handleSubmit = async () => {
-    const nextErrors = {
-      email: validateEmail(email),
-      password: validatePasswordPresent(password),
-    };
-    setErrors(nextErrors);
+  const handleSubmit = () => {
+    setErrors({});
     setFormError('');
-    if (nextErrors.email || nextErrors.password) return;
-
     setSubmitting(true);
-    try {
-      await signIn(email.trim(), password);
-    } catch (error) {
-      setFormError(getAuthErrorMessage(error));
-    } finally {
-      setSubmitting(false);
-    }
+    signInDemo(portal);
   };
 
   return (

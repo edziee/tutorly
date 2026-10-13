@@ -32,7 +32,7 @@ The function names and inputs are the ones already in `src/services` and are not
 
 ## Not built yet
 
-- **Proof files:** the verification screen shows the submitted courses but cannot open `courses[].proofPath`. It needs the file storage decision in [FIRESTORE_SCHEMA.md](FIRESTORE_SCHEMA.md).
+- **Verification proof:** the verification screen shows the submitted courses and may open `courses[].proofUrl` when present. `courses[].proofName` is descriptive only; there is no Firebase file upload on the Spark plan. See [FIRESTORE_SCHEMA.md](FIRESTORE_SCHEMA.md).
 - **Opening a notification:** tapping one only marks it read. Going to the booking or chat it is about needs those screens. `data` (`{ bookingId }` or `{ conversationId }`) is where the target will come from.
 - **Google login and "Forgot password?":** left out because there is no service function for them. Ask Member 1 to add `signInWithGoogle` and `sendPasswordReset` and tell Member 3.
 - **Leaderboard on the dashboard:** there is no service function for it.

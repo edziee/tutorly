@@ -1,4 +1,5 @@
-// Hidden admin login. Normal users must never see a link to this screen.
+// Admin login screen. During screen review, it creates a local demo admin
+// without requiring an account.
 // Layout: Member 3 (designs it in Figma in Week 1).   Logic: Member 1
 // (authService.signInAdmin).
 // Plan task: "Build the hidden admin login (no public sign-up; admin accounts
@@ -16,34 +17,21 @@ import AppButton from '../../components/AppButton';
 import AppInput from '../../components/AppInput';
 import AuthHeader from '../../components/AuthHeader';
 import Card from '../../components/Card';
-import { signInAdmin } from '../../services/authService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { getAuthErrorMessage } from '../../utils/errors';
-import { validateEmail, validatePasswordPresent } from '../../utils/validation';
+import { useAuth } from '../../context/AuthContext';
 
 export default function AdminLoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { signInDemo } = useAuth();
 
-  async function submit() {
-    const emailError = validateEmail(email);
-    const passwordError = validatePasswordPresent(password);
-    if (emailError || passwordError) {
-      setError(emailError || passwordError);
-      return;
-    }
+  function submit() {
     setSubmitting(true);
     setError('');
-    try {
-      await signInAdmin(email.trim(), password);
-    } catch (failure) {
-      setError(getAuthErrorMessage(failure));
-    } finally {
-      setSubmitting(false);
-    }
+    signInDemo('admin');
   }
 
   return (

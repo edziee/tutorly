@@ -6,6 +6,7 @@ import { ROUTES } from '../constants/routes';
 import NotificationBell from '../components/NotificationBell';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import ProfessionalDashboardScreen from '../screens/professional/ProfessionalDashboardScreen';
+import AppHeader from '../components/AppHeader';
 
 const Stack = createNativeStackNavigator();
 
@@ -17,6 +18,7 @@ export default function ProfessionalNavigator() {
         component={ProfessionalDashboardScreen}
         options={({ navigation }) => ({
           title: 'Dashboard',
+          header: () => <AppHeader title="Dashboard" initials="PT" />,
           headerRight: () => (
             <NotificationBell onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)} />
           ),

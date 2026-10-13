@@ -25,7 +25,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `role` | `'student'` \| `'tutor'` \| `'professional'` \| `'admin'` | Set once at sign-up. Users must not be able to change it, and nobody can sign up as `admin` (admins are created in the Firebase console) |
 | `name` | string | |
 | `phone`, `age`, `location` (city), `year`, `campus`, `campusAddress` | string | From the student profile screen |
-| `photoUrl` | string | Profile picture. Needs file storage, see the decision below |
+| `photoUrl` | string | Optional instructor-approved external image URL. If empty, show initials; do not use Firebase Storage |
 | `notificationPreferences` | map of booleans | Week 3, Member 4 (for example `bookings`, `messages`, `reminders`) |
 | `createdAt` | timestamp | |
 
@@ -45,9 +45,9 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `credentials`, `bio`, `teachingPhilosophy` | string | |
 | `availability` | array of string | For example `'Monday, 4:00 PM'`, as the mock data has it |
 | `preferredDays`, `preferredTimeSlots` | array of string | From the tutor application |
-| `courses` | array of `{ code, title, grade, proofPath }` | The courses from the application. `proofPath` points to the uploaded proof file |
+| `courses` | array of `{ code, title, grade, proofUrl, proofName }` | The courses from the application. `proofUrl` is an optional reviewable external URL; `proofName` is the tutor-entered document title |
 | `online` | boolean | |
-| `photoUrl` | string | |
+| `photoUrl` | string | Optional instructor-approved external image URL; otherwise use initials |
 | `verificationStatus` | `'not_submitted'` \| `'pending'` \| `'approved'` \| `'rejected'` | `VERIFICATION_STATUS`. Students only see `approved` tutors |
 | `verificationNote` | string | Reason, when an admin rejects |
 | `verificationReviewedBy`, `verificationReviewedAt` | string, timestamp | The admin and the time |
@@ -99,14 +99,17 @@ The filter tabs on the Messages screen (`All Messages`, `Active Tutors`, `Facult
 | `read` | boolean | |
 | `createdAt` | timestamp | |
 
-## Files in Storage
+## Files and images on the Spark plan
 
-| Path | What | Who can read |
+Firebase Storage is intentionally not used because it requires the paid Blaze plan. The app stores only metadata and optional external URLs:
+
+| Field | What it contains | Rule |
 | --- | --- | --- |
-| `verification/{uid}/{fileName}` | Proof files from the tutor application | The owner and admins |
-| `avatars/{uid}.jpg` | Profile pictures | Any logged-in user |
+| `courses[].proofUrl` | A reviewable URL supplied by the tutor | The tutor must confirm that the assigned admin can open it |
+| `courses[].proofName` | The document title or file name | Informational only; it is not an uploaded file |
+| `users/{uid}.photoUrl` or `tutors/{uid}.photoUrl` | An instructor-approved external image URL | If absent or invalid, show initials |
 
-Storage needs a paid Firebase plan, so the team must decide first. See "Decision: Firebase Storage" in [`members/MEMBER_1_FIREBASE_AND_AUTH.md`](members/MEMBER_1_FIREBASE_AND_AUTH.md).
+Never store a device-local `file://` URI, base64 file contents, or a Firebase Storage path. If no approved external host is available, keep structured proof details and leave `proofUrl` empty.
 
 ## Things to know about queries
 
@@ -117,5 +120,5 @@ Storage needs a paid Firebase plan, so the team must decide first. See "Decision
 
 1. **Leaderboard:** the profile screen shows other students' names and points. Showing them needs rules that let one student read others' stats. Either keep a small public stats document per student, or drop the leaderboard from the real data.
 2. **Real timestamps:** bookings keep `dateKey` and time text because the schedule screen is built on them. Reminders and sorting are easier with a real `startAt` timestamp. Member 2 decides whether to add it.
-3. **Who creates notifications:** this draft assumes the app creates them when something happens (a booking, a message). Doing it on the server with Cloud Functions needs a paid Firebase plan.
+3. **Who creates notifications:** the app creates the notification document after a booking, message or verification write succeeds. Cloud Functions and scheduled functions are intentionally not used on the Spark plan. These alerts are best effort and are not a trusted audit log.
 4. **Tier names:** some mock data says `Faculty` or `Faculty Tier`. The real data uses `Professor` only.

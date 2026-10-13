@@ -34,7 +34,7 @@ When you start or finish a task, change its status in the week tables in `docs/P
 ## Secrets and Firebase
 
 - Never commit passwords, service account keys, admin credentials or any `.env.local` file. The `.gitignore` already skips `.env*.local`.
-- Copy `.env.example` to `.env.local` and fill in the values the team shares. Variables that start with `EXPO_PUBLIC_` are included in the built app and can be read by anyone, so they are configuration, not secrets. Protection comes from the Firestore and Storage security rules.
+- Copy `.env.example` to `.env.local` and fill in the values the team shares. Variables that start with `EXPO_PUBLIC_` are included in the built app and can be read by anyone, so they are configuration, not secrets. Protection comes from Firestore security rules and validation of any external proof or image URLs.
 - Admin accounts are created by the team directly in Firebase. There is no public admin sign-up.
 
 ## Code style
