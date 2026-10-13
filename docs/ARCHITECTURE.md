@@ -38,29 +38,37 @@ src/
   context/
     AuthContext.jsx            useAuth(): who is logged in and their role
   services/                    All data access. One file per area (see the table below)
+  hooks/
+    useAsync.js                Load data once from a service: { status, data, error, retry }
+    useSubscription.js         Listen to live data from a subscribeTo... service, stops on close
   utils/
     distance.js                Distance in km or meters, "within radius", sort by distance (tested)
+    format.js                  timeAgo, formatPeso, formatDateKey (tested)
+    validation.js              Email, password and required-field checks for forms (tested)
+    errors.js                  Turns a thrown error into a message for the person (tested)
+    bookings.js                getNextBooking and time helpers (tested)
+    user.js                    getUserId and getFirstName for the logged-in profile (tested)
   navigation/
     AppNavigator.jsx           Picks the navigator for the logged-in role
     AuthNavigator.jsx          Login, sign up, hidden admin login
-    StudentNavigator.jsx       Student tabs (already built)
+    StudentNavigator.jsx       Student tabs inside a stack, so Notifications and the dashboard open on top
     TutorNavigator.jsx         Tutor screens
     ProfessionalNavigator.jsx  Professional tutor screens
     AdminNavigator.jsx         Admin tabs
   screens/
     onboarding/                SplashScreen, OnboardingScreen
-    auth/                      LoginScreen, SignUpScreen, AdminLoginScreen
-    student/                   Tutors, Schedule, StudentProfile (built) + dashboard, booking, payment, map, check-in
+    auth/                      LoginScreen, SignUpScreen (built), AdminLoginScreen
+    student/                   Tutors, Schedule, StudentProfile, StudentDashboard (built) + booking, payment, map, check-in
     tutor/                     TutorProfileScreen (built)
     professional/              ProfessionalDashboardScreen
-    admin/                     Dashboard, Users, Verifications, Bookings
-    shared/                    ChatScreen (built), NotificationsScreen, PlaceholderScreen
-  components/                  Reusable UI used by many screens
+    admin/                     Dashboard, Users, Verifications, Bookings (all built)
+    shared/                    ChatScreen, NotificationsScreen (built), PlaceholderScreen
+  components/                  Reusable UI used by many screens: AppButton, AppInput, Card, StatCard, StatusBadge, FilterChips, SegmentedControl, Checkbox, RoleCard, AuthHeader, NotificationBell, and the Loading, Empty and Error states
   theme/                       Colors, spacing, typography, responsive helpers, screen styles
   data/                        Mock data. Temporary: every file here is deleted by the end of Week 3
 ```
 
-Screens marked "built" already work on mock data. The others are placeholders that show a title and "Coming soon", each with a comment at the top saying who builds the layout, who connects the data, and which plan task it belongs to.
+Screens marked "built" are finished. The older ones (tutors, schedule, chat, profiles) still use mock data; the ones built in the `member3/ui-screens` branch read only from services (see [SCREEN_DATA_CONTRACTS.md](SCREEN_DATA_CONTRACTS.md)). The rest are placeholders that show a title and "Coming soon", each with a comment at the top saying who builds the layout, who connects the data, and which plan task it belongs to.
 
 ## Services
 
@@ -115,7 +123,7 @@ Member 1 does the switch when login works:
 
 **A new Firestore field or collection:** ask Member 1 first, then update [`FIRESTORE_SCHEMA.md`](FIRESTORE_SCHEMA.md) in the same pull request. Security rules depend on it.
 
-**Loading, empty and error states:** every screen that loads data uses `LoadingState`, `EmptyState` and `ErrorState` from `src/components`.
+**Loading, empty and error states:** every screen that loads data uses `LoadingState`, `EmptyState` and `ErrorState` from `src/components`. The hooks in `src/hooks` give a screen the state it needs: `useAsync(() => getUsers(), [])` for one-time loads and `useSubscription((onData) => subscribeToNotifications(id, onData), [id])` for live data. Both turn a thrown error (including a placeholder service that is "not implemented yet") into `status: 'error'`, so the screen shows the error state with a "Try again" button instead of crashing.
 
 ## Placeholders still in the repo
 

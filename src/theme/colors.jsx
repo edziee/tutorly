@@ -26,6 +26,12 @@ export const colors = {
   error: '#D9534F',
   warning: '#E5A928',
 
+  // Text colors that stay readable on the soft status backgrounds below
+  successText: '#006F66',
+  warningText: '#6E3900',
+  errorText: '#BA1A1A',
+  errorBackground: '#FFDAD6',
+
   // Figma-style soft category colors
   lavender: '#DED9FF',      // Alumni tag
   mint: '#C8F0E9',          // Peer Tutor tag

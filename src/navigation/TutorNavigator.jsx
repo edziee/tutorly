@@ -4,6 +4,8 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { ROUTES } from '../constants/routes';
+import NotificationBell from '../components/NotificationBell';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import TutorProfileScreen from '../screens/tutor/TutorProfileScreen';
 
 const Stack = createNativeStackNavigator();
@@ -14,7 +16,17 @@ export default function TutorNavigator() {
       <Stack.Screen
         name={ROUTES.TUTOR_PROFILE}
         component={TutorProfileScreen}
-        options={{ title: 'Tutor Profile' }}
+        options={({ navigation }) => ({
+          title: 'Tutor Profile',
+          headerRight: () => (
+            <NotificationBell onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)} />
+          ),
+        })}
+      />
+      <Stack.Screen
+        name={ROUTES.NOTIFICATIONS}
+        component={NotificationsScreen}
+        options={{ title: 'Notifications' }}
       />
     </Stack.Navigator>
   );

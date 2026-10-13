@@ -35,6 +35,14 @@ Some sample values are typed into the screens instead of coming from `src/data/`
 
 `src/screens/student/ScheduleScreen.jsx` saves the session list on the device with AsyncStorage. After bookings move to Firestore, this should become only a cache or be removed so the device and the database do not disagree.
 
+## Screens built without mock data
+
+These screens read their data only through the functions in `src/services`, so they add nothing to the sweep below. While the services are placeholders they show the error state with the "not implemented yet" message.
+
+- [x] Login, sign-up, student dashboard, notifications screen and the 4 admin screens (branch `member3/ui-screens`) contain no mock data
+
+`mockNotifications.jsx` is still not used by anything. Delete it in the Week 3 sweep.
+
 ## Final sweep checklist (Week 3)
 
 - [ ] Search the repo for `mock`, `sample`, `dummy` and `fake` and delete every file or value that is left
