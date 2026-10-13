@@ -68,7 +68,7 @@ npm start
 Then press `a` for Android, `i` for iOS, or `w` for the web, or scan the QR code with Expo Go. The same can be started directly with `npm run android`, `npm run ios` or `npm run web`.
 create a new branch when creating something new
 
-Run `npm test` to run the tests for the distance helpers in `src/utils` (needs Node 22 or newer).
+Run `npm test` to run the tests for the helpers in `src/utils` (needs Node 22 or newer).
 
 Known limits when running:
 
@@ -97,7 +97,8 @@ src/
   constants/            Roles, collection names, statuses, screen names, campus location
   context/              AuthContext: who is logged in and their role
   services/             All data access, one file per area (screens never call Firebase directly)
-  utils/                Helpers, such as distance for geolocation
+  hooks/                useAsync and useSubscription: loading, error and retry for screens
+  utils/                Helpers: distance, formatting, form validation, error messages
   navigation/           One navigator per role, and AppNavigator that picks the right one
   screens/              Grouped by who uses them: onboarding, auth, student, tutor, professional, admin, shared
   components/           Reusable UI (buttons, inputs, cards, header, loading/empty/error states)
@@ -109,6 +110,7 @@ docs/
   PROJECT_PLAN.md       3-week plan with member areas and task tables
   FIRESTORE_SCHEMA.md   Draft data structure for Firebase
   MOCK_DATA_INVENTORY.md  Where mock data is used and what replaces it
+  SCREEN_DATA_CONTRACTS.md  What each new screen expects from its service functions
   members/              One task brief per member
 .github/                Pull request checklist
 ```

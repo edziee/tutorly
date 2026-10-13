@@ -116,8 +116,8 @@ Week 1 sets up Firebase and the shared data structure first, because everything 
 | Design Firestore structure (users with a role field, tutors, bookings, messages, notifications) | Member 1 (with all) | Not started |
 | List every file and screen in the repo that uses mock data, and which Firestore collection will replace it | Everyone (Member 1 compiles) | Draft ready in [MOCK_DATA_INVENTORY.md](MOCK_DATA_INVENTORY.md), team to review |
 | Sign-up and login logic for students and tutors | Member 1 | Not started |
-| Set up the shared UI theme and reusable components to match Figma | Member 3 | In progress (theme and components exist in the repo) |
-| Build the UI for login and sign-up, the student dashboard and the tutors list | Member 3 | In progress (tutors list exists; login, sign-up and dashboard not built) |
+| Set up the shared UI theme and reusable components to match Figma | Member 3 | In progress (theme, form, card, badge, filter and state components are in; `ScreenHeader` and `SessionCard` are still empty) |
+| Build the UI for login and sign-up, the student dashboard and the tutors list | Member 3 | Done on branch `member3/ui-screens` (login, sign-up and dashboard built and waiting for review; tutors list already existed). Google login and "Forgot password" are left out until Member 1 has service functions for them. The dashboard is registered but no button opens it yet |
 | Design in Figma: professional tutor login and hidden admin login | Member 3 | Not started |
 | Design in Figma: professional tutor dashboard and admin dashboard | Member 3 | Not started |
 | Tutors list logic with search and filters (temporary data is fine for now) | Member 2 | In progress (search and filters exist on mock data) |
@@ -138,9 +138,9 @@ Week 2 connects each area to real Firebase data and builds the two new logins an
 | Booking flow and schedule saved to Firestore | Member 2 | Not started (schedule screen exists on mock data and device storage) |
 | Connect the student dashboard and tutors list to Firestore and replace mock data in them, in booking and in the schedule | Member 2 | Not started |
 | Build the booking, schedule, payment and chat screens | Member 3 | In progress (schedule and chat screens exist; booking and payment not built) |
-| Build the professional tutor login and dashboard, the hidden admin login and the admin dashboard | Member 3 | Not started |
-| Build the tutors map view and session check-in screens, and the notification bell and toast | Member 3 | Not started (the bell in the header is a placeholder) |
-| Add loading, empty and error states to every screen | Member 3 | Not started |
+| Build the professional tutor login and dashboard, the hidden admin login and the admin dashboard | Member 3 | In progress (admin dashboard, users, verifications and bookings screens built on branch `member3/ui-screens`; professional login and dashboard and the admin login are not built) |
+| Build the tutors map view and session check-in screens, and the notification bell and toast | Member 3 | In progress (notifications screen and the bell in every role's header are built; map view, check-in and the toast are not) |
+| Add loading, empty and error states to every screen | Member 3 | In progress (done for the screens built in this branch: login, sign-up, dashboard, notifications and the 4 admin screens; the older screens still need them) |
 | Real-time chat using Firestore | Member 4 | Not started |
 | In-app notifications triggered by booking events (requested, accepted, reminder) and new messages | Member 4 | Not started |
 | Connect the admin dashboard to Firestore (users list, approve or reject tutor and professional verification, bookings overview) | Member 4 | Not started |

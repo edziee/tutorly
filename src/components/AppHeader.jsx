@@ -25,6 +25,7 @@ export function AppHeaderActions({
   initials,
   imageUri,
   onProfilePress,
+  onNotificationsPress,
 }) {
   return (
     <View style={styles.actions}>
@@ -32,7 +33,10 @@ export function AppHeaderActions({
         accessibilityRole="button"
         accessibilityLabel="Notifications"
         hitSlop={8}
-        onPress={() => Alert.alert('Notifications', 'No new notifications.')}
+        onPress={
+          onNotificationsPress ??
+          (() => Alert.alert('Notifications', 'No new notifications.'))
+        }
       >
         <Ionicons
           name="notifications-outline"
@@ -59,6 +63,7 @@ export default function AppHeader({
   initials,
   imageUri,
   onProfilePress,
+  onNotificationsPress,
 }) {
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -68,6 +73,7 @@ export default function AppHeader({
           initials={initials}
           imageUri={imageUri}
           onProfilePress={onProfilePress}
+          onNotificationsPress={onNotificationsPress}
         />
       </View>
     </SafeAreaView>
