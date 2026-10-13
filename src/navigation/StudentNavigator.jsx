@@ -129,12 +129,18 @@ export default function StudentNavigator() {
       <Stack.Screen
         name={ROUTES.NOTIFICATIONS}
         component={NotificationsScreen}
-        options={{ title: 'Notifications' }}
+        options={{
+          title: 'Notifications',
+          header: () => <AppHeader title="Notifications" initials={studentInitials} />,
+        }}
       />
       <Stack.Screen
         name={ROUTES.STUDENT_DASHBOARD}
         component={StudentDashboardScreen}
-        options={{ title: 'Dashboard' }}
+        options={{
+          title: 'Dashboard',
+          header: () => <AppHeader title="Dashboard" initials={studentInitials} />,
+        }}
       />
     </Stack.Navigator>
   );

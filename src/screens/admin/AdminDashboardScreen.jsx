@@ -21,9 +21,11 @@ import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
 import StatCard from '../../components/StatCard';
 import Card from '../../components/Card';
+import AppButton from '../../components/AppButton';
 import { BOOKING_STATUS } from '../../constants/statuses';
 import { ROLES } from '../../constants/roles';
 import { ROUTES } from '../../constants/routes';
+import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
 import { useSubscription } from '../../hooks/useSubscription';
 import {
@@ -40,9 +42,20 @@ const countByStatus = (bookings, status) =>
   bookings.filter((booking) => booking.status === status).length;
 
 export default function AdminDashboardScreen({ navigation }) {
-  const users = useAsync(() => getUsers(), []);
-  const bookings = useAsync(() => getBookingsOverview(), []);
-  const pending = useSubscription((onData) => subscribeToPendingVerifications(onData), []);
+  const { user, signOutDemo } = useAuth();
+  const isDemoAdmin = user?.id === 'demo-admin';
+  const users = useAsync(() => (isDemoAdmin ? Promise.resolve([]) : getUsers()), [isDemoAdmin]);
+  const bookings = useAsync(
+    () => (isDemoAdmin ? Promise.resolve([]) : getBookingsOverview()),
+    [isDemoAdmin],
+  );
+  const pending = useSubscription(
+    (onData) =>
+      isDemoAdmin
+        ? (onData([]), undefined)
+        : subscribeToPendingVerifications(onData),
+    [isDemoAdmin],
+  );
 
   const parts = [users, bookings, pending];
   const failed = parts.find((part) => part.status === 'error');
@@ -121,6 +134,11 @@ export default function AdminDashboardScreen({ navigation }) {
           title="View bookings"
           detail="Every booking and its status"
           onPress={() => goTo(ROUTES.ADMIN_BOOKINGS)}
+        />
+        <AppButton
+          title="Log out"
+          variant="danger"
+          onPress={signOutDemo}
         />
       </ScrollView>
     </ScreenContainer>

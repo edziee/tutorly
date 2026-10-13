@@ -6,8 +6,6 @@ import { radius, spacing } from '../theme/spacing';
 
 // The top of the login and sign-up screens: logo, the "limited to" pill, the
 // title and a line of text (see the Figma "SignUp/Login Portal" frames).
-// `onLogoLongPress` is how the team reaches the hidden admin login. Nothing on
-// the screen hints that it exists.
 export default function AuthHeader({ subtitle, onLogoLongPress }) {
   return (
     <View style={styles.container}>

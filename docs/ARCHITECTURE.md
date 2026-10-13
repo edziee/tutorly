@@ -22,13 +22,13 @@ App.js                         App entry: splash, onboarding, then the student n
 index.jsx                      Registers the root component
 app.json                       Expo configuration and plugins
 .env.example                   Names of the settings you copy to .env.local (never commit .env.local)
-firebase-rules/                Firestore and Storage security rules (locked by default, Member 1 writes them)
+firebase-rules/                Firestore security rules (locked by default, Member 1 writes them)
 docs/                          Plan, schema, mock data list, this file, one brief per member
 .github/                       Pull request checklist
 
 src/
   config/
-    firebase.js                Connects to Firebase. Exports auth, db, storage, requireFirebase()
+    firebase.js                Connects to Firebase. Exports auth, db, requireFirebase()
   constants/
     roles.js                   ROLES: student, tutor, professional, admin
     collections.js             COLLECTIONS: Firestore collection names
@@ -76,7 +76,7 @@ Screens marked "built" are finished. The older ones (tutors, schedule, chat, pro
 | --- | --- | --- |
 | `authService.js` | Sign up, login, admin login, logout, listen to login state | Member 1 |
 | `userService.js` | Read and write the user document | Member 1 |
-| `storageService.js` | Upload verification files and profile photos | Member 1 |
+| `storageService.js` | Reserved; not used on the Spark plan. Proof and profile images use approved external URLs | Member 1 |
 | `tutorService.js` | Tutors list and detail (Member 2); tutor application (Member 1) | Members 2 and 1 |
 | `bookingService.js` | Create, list, reschedule, pay for, check in to bookings | Member 2 |
 | `locationService.js` | Location permission, current position, "am I at campus" | Member 2 |
@@ -134,4 +134,5 @@ Member 1 does the switch when login works:
 ## Not decided yet
 
 - **Map library:** see "Map library" in [`members/MEMBER_2_STUDENT_FEATURES.md`](members/MEMBER_2_STUDENT_FEATURES.md).
-- **File storage:** see "Decision: Firebase Storage" in [`members/MEMBER_1_FIREBASE_AND_AUTH.md`](members/MEMBER_1_FIREBASE_AND_AUTH.md).
+- **Files and images:** Firebase Storage is intentionally disabled on the Spark plan. Store only approved external URLs and metadata; see [`members/MEMBER_1_FIREBASE_AND_AUTH.md`](members/MEMBER_1_FIREBASE_AND_AUTH.md).
+- **Notifications:** client services write in-app notification documents after the related Firestore write. Do not add Cloud Functions or scheduled Firebase jobs; client-created notifications are best effort, not a trusted audit log.

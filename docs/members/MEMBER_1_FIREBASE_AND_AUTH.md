@@ -12,7 +12,7 @@ You make the database and the logins work. Members 2, 3 and 4 cannot use real da
 | `.env.example` | Ready | Copy to `.env.local` and fill in |
 | `src/services/authService.js` | Placeholders | `signUp`, `signIn`, `signInAdmin`, `signOut`, `subscribeToAuthState` |
 | `src/services/userService.js` | Placeholders | `getUserProfile`, `createUserProfile`, `updateUserProfile` |
-| `src/services/storageService.js` | Placeholders | `uploadVerificationDocument`, `uploadProfilePhoto` (see the decision below) |
+| `src/services/storageService.js` | Reserved | Do not implement Firebase Storage uploads on Spark; store approved external proof/photo URLs instead |
 | `src/services/tutorService.js` | Placeholders | Yours: `getTutorApplication`, `saveTutorApplication` |
 | `src/context/AuthContext.jsx` | Starter | Finish `AuthProvider` (steps in the comment at the top) |
 | `src/navigation/AppNavigator.jsx` | Ready | Chooses the screens for the role. You switch `App.js` to it |
@@ -22,18 +22,24 @@ You make the database and the logins work. Members 2, 3 and 4 cannot use real da
 | `firebase-rules/` | Locked | Where you write the security rules in Week 3 |
 | `docs/FIRESTORE_SCHEMA.md` | Draft | Confirm or change it, then keep it up to date |
 
-## Decision: Firebase Storage needs a paid plan
+## Spark-plan rule: do not use Firebase Storage or Cloud Functions
 
-Checked on the official Firebase pages on Oct 11, 2026: **Cloud Storage for Firebase requires the pay-as-you-go Blaze plan.** Authentication and Firestore both work on the free Spark plan. Blaze needs a billing account (a card) linked to the project, but usage inside the free amounts (5 GB stored in `us-central1`, `us-east1` or `us-west1`) costs nothing. Spark projects cannot use Storage at all, and calls fail with an error.
+The team is staying on Firebase's free Spark plan. **Cloud Storage for Firebase requires the pay-as-you-go Blaze plan**, so the app must not call `firebase/storage`, upload files, or depend on Storage security rules. **Cloud Functions and other server-side Firebase features that require billing are also out of scope.** Authentication and Firestore remain the Firebase services used by the app.
 
-This matters because the plan uploads tutors' verification files (transcripts) to Storage. Decide this in Week 1 and tell everyone:
+The required features still work with these Spark-compatible replacements:
 
-| Option | What changes |
+| Feature | Spark-compatible approach |
 | --- | --- |
-| A. Upgrade to Blaze | Plan stays as is. Choose a US region, and set a budget alert in Google Cloud so you are warned early (an alert only warns, it does not stop charges) |
-| B. Stay on Spark and skip file upload | Tutors enter courses, grades and the file name, and the admin reviews those. `storageService.js` and `proofPath` are not used. The "verification documents upload" part of the plan changes, so tell your instructor |
+| Tutor transcript or verification proof | Let the tutor enter the course, grade and document title, then provide a reviewable URL from an instructor-approved free file host. Store only the URL and metadata in the tutor document. Never store a device-local `file://` URI because admins and other devices cannot open it. |
+| Profile photo | Store an instructor-approved external image URL in `photoUrl`. If no URL is available, use the user's initials/avatar placeholder. Do not add a Firebase Storage upload path. |
+| Booking, message and verification alerts | Write an in-app notification document from the client service immediately after the related Firestore write succeeds. Do not create a Cloud Function, scheduled function or Firebase Extension. |
+| Session reminders | Keep using local `expo-notifications` scheduling on the user's device. This is separate from Firebase and does not require a paid plan. |
 
-Sources: [Firebase pricing](https://firebase.google.com/pricing), [Cloud Storage billing changes FAQ](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024).
+The external file host is not part of Firebase. Do not add credentials or private API keys for it to `EXPO_PUBLIC_*` variables. A tutor must confirm that the submitted URL is accessible to the assigned admin before the application can be reviewed. If the instructor does not approve an external host, keep the proof as structured text and mark the file attachment as unavailable rather than enabling Blaze.
+
+**Important limitation:** client-created notifications are not guaranteed if the app is closed or offline. The booking/message write is the source of truth; notification creation is best effort and must show an error state without rolling back the main action. Security rules must still restrict notification documents to authenticated users and the allowed schema. Do not describe these client-created alerts as trusted server events.
+
+Sources: [Firebase pricing](https://firebase.google.com/pricing), [Cloud Storage billing changes FAQ](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024), [Cloud Functions pricing](https://firebase.google.com/pricing).
 
 ## Step by step: Week 1 setup
 
@@ -42,7 +48,7 @@ Sources: [Firebase pricing](https://firebase.google.com/pricing), [Cloud Storage
 3. Add an app, choose **Web** (`</>`), and copy the config values it shows.
 4. **Build > Authentication > Get started > Sign-in method**: turn on **Email/Password**.
 5. **Build > Firestore Database > Create database**. Start in **test mode** so the team can build. Test mode lets anyone read and write until a date Firebase shows you (usually 30 days), so it must be replaced with real rules in Week 3.
-6. Storage: only after the decision above.
+6. Do not enable Storage, add Storage imports, or create a Storage bucket. Use the Spark-compatible proof and photo URL fields described above.
 7. Copy `.env.example` to `.env.local` and paste the config values. Restart Expo with `npx expo start -c`, because Expo only reads the variables when it starts.
 8. Share the values with the team in your group chat. Never commit `.env.local`. These values are settings and not secrets, but the repo should not carry them.
 9. Check the connection: `isFirebaseConfigured` from `src/config/firebase.js` is `true` once the values are filled in.
@@ -64,16 +70,16 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 - Professional tutor login and sign-up with verification documents, and the hidden admin login (`signInAdmin` signs the person out and throws if the role is not `admin`).
 - Each role opens its own dashboard (this is `AppNavigator`).
 - Profiles save to and load from Firestore. `StudentProfileScreen` and `TutorProfileScreen` stop using their mock data.
-- Verification: `saveTutorApplication` sets `verificationStatus` to `pending`. The upload part follows the Storage decision.
+- Verification: `saveTutorApplication` sets `verificationStatus` to `pending` and saves structured proof metadata plus the reviewable URL. There is no file upload.
 - Connect `ProfessionalDashboardScreen` to Firestore once Member 3 has built it.
 
 **Week 3**
-- Security rules for Firestore (and Storage if used). Each role only reaches its own data, only admins reach admin data, and users cannot change their own `role`. Write them in `firebase-rules/firestore.rules`, test them in the console's Rules Playground, then publish.
+- Security rules for Firestore. Each role only reaches its own data, only admins reach admin data, users cannot change their own `role`, and notification documents follow the allowed schema. Write them in `firebase-rules/firestore.rules`, test them in the console's Rules Playground, then publish.
 - Run the final mock-data sweep for the whole team (checklist at the end of [MOCK_DATA_INVENTORY](../MOCK_DATA_INVENTORY.md)).
 
 ## Mock data you remove
 
-`src/data/mockStudentProfile.jsx` (replaced by `users`) and `src/data/mockMentorApplication.jsx` (replaced by the tutor's profile). Delete each file in the same pull request that stops using it, and tick it in `MOCK_DATA_INVENTORY.md`. `StudentNavigator.jsx` also reads `mockStudentProfile` for the header initials.
+`src/data/mockStudentProfile.jsx` (replaced by `users`) and `src/data/mockMentorApplication.jsx` (replaced by the tutor's profile). Delete each file in the same pull request that stops using it, and tick it in `MOCK_DATA_INVENTORY.md`. `StudentNavigator.jsx` also reads `mockStudentProfile` for the header initials. Do not replace these with Firebase Storage uploads.
 
 ## Watch out for
 
