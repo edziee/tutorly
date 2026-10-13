@@ -16,3 +16,11 @@ export const ROLE_VALUES = Object.values(ROLES);
 export const SIGNUP_ROLES = [ROLES.STUDENT, ROLES.TUTOR, ROLES.PROFESSIONAL];
 
 export const isValidRole = (value) => ROLE_VALUES.includes(value);
+
+// Names to show on screen for each role.
+export const ROLE_LABELS = {
+  [ROLES.STUDENT]: 'Student',
+  [ROLES.TUTOR]: 'Tutor',
+  [ROLES.PROFESSIONAL]: 'Professional Tutor',
+  [ROLES.ADMIN]: 'Admin',
+};

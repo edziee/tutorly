@@ -14,9 +14,10 @@ export default function EmptyState({
   message,
   actionLabel,
   onAction,
+  compact = false,
 }) {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compact && styles.compact]}>
       <Ionicons name={icon} size={36} color={colors.mutedText} />
       <Text style={styles.title}>{title}</Text>
       {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -43,6 +44,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  compact: {
+    flex: 0,
+    flexBasis: 'auto', // plain flex: 0 makes the box zero tall on web, so the content spills out
+    backgroundColor: 'transparent',
+    paddingVertical: spacing.lg,
   },
   message: {
     marginTop: spacing.sm,

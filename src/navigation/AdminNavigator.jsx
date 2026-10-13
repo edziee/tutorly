@@ -3,9 +3,12 @@
 // data.
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { View } from 'react-native';
 
 import { ROUTES } from '../constants/routes';
 import { colors } from '../theme/colors';
+import NotificationBell from '../components/NotificationBell';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
 import AdminVerificationsScreen from '../screens/admin/AdminVerificationsScreen';
@@ -24,7 +27,12 @@ export default function AdminNavigator() {
   return (
     <Tab.Navigator
       initialRouteName={ROUTES.ADMIN_DASHBOARD}
-      screenOptions={({ route }) => ({
+      screenOptions={({ route, navigation }) => ({
+        headerRight: () => (
+          <View style={{ marginRight: 16 }}>
+            <NotificationBell onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)} />
+          </View>
+        ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
         tabBarIcon: ({ color, size }) => (
@@ -51,6 +59,16 @@ export default function AdminNavigator() {
         name={ROUTES.ADMIN_BOOKINGS}
         component={AdminBookingsScreen}
         options={{ title: 'Bookings' }}
+      />
+      {/* Opened from the bell. It has no tab button of its own. */}
+      <Tab.Screen
+        name={ROUTES.NOTIFICATIONS}
+        component={NotificationsScreen}
+        options={{
+          title: 'Notifications',
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
       />
     </Tab.Navigator>
   );

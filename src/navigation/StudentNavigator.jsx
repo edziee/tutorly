@@ -1,10 +1,14 @@
 import { BottomTabBar, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 
 import AppHeader from '../components/AppHeader';
 import StudentAvatar from '../components/StudentAvatar';
+import { ROUTES } from '../constants/routes';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import StudentDashboardScreen from '../screens/student/StudentDashboardScreen';
 import { TutorsScreen } from '../screens/student/TutorsScreen';
 import ChatScreen from '../screens/shared/ChatScreen';
 import ScheduleScreen from '../screens/student/ScheduleScreen';
@@ -14,6 +18,7 @@ import { mockStudentProfile } from '../data/mockStudentProfile';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
 const tabConfig = {
   Tutors: { icon: 'people', inactiveIcon: 'people-outline', title: 'Tutors' },
@@ -29,7 +34,9 @@ const studentInitials = mockStudentProfile.name
   .join('')
   .slice(0, 2);
 
-export default function StudentNavigator() {
+// The five tabs. They sit inside the stack below so that Notifications and the
+// dashboard can open on top of them with a back button.
+function StudentTabs() {
   const [profileImageUri, setProfileImageUri] = useState(null);
 
   return (
@@ -51,6 +58,7 @@ export default function StudentNavigator() {
             initials={studentInitials}
             imageUri={profileImageUri}
             onProfilePress={() => navigation.navigate('Profile')}
+            onNotificationsPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}
           />
         ),
         tabBarActiveTintColor: colors.primary,
@@ -107,6 +115,28 @@ export default function StudentNavigator() {
 
       <Tab.Screen name="Chat" component={ChatScreen} />
     </Tab.Navigator>
+  );
+}
+
+export default function StudentNavigator() {
+  return (
+    <Stack.Navigator initialRouteName="StudentTabs">
+      <Stack.Screen
+        name="StudentTabs"
+        component={StudentTabs}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.NOTIFICATIONS}
+        component={NotificationsScreen}
+        options={{ title: 'Notifications' }}
+      />
+      <Stack.Screen
+        name={ROUTES.STUDENT_DASHBOARD}
+        component={StudentDashboardScreen}
+        options={{ title: 'Dashboard' }}
+      />
+    </Stack.Navigator>
   );
 }
 
