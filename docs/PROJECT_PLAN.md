@@ -118,8 +118,8 @@ Week 1 sets up Firebase and the shared data structure first, because everything 
 | Sign-up and login logic for students and tutors | Member 1 | Not started |
 | Set up the shared UI theme and reusable components to match Figma | Member 3 | In progress (theme, form, card, badge, filter and state components are in; `ScreenHeader` and `SessionCard` are still empty) |
 | Build the UI for login and sign-up, the student dashboard and the tutors list | Member 3 | Done on branch `member3/ui-screens` (login, sign-up and dashboard built and waiting for review; tutors list already existed). Google login and "Forgot password" are left out until Member 1 has service functions for them. The dashboard is registered but no button opens it yet |
-| Design in Figma: professional tutor login and hidden admin login | Member 3 | Not started |
-| Design in Figma: professional tutor dashboard and admin dashboard | Member 3 | Not started |
+| Design in Figma: professional tutor login and hidden admin login | Member 3 | Done |
+| Design in Figma: professional tutor dashboard and admin dashboard | Member 3 | Done |
 | Tutors list logic with search and filters (temporary data is fine for now) | Member 2 | In progress (search and filters exist on mock data) |
 | Firestore data and logic for chat and notifications | Member 4 | Not started |
 
