@@ -2,19 +2,19 @@
 // which screens to show (see src/navigation/AppNavigator.jsx).
 // Owner: Member 1.
 //
-// Demo login is enabled while the screens are being reviewed. To finish the
-// real login flow (Week 1 to 2):
-//   1. Keep the value in state: const [state, setState] = useState({ ...signedOut, loading: true });
-//   2. In a useEffect, call subscribeToAuthState from src/services/authService.js
-//      and return the function it gives you, so the listener stops on unmount.
-//   3. When it gives a Firebase user, load users/{uid} with getUserProfile and
-//      set `user` to that profile and `role` to its role field.
-//   4. When it gives null, set user and role back to null.
-//   5. Set `loading` to false after the first answer, so the app does not flash
-//      the login screen at a person who is already logged in.
-// Then wrap the app in <AuthProvider> and render <AppNavigator /> in App.js
-// (see "Switching on login" in docs/ARCHITECTURE.md).
-import { createContext, useContext, useState } from 'react';
+// How it works: AuthProvider listens to Firebase Auth (subscribeToAuthState).
+// When someone is logged in it loads their users/{uid} document and exposes it
+// as `user`, with its `role` field as `role`. `loading` stays true until the
+// first answer, so a person who is already logged in does not see the login
+// screen flash by.
+//
+// signInDemo / signOutDemo are kept for screens that are not wired yet (the
+// hidden admin login until Week 2). signOutDemo now also logs a real user out,
+// so the existing "Log Out" buttons work for everyone.
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+
+import { signOut, subscribeToAuthState } from '../services/authService';
+import { getUserProfile } from '../services/userService';
 
 const signedOut = {
   user: null, // the user's profile document, or null when logged out
@@ -24,14 +24,62 @@ const signedOut = {
 
 const AuthContext = createContext({
   ...signedOut,
+  signOut: async () => {},
   signInDemo: () => {},
   signOutDemo: () => {},
 });
 
 export function AuthProvider({ children }) {
-  const [state, setState] = useState(signedOut);
+  const [state, setState] = useState({ ...signedOut, loading: true });
+  // Counts auth events, so a slow profile load from an old event cannot
+  // overwrite the result of a newer one.
+  const latestEvent = useRef(0);
 
-  const signInDemo = (role) => {
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
+      const eventId = ++latestEvent.current;
+      const isCurrent = () => eventId === latestEvent.current;
+
+      if (!firebaseUser) {
+        setState(signedOut);
+        return;
+      }
+
+      try {
+        const profile = await getUserProfile(firebaseUser.uid);
+        if (!isCurrent()) return;
+
+        if (!profile) {
+          // Logged in with Firebase but no users/{uid} document, so there is no
+          // role to route by. Log out instead of leaving the person stuck.
+          setState(signedOut);
+          signOut().catch(() => {});
+          return;
+        }
+        setState({ user: profile, role: profile.role ?? null, loading: false });
+      } catch (error) {
+        if (!isCurrent()) return;
+        console.warn('Could not load the user profile:', error);
+        setState(signedOut);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      // Firebase not configured, or already logged out (demo login). Either way
+      // the app should end up on the login screen.
+    }
+    latestEvent.current += 1;
+    setState(signedOut);
+  }, []);
+
+  const signInDemo = useCallback((role) => {
+    latestEvent.current += 1;
     setState({
       user: {
         id: `demo-${role}`,
@@ -44,12 +92,12 @@ export function AuthProvider({ children }) {
       role,
       loading: false,
     });
-  };
-
-  const signOutDemo = () => setState(signedOut);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, signInDemo, signOutDemo }}>
+    <AuthContext.Provider
+      value={{ ...state, signOut: handleSignOut, signInDemo, signOutDemo: handleSignOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

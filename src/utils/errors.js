@@ -16,6 +16,7 @@ const AUTH_MESSAGES = {
   'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
   'auth/network-request-failed': 'No internet connection. Check your connection and try again.',
   'auth/user-disabled': 'This account has been disabled. Contact the team.',
+  'auth/profile-missing': 'This account is not set up yet. Sign up again or contact the team.',
 };
 
 const GENERIC = 'Something went wrong. Please try again.';

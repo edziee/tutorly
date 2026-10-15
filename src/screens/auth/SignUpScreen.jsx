@@ -11,8 +11,8 @@
 // admin account can never be created here. Like the login screen, it does not
 // navigate afterwards: AuthContext notices the new account.
 //
-// Choosing "Tutor" shows a second switch: Peer Tutor (role 'tutor') or
-// Professor / Alumni (role 'professional').
+// Choosing "Tutor" shows a second switch: Peer Tutor or Professor / Alumni.
+// Both choices create a 'tutor' account; Professor / Alumni do not need a campus ID.
 //
 // Tutors and professional tutors send their verification documents after
 // signing up, from the tutor application (storageService.uploadVerificationDocument),
@@ -50,9 +50,14 @@ const modeOptions = [
   { value: 'signUp', label: 'Sign Up / Register' },
 ];
 
+const TUTOR_KINDS = {
+  PEER: 'peer',
+  PROFESSIONAL: 'professional',
+};
+
 const tutorKindOptions = [
-  { value: ROLES.TUTOR, label: 'Peer Tutor' },
-  { value: ROLES.PROFESSIONAL, label: 'Professor / Alumni' },
+  { value: TUTOR_KINDS.PEER, label: 'Peer Tutor' },
+  { value: TUTOR_KINDS.PROFESSIONAL, label: 'Professor / Alumni' },
 ];
 
 // What each consent covers, from the Figma "Academic Permissions & Privacy Consent" box.
@@ -80,7 +85,7 @@ export default function SignUpScreen({ navigation, route }) {
     requestedRole && requestedRole !== ROLES.STUDENT ? ROLES.TUTOR : ROLES.STUDENT,
   );
   const [tutorKind, setTutorKind] = useState(
-    requestedRole === ROLES.PROFESSIONAL ? ROLES.PROFESSIONAL : ROLES.TUTOR,
+    requestedRole === ROLES.PROFESSIONAL ? TUTOR_KINDS.PROFESSIONAL : TUTOR_KINDS.PEER,
   );
   const [name, setName] = useState('');
   const [campusId, setCampusId] = useState('');
@@ -94,9 +99,9 @@ export default function SignUpScreen({ navigation, route }) {
   const [submitting, setSubmitting] = useState(false);
 
   const isStudent = portal === ROLES.STUDENT;
-  const role = isStudent ? ROLES.STUDENT : tutorKind;
+  const role = isStudent ? ROLES.STUDENT : ROLES.TUTOR;
   // Professors and alumni may not have a campus ID number, so it is optional for them.
-  const campusIdRequired = role !== ROLES.PROFESSIONAL;
+  const campusIdRequired = isStudent || tutorKind !== TUTOR_KINDS.PROFESSIONAL;
 
   const handleSubmit = async () => {
     const nextErrors = {

@@ -9,7 +9,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | Collection | One document is | Who writes it |
 | --- | --- | --- |
 | `users/{uid}` | An account of any role | The user (never the `role` after sign-up) |
-| `tutors/{uid}` | The public profile of a tutor or professional tutor, same id as their user | The tutor; admin changes verification |
+| `tutors/{uid}` | The public profile of a tutor, including Professor / Alumni accounts, same id as their user | The tutor; admin changes verification |
 | `bookings/{id}` | A session between a student and a tutor | Student creates, tutor answers |
 | `conversations/{id}` | A chat between one student and one tutor | Either person in the chat |
 | `conversations/{id}/messages/{id}` | One message | Either person in the chat |
@@ -22,7 +22,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | Field | Type | Notes |
 | --- | --- | --- |
 | `email` | string | |
-| `role` | `'student'` \| `'tutor'` \| `'professional'` \| `'admin'` | Set once at sign-up. Users must not be able to change it, and nobody can sign up as `admin` (admins are created in the Firebase console) |
+| `role` | `'student'` \| `'tutor'` \| `'professional'` (legacy) \| `'admin'` | Set once at sign-up. Peer tutors and Professor / Alumni accounts use `'tutor'`; existing `'professional'` accounts remain supported as tutors. Users must not be able to change it, and nobody can sign up as `admin` (admins are created in the Firebase console) |
 | `name` | string | |
 | `phone`, `age`, `location` (city), `year`, `campus`, `campusAddress` | string | From the student profile screen |
 | `photoUrl` | string | Optional instructor-approved external image URL. If empty, show initials; do not use Firebase Storage |

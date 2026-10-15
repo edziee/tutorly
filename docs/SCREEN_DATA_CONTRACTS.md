@@ -17,7 +17,7 @@ The function names and inputs are the ones already in `src/services` and are not
 | Screen | Service function | Fields the screen reads |
 | --- | --- | --- |
 | `LoginScreen` | `authService.signIn(email, password)` | The result is ignored. It does not navigate: `AuthContext` sees the new user and `AppNavigator` switches role |
-| `SignUpScreen` | `authService.signUp({ email, password, role, profile: { name, campusId } })` | The result is ignored. `role` is `student`, `tutor` or `professional`. Professional tutors do not send a `campusId` |
+| `SignUpScreen` | `authService.signUp({ email, password, role, profile: { name, campusId } })` | The result is ignored. `role` is `student` or `tutor`. Peer tutors and Professor / Alumni sign-ups both use `tutor`; Professor / Alumni do not need a `campusId` |
 | `StudentDashboardScreen` | `useAuth().user.stats` | `streakDays`, `weeklyActivity` (7 true or false values, Monday first), `scholarLevel`, `scholarProgress` (0 to 100), `studyHours`, `completedSessions`, `rating`. Missing values show as 0 |
 | `StudentDashboardScreen` | `bookingService.subscribeToStudentBookings(userId, callback)` | `id`, `status`, `dateKey`, `startTime`, `endTime`, `tutorName`, `subject`, `location`. The "next session" is the earliest booking with status `upcoming` or `requested` that has not ended |
 | `NotificationsScreen` | `notificationService.subscribeToNotifications(userId, callback)` | `id`, `title`, `message`, `read`, `createdAt`. Newest first |

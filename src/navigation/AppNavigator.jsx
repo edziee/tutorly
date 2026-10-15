@@ -2,8 +2,7 @@
 // screens for that person's role:
 //   not logged in -> AuthNavigator
 //   student       -> StudentNavigator (already built)
-//   tutor          -> StudentNavigator
-//   professional  -> ProfessionalNavigator
+//   tutor          -> TutorNavigator (including legacy professional accounts)
 //   admin         -> AdminNavigator
 // Owner: Member 1 (role routing) with Member 3 (the navigators and screens).
 //
@@ -17,7 +16,6 @@ import { ROLES } from '../constants/roles';
 import { useAuth } from '../context/AuthContext';
 import AdminNavigator from './AdminNavigator';
 import AuthNavigator from './AuthNavigator';
-import ProfessionalNavigator from './ProfessionalNavigator';
 import StudentNavigator from './StudentNavigator';
 import TutorNavigator from './TutorNavigator';
 
@@ -31,9 +29,8 @@ export default function AppNavigator() {
     case ROLES.STUDENT:
       return <StudentNavigator />;
     case ROLES.TUTOR:
-      return <TutorNavigator />;
     case ROLES.PROFESSIONAL:
-      return <ProfessionalNavigator />;
+      return <TutorNavigator />;
     case ROLES.ADMIN:
       return <AdminNavigator />;
     default:

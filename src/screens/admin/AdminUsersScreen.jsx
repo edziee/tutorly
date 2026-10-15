@@ -17,7 +17,7 @@ import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
 import StatusBadge from '../../components/StatusBadge';
 import { VERIFICATION_STATUS_BADGE } from '../../components/StatusBadge';
-import { ROLES, ROLE_LABELS } from '../../constants/roles';
+import { isTutorRole, ROLES, ROLE_LABELS } from '../../constants/roles';
 import { useAsync } from '../../hooks/useAsync';
 import { getUsers } from '../../services/adminService';
 import { colors } from '../../theme/colors';
@@ -28,7 +28,6 @@ const roleFilters = [
   { value: 'all', label: 'All' },
   { value: ROLES.STUDENT, label: 'Students' },
   { value: ROLES.TUTOR, label: 'Tutors' },
-  { value: ROLES.PROFESSIONAL, label: 'Professionals' },
   { value: ROLES.ADMIN, label: 'Admins' },
 ];
 
@@ -44,20 +43,23 @@ export default function AdminUsersScreen() {
   const [search, setSearch] = useState('');
 
   const { status, data, error, refreshing, retry } = useAsync(
-    () => getUsers(role === 'all' ? {} : { role }),
+    () => getUsers(role === 'all' || role === ROLES.TUTOR ? {} : { role }),
     [role],
   );
 
   const users = useMemo(() => {
     const list = Array.isArray(data) ? data : [];
     const query = search.trim().toLowerCase();
-    if (!query) return list;
-    return list.filter(
+    const roleFiltered = role === ROLES.TUTOR
+      ? list.filter((user) => isTutorRole(user.role))
+      : list;
+    if (!query) return roleFiltered;
+    return roleFiltered.filter(
       (user) =>
         String(user.name ?? '').toLowerCase().includes(query) ||
         String(user.email ?? '').toLowerCase().includes(query),
     );
-  }, [data, search]);
+  }, [data, role, search]);
 
   const header = (
     <View style={styles.header}>
@@ -120,7 +122,7 @@ export default function AdminUsersScreen() {
 
 function UserRow({ user }) {
   const verification = VERIFICATION_STATUS_BADGE[user.verificationStatus];
-  const isTutor = user.role === ROLES.TUTOR || user.role === ROLES.PROFESSIONAL;
+  const isTutor = isTutorRole(user.role);
   const name = user.name || 'No name';
 
   return (

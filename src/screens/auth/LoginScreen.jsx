@@ -4,9 +4,6 @@
 // Plan tasks: "Build the UI for login and sign-up" (Member 3, Week 1) and
 // "Sign-up and login logic for students and tutors" (Member 1, Week 1).
 //
-// While screens are being reviewed, Sign In creates a local demo user for the
-// selected portal role. No account or credentials are required.
-//
 // The Student / Tutor cards only choose the wording on the screen. Tutors and
 // professional tutors both choose "Tutor", and the account's own role decides
 // which dashboard opens. The role can be passed in with
@@ -40,7 +37,9 @@ import { ROLES } from '../../constants/roles';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
-import { useAuth } from '../../context/AuthContext';
+import { signIn } from '../../services/authService';
+import { getAuthErrorMessage } from '../../utils/errors';
+import { validateEmail, validatePasswordPresent } from '../../utils/validation';
 
 const modeOptions = [
   { value: 'signIn', label: 'Sign In' },
@@ -58,15 +57,28 @@ export default function LoginScreen({ navigation, route }) {
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { signInDemo } = useAuth();
 
   const isStudent = portal === ROLES.STUDENT;
 
-  const handleSubmit = () => {
-    setErrors({});
+  const handleSubmit = async () => {
+    if (submitting) return;
+
+    const nextErrors = {
+      email: validateEmail(email),
+      password: validatePasswordPresent(password),
+    };
+    setErrors(nextErrors);
     setFormError('');
+    if (Object.values(nextErrors).some(Boolean)) return;
+
     setSubmitting(true);
-    signInDemo(portal);
+    try {
+      await signIn(email.trim(), password);
+    } catch (error) {
+      setFormError(getAuthErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

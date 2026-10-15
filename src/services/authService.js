@@ -4,36 +4,131 @@
 // Rules for everyone: screens never call Firebase directly. They call the
 // functions in this folder, so the layout (Member 3) and the data (the feature
 // owner) can be built at the same time against the same function names.
-//
-// Start from `requireFirebase()` in src/config/firebase.js:
-//   import { requireFirebase } from '../config/firebase';
-//   const { auth, db } = requireFirebase();
 // Firebase Auth docs: https://firebase.google.com/docs/auth/web/start
+import {
+  createUserWithEmailAndPassword,
+  deleteUser,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+} from 'firebase/auth';
+
+import { isFirebaseConfigured, requireFirebase } from '../config/firebase';
+import { LOGIN_ROLES, ROLES, SIGNUP_ROLES } from '../constants/roles';
 import { notImplemented } from './notImplemented';
+import { createUserProfile, getUserProfile } from './userService';
+
+// Errors we throw ourselves use Firebase-style codes so src/utils/errors.js can
+// turn them into messages for the screens.
+function authError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+// Sign-up and login take several steps (Firebase Auth, then the users/{uid}
+// document). Firebase announces the new login to subscribeToAuthState after the
+// first step, which would reach the app before the document exists or before we
+// have checked the role. While one of these flows runs, the listener waits for
+// it to finish, so the app never sees a half-finished account.
+let flowInProgress = null;
+
+async function runAuthFlow(flow) {
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  flowInProgress = gate;
+  try {
+    return await flow();
+  } finally {
+    release();
+    if (flowInProgress === gate) flowInProgress = null;
+  }
+}
 
 /**
  * Create an account and its user document (users/{uid}) with the chosen role.
  * Admin accounts cannot be created here.
- * @param {{ email: string, password: string, role: 'student'|'tutor'|'professional', profile?: object }} input
+ * @param {{ email: string, password: string, role: 'student'|'tutor', profile?: object }} input
  * @returns {Promise<{ uid: string, role: string }>}
  */
-export async function signUp(input) {
-  throw notImplemented('authService.signUp', 'Member 1');
+export async function signUp({ email, password, role, profile = {} } = {}) {
+  // Check the role before talking to Firebase. Admin is never allowed here.
+  if (!SIGNUP_ROLES.includes(role)) {
+    throw authError('auth/invalid-role', 'That account type cannot be created from the app.');
+  }
+  const { auth } = requireFirebase();
+  const cleanEmail = (email ?? '').trim();
+
+  return runAuthFlow(async () => {
+    const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+    const { user } = credential;
+
+    try {
+      await createUserProfile(user.uid, {
+        email: cleanEmail,
+        role,
+        name: profile.name,
+        campusId: profile.campusId,
+      });
+    } catch (error) {
+      // The login exists but the profile could not be saved. Remove the login
+      // so the person can try again with the same email instead of being stuck
+      // with an account that has no role.
+      try {
+        await deleteUser(user);
+      } catch (cleanupError) {
+        await firebaseSignOut(auth).catch(() => {});
+      }
+      throw error;
+    }
+
+    return { uid: user.uid, role };
+  });
 }
 
 /**
  * Log in with email and password (student, tutor and professional login).
+ * The account's own role decides which dashboard opens. Admins must use
+ * signInAdmin, so they are refused here.
  * @param {string} email
  * @param {string} password
  * @returns {Promise<{ uid: string, role: string }>}
  */
 export async function signIn(email, password) {
-  throw notImplemented('authService.signIn', 'Member 1');
+  const { auth } = requireFirebase();
+
+  return runAuthFlow(async () => {
+    const { user } = await signInWithEmailAndPassword(auth, (email ?? '').trim(), password);
+
+    let profile;
+    try {
+      profile = await getUserProfile(user.uid);
+    } catch (error) {
+      await firebaseSignOut(auth).catch(() => {});
+      throw error;
+    }
+
+    if (!profile || !LOGIN_ROLES.includes(profile.role)) {
+      await firebaseSignOut(auth).catch(() => {});
+      if (profile?.role === ROLES.ADMIN) {
+        throw authError('auth/use-admin-login', 'Admin accounts cannot sign in here.');
+      }
+      throw authError(
+        'auth/profile-missing',
+        'This account is not set up yet. Sign up again or contact the team.',
+      );
+    }
+
+    return { uid: user.uid, role: profile.role };
+  });
 }
 
 /**
  * Hidden admin login. Must sign the user out and throw if the account's role
  * is not 'admin', so a normal user can never enter the admin dashboard.
+ * (Week 2: not wired to AdminLoginScreen yet, which still uses the demo login.)
  * @param {string} email
  * @param {string} password
  * @returns {Promise<{ uid: string, role: 'admin' }>}
@@ -44,14 +139,43 @@ export async function signInAdmin(email, password) {
 
 /** Log out the current user. @returns {Promise<void>} */
 export async function signOut() {
-  throw notImplemented('authService.signOut', 'Member 1');
+  const { auth } = requireFirebase();
+  await firebaseSignOut(auth);
 }
 
 /**
  * Call `callback(firebaseUser | null)` whenever the login state changes.
+ * If Firebase is not configured (no .env.local), it reports "logged out" once
+ * so the app still opens and the team can keep working on screens.
  * @param {(user: object | null) => void} callback
  * @returns {() => void} function that stops listening
  */
 export function subscribeToAuthState(callback) {
-  throw notImplemented('authService.subscribeToAuthState', 'Member 1');
+  if (!isFirebaseConfigured) {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) callback(null);
+    });
+    return () => {
+      active = false;
+    };
+  }
+
+  const { auth } = requireFirebase();
+  let active = true;
+
+  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // Wait for a sign-up or login that is still finishing (see runAuthFlow).
+    if (flowInProgress) await flowInProgress;
+    if (!active) return;
+    // If that flow signed the person out again (wrong role, missing profile),
+    // this event is out of date. Firebase sends a fresh "logged out" next.
+    if (firebaseUser && auth.currentUser?.uid !== firebaseUser.uid) return;
+    callback(firebaseUser);
+  });
+
+  return () => {
+    active = false;
+    unsubscribe();
+  };
 }

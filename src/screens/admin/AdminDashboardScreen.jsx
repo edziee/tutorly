@@ -23,7 +23,7 @@ import StatCard from '../../components/StatCard';
 import Card from '../../components/Card';
 import AppButton from '../../components/AppButton';
 import { BOOKING_STATUS } from '../../constants/statuses';
-import { ROLES } from '../../constants/roles';
+import { isTutorRole, ROLES } from '../../constants/roles';
 import { ROUTES } from '../../constants/routes';
 import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
@@ -38,6 +38,7 @@ import { radius, spacing } from '../../theme/spacing';
 import { getErrorMessage } from '../../utils/errors';
 
 const countByRole = (users, role) => users.filter((user) => user.role === role).length;
+const countTutors = (users) => users.filter((user) => isTutorRole(user.role)).length;
 const countByStatus = (bookings, status) =>
   bookings.filter((booking) => booking.status === status).length;
 
@@ -104,11 +105,7 @@ export default function AdminDashboardScreen({ navigation }) {
         <Card style={styles.rolesCard}>
           <Text style={styles.cardTitle}>Users by role</Text>
           <RoleLine label="Students" count={countByRole(userList, ROLES.STUDENT)} />
-          <RoleLine label="Peer tutors" count={countByRole(userList, ROLES.TUTOR)} />
-          <RoleLine
-            label="Professional tutors"
-            count={countByRole(userList, ROLES.PROFESSIONAL)}
-          />
+          <RoleLine label="Tutors" count={countTutors(userList)} />
           <RoleLine label="Admins" count={countByRole(userList, ROLES.ADMIN)} />
         </Card>
 

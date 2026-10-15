@@ -30,7 +30,7 @@ src/
   config/
     firebase.js                Connects to Firebase. Exports auth, db, requireFirebase()
   constants/
-    roles.js                   ROLES: student, tutor, professional, admin
+    roles.js                   ROLES: student, tutor, legacy professional, admin
     collections.js             COLLECTIONS: Firestore collection names
     statuses.js                TUTOR_TIERS, BOOKING_STATUS, VERIFICATION_STATUS, NOTIFICATION_TYPES
     routes.js                  ROUTES: the screen names used in navigation.navigate(...)
@@ -53,14 +53,12 @@ src/
     AuthNavigator.jsx          Login, sign up, hidden admin login
     StudentNavigator.jsx       Student tabs inside a stack, so Notifications and the dashboard open on top
     TutorNavigator.jsx         Tutor screens
-    ProfessionalNavigator.jsx  Professional tutor screens
     AdminNavigator.jsx         Admin tabs
   screens/
     onboarding/                SplashScreen, OnboardingScreen
     auth/                      LoginScreen, SignUpScreen (built), AdminLoginScreen
     student/                   Tutors, Schedule, StudentProfile, StudentDashboard (built) + booking, payment, map, check-in
     tutor/                     TutorProfileScreen (built)
-    professional/              ProfessionalDashboardScreen
     admin/                     Dashboard, Users, Verifications, Bookings (all built)
     shared/                    ChatScreen, NotificationsScreen (built), PlaceholderScreen
   components/                  Reusable UI used by many screens: AppButton, AppInput, Card, StatCard, StatusBadge, FilterChips, SegmentedControl, Checkbox, RoleCard, AuthHeader, NotificationBell, and the Loading, Empty and Error states
@@ -92,7 +90,7 @@ App.js  ->  splash  ->  onboarding  ->  NavigationContainer
                                                not logged in  -> AuthNavigator
                                                student        -> StudentNavigator
                                                tutor          -> TutorNavigator
-                                               professional   -> ProfessionalNavigator
+                                               legacy professional -> TutorNavigator
                                                admin          -> AdminNavigator
 ```
 
