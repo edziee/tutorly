@@ -7,6 +7,7 @@ import StudentNavigator from './src/navigation/StudentNavigator';
 import OnboardingScreen from './src/screens/onboarding/OnboardingScreen';
 import SplashScreen from './src/screens/onboarding/SplashScreen';
 
+
 export default function App() {
   const [onboardingPage, setOnboardingPage] = useState(null);
   const [showSplash, setShowSplash] = useState(true);
