@@ -10,7 +10,7 @@ Besides the screens from the Figma prototype, the project requires three things:
 
 | Requirement | What it means in Tutorly |
 | --- | --- |
-| Database | Firebase (Authentication, Firestore, Storage) stores users, tutors, bookings, messages and notifications |
+| Database | Firebase Authentication and Firestore store users, tutors, bookings, messages and notifications |
 | In-app notifications | Alerts shown inside the app, such as a new booking request or a new message |
 | Geolocation | The phone's location shows tutors on a map, sorts nearby tutors first and checks a student in at campus |
 
@@ -32,7 +32,7 @@ Last updated on Oct 11, 2026, after the files were organized for the team. The r
 | Tutors list with search and course and tier filters | Built with mock data |
 | Schedule with upcoming and past sessions, reschedule, add to calendar | Built with mock data, saved on the device only |
 | Messages screen | Built with mock data |
-| Tutor application (grades, courses, proof upload) | Built, the proof upload picks a file but keeps it only in the screen's state, nothing is stored |
+| Tutor application (grades, courses, proof details/link) | Built, proof details and an optional reviewable URL are stored instead of a Firebase file upload |
 | Shared theme and reusable components | Started in `src/theme` and `src/components` |
 | Login and sign-up (student, tutor, professional tutor, admin) | Not built. Placeholder screens, the role navigators and `AuthContext` are in place |
 | Professional tutor dashboard and admin dashboard | Not built, not yet designed in Figma. Placeholder screens are in place |
@@ -49,7 +49,7 @@ The full list of mock data is in [`docs/MOCK_DATA_INVENTORY.md`](docs/MOCK_DATA_
 - React Navigation (bottom tabs and native stack)
 - Expo modules in use: `expo-calendar`, `expo-document-picker`, `expo-image-picker`, `expo-notifications`, `expo-font`, `expo-location`
 - `@react-native-async-storage/async-storage` for data kept on the device
-- Firebase JS SDK (`firebase` 12) for Authentication, Firestore and Storage. It runs in Expo Go
+- Firebase JS SDK (`firebase` 12) for Authentication and Firestore. It runs in Expo Go
 - Still to decide: a map library (see [`docs/members/MEMBER_2_STUDENT_FEATURES.md`](docs/members/MEMBER_2_STUDENT_FEATURES.md))
 
 Expo has changed a lot between versions. Before writing code, check the [SDK 57 docs](https://docs.expo.dev/versions/v57.0.0/) instead of relying on older tutorials. This is also noted in `AGENTS.md` for AI coding tools.
@@ -77,11 +77,11 @@ Known limits when running:
 
 ### Firebase configuration (when Firebase is added)
 
-Do not commit Firebase keys or any secret. Copy `.env.example` to `.env.local` and fill in the values from the Firebase console, then restart Expo with `npx expo start -c` because Expo only reads the variables when it starts. Files named `.env*.local` are already ignored by git. Expo loads variables that start with `EXPO_PUBLIC_` automatically, and they are readable in the built app, so keep real secrets (such as admin credentials) out of them. Access to data is protected by Firestore and Storage security rules, not by hiding the config.
+Do not commit Firebase keys or any secret. Copy `.env.example` to `.env.local` and fill in the values from the Firebase console, then restart Expo with `npx expo start -c` because Expo only reads the variables when it starts. Files named `.env*.local` are already ignored by git. Expo loads variables that start with `EXPO_PUBLIC_` automatically, and they are readable in the built app, so keep real secrets (such as admin credentials) out of them. Access to data is protected by Firestore security rules, not by hiding the config.
 
 The app opens without these values (`isFirebaseConfigured` in `src/config/firebase.js` is then `false`), so members who have not set Firebase up yet can still work on screens.
 
-Cloud Storage for Firebase needs the paid Blaze plan, while Authentication and Firestore work on the free Spark plan. The team must decide this in Week 1, see "Decision: Firebase Storage" in [`docs/members/MEMBER_1_FIREBASE_AND_AUTH.md`](docs/members/MEMBER_1_FIREBASE_AND_AUTH.md).
+The project stays on Firebase's free Spark plan. Firebase Storage and Cloud Functions are not used because they require paid billing. Tutor proof is represented by structured course details and an optional instructor-approved external URL; profile photos use an external URL or initials. In-app notifications are written by the client after the related Firestore write and are best effort. See [`docs/members/MEMBER_1_FIREBASE_AND_AUTH.md`](docs/members/MEMBER_1_FIREBASE_AND_AUTH.md).
 
 ## Project structure
 
@@ -91,7 +91,7 @@ index.jsx               Registers the root component
 app.json                Expo configuration and plugins
 .env.example            Settings to copy to .env.local
 assets/                 Logo, owl illustrations and app icons
-firebase-rules/         Firestore and Storage security rules (locked until Member 1 writes them)
+firebase-rules/         Firestore security rules (locked until Member 1 writes them)
 src/
   config/               Firebase connection
   constants/            Roles, collection names, statuses, screen names, campus location

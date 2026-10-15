@@ -3,36 +3,35 @@
 // data.
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View } from 'react-native';
 
 import { ROUTES } from '../constants/routes';
-import { colors } from '../theme/colors';
-import NotificationBell from '../components/NotificationBell';
-import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
-import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
 import AdminVerificationsScreen from '../screens/admin/AdminVerificationsScreen';
-import AdminBookingsScreen from '../screens/admin/AdminBookingsScreen';
+import AdminReviewHistoryScreen from '../screens/admin/AdminReviewHistoryScreen';
+import AppHeader from '../components/AppHeader';
+import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
 
 const tabIcons = {
   [ROUTES.ADMIN_DASHBOARD]: 'grid-outline',
-  [ROUTES.ADMIN_USERS]: 'people-outline',
   [ROUTES.ADMIN_VERIFICATIONS]: 'shield-checkmark-outline',
-  [ROUTES.ADMIN_BOOKINGS]: 'calendar-outline',
+  [ROUTES.ADMIN_REVIEW_HISTORY]: 'time-outline',
+};
+
+const tabTitles = {
+  [ROUTES.ADMIN_DASHBOARD]: 'Dashboard',
+  [ROUTES.ADMIN_VERIFICATIONS]: 'Awaiting review',
+  [ROUTES.ADMIN_REVIEW_HISTORY]: 'Review history',
 };
 
 export default function AdminNavigator() {
   return (
     <Tab.Navigator
       initialRouteName={ROUTES.ADMIN_DASHBOARD}
-      screenOptions={({ route, navigation }) => ({
-        headerRight: () => (
-          <View style={{ marginRight: 16 }}>
-            <NotificationBell onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)} />
-          </View>
-        ),
+      screenOptions={({ route }) => ({
+        headerShown: true,
+        header: () => <AppHeader title={tabTitles[route.name]} initials="DA" />,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
         tabBarIcon: ({ color, size }) => (
@@ -46,29 +45,14 @@ export default function AdminNavigator() {
         options={{ title: 'Dashboard' }}
       />
       <Tab.Screen
-        name={ROUTES.ADMIN_USERS}
-        component={AdminUsersScreen}
-        options={{ title: 'Users' }}
-      />
-      <Tab.Screen
         name={ROUTES.ADMIN_VERIFICATIONS}
         component={AdminVerificationsScreen}
-        options={{ title: 'Verifications' }}
+        options={{ title: 'Awaiting review' }}
       />
       <Tab.Screen
-        name={ROUTES.ADMIN_BOOKINGS}
-        component={AdminBookingsScreen}
-        options={{ title: 'Bookings' }}
-      />
-      {/* Opened from the bell. It has no tab button of its own. */}
-      <Tab.Screen
-        name={ROUTES.NOTIFICATIONS}
-        component={NotificationsScreen}
-        options={{
-          title: 'Notifications',
-          tabBarButton: () => null,
-          tabBarItemStyle: { display: 'none' },
-        }}
+        name={ROUTES.ADMIN_REVIEW_HISTORY}
+        component={AdminReviewHistoryScreen}
+        options={{ title: 'Review history' }}
       />
     </Tab.Navigator>
   );

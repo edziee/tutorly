@@ -2,7 +2,7 @@
 // screens for that person's role:
 //   not logged in -> AuthNavigator
 //   student       -> StudentNavigator (already built)
-//   tutor         -> TutorNavigator
+//   tutor          -> StudentNavigator
 //   professional  -> ProfessionalNavigator
 //   admin         -> AdminNavigator
 // Owner: Member 1 (role routing) with Member 3 (the navigators and screens).
