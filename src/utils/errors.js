@@ -17,6 +17,7 @@ const AUTH_MESSAGES = {
   'auth/network-request-failed': 'No internet connection. Check your connection and try again.',
   'auth/user-disabled': 'This account has been disabled. Contact the team.',
   'auth/profile-missing': 'This account is not set up yet. Sign up again or contact the team.',
+  'auth/not-admin': 'This account is not authorized for admin access.',
 };
 
 const GENERIC = 'Something went wrong. Please try again.';

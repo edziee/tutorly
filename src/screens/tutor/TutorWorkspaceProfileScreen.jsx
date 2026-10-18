@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppButton from '../../components/AppButton';
 import ScreenContainer from '../../components/ScreenContainer';
 import { useAuth } from '../../context/AuthContext';
+import { getAuthErrorMessage } from '../../utils/errors';
 import { mockMentorApplication } from '../../data/mockMentorApplication';
 import { mockTutorSessions } from '../../data/mockTutorWorkspace';
 import { colors } from '../../theme/colors';
@@ -55,8 +56,20 @@ function RequestCard({ request }) {
 
 export default function TutorWorkspaceProfileScreen() {
   const { tutor, courses, preferredDays, preferredTimeSlots } = mockMentorApplication;
-  const { signOutDemo } = useAuth();
+  const { signOut } = useAuth();
   const [instantHelp, setInstantHelp] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+    } catch (error) {
+      Alert.alert('Unable to log out', getAuthErrorMessage(error));
+      setSigningOut(false);
+    }
+  };
 
   return (
     <ScreenContainer>
@@ -108,7 +121,12 @@ export default function TutorWorkspaceProfileScreen() {
           </View>
         ))}
 
-        <AppButton title="Log Out" variant="danger" onPress={signOutDemo} />
+        <AppButton
+          title="Log Out"
+          variant="danger"
+          onPress={handleSignOut}
+          loading={signingOut}
+        />
       </ScrollView>
     </ScreenContainer>
   );

@@ -15,7 +15,6 @@ import {
 
 import { isFirebaseConfigured, requireFirebase } from '../config/firebase';
 import { LOGIN_ROLES, ROLES, SIGNUP_ROLES } from '../constants/roles';
-import { notImplemented } from './notImplemented';
 import { createUserProfile, getUserProfile } from './userService';
 
 // Errors we throw ourselves use Firebase-style codes so src/utils/errors.js can
@@ -128,13 +127,31 @@ export async function signIn(email, password) {
 /**
  * Hidden admin login. Must sign the user out and throw if the account's role
  * is not 'admin', so a normal user can never enter the admin dashboard.
- * (Week 2: not wired to AdminLoginScreen yet, which still uses the demo login.)
  * @param {string} email
  * @param {string} password
  * @returns {Promise<{ uid: string, role: 'admin' }>}
  */
 export async function signInAdmin(email, password) {
-  throw notImplemented('authService.signInAdmin', 'Member 1');
+  const { auth } = requireFirebase();
+
+  return runAuthFlow(async () => {
+    const { user } = await signInWithEmailAndPassword(auth, (email ?? '').trim(), password);
+
+    let profile;
+    try {
+      profile = await getUserProfile(user.uid);
+    } catch (error) {
+      await firebaseSignOut(auth);
+      throw error;
+    }
+
+    if (profile?.role !== ROLES.ADMIN) {
+      await firebaseSignOut(auth);
+      throw authError('auth/not-admin', 'This account is not authorized for admin access.');
+    }
+
+    return { uid: user.uid, role: ROLES.ADMIN };
+  });
 }
 
 /** Log out the current user. @returns {Promise<void>} */

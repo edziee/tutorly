@@ -13,6 +13,7 @@
 // The screen does not call Firebase itself. If one of the three fails, the whole
 // screen shows the error with a "Try again" button, because half a dashboard
 // would show wrong numbers.
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -35,7 +36,7 @@ import {
 } from '../../services/adminService';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
-import { getErrorMessage } from '../../utils/errors';
+import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
 
 const countByRole = (users, role) => users.filter((user) => user.role === role).length;
 const countTutors = (users) => users.filter((user) => isTutorRole(user.role)).length;
@@ -43,7 +44,9 @@ const countByStatus = (bookings, status) =>
   bookings.filter((booking) => booking.status === status).length;
 
 export default function AdminDashboardScreen({ navigation }) {
-  const { user, signOutDemo } = useAuth();
+  const { user, signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
   const isDemoAdmin = user?.id === 'demo-admin';
   const users = useAsync(() => (isDemoAdmin ? Promise.resolve([]) : getUsers()), [isDemoAdmin]);
   const bookings = useAsync(
@@ -79,6 +82,18 @@ export default function AdminDashboardScreen({ navigation }) {
   const pendingList = Array.isArray(pending.data) ? pending.data : [];
 
   const goTo = (route) => navigation.navigate(route);
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError('');
+    try {
+      await signOut();
+    } catch (error) {
+      setSignOutError(getAuthErrorMessage(error));
+      setSigningOut(false);
+    }
+  };
 
   return (
     <ScreenContainer>
@@ -132,10 +147,16 @@ export default function AdminDashboardScreen({ navigation }) {
           detail="Every booking and its status"
           onPress={() => goTo(ROUTES.ADMIN_BOOKINGS)}
         />
+        {signOutError ? (
+          <Text accessibilityRole="alert" style={styles.signOutError}>
+            {signOutError}
+          </Text>
+        ) : null}
         <AppButton
           title="Log out"
           variant="danger"
-          onPress={signOutDemo}
+          onPress={handleSignOut}
+          loading={signingOut}
         />
       </ScrollView>
     </ScreenContainer>
@@ -209,6 +230,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  signOutError: {
+    marginBottom: spacing.sm,
+    color: colors.errorText,
+    fontSize: 13,
   },
   shortcut: {
     flexDirection: 'row',

@@ -8,9 +8,8 @@
 // first answer, so a person who is already logged in does not see the login
 // screen flash by.
 //
-// signInDemo / signOutDemo are kept for screens that are not wired yet (the
-// hidden admin login until Week 2). signOutDemo now also logs a real user out,
-// so the existing "Log Out" buttons work for everyone.
+// signInDemo is a local preview shortcut. signOut handles both Firebase
+// sessions and demo sessions; signOutDemo remains as a compatibility alias.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { signOut, subscribeToAuthState } from '../services/authService';
@@ -20,6 +19,7 @@ const signedOut = {
   user: null, // the user's profile document, or null when logged out
   role: null, // one of ROLES in src/constants/roles.js, or null when logged out
   loading: false, // true while the app is still finding out who is logged in
+  isDemo: false,
 };
 
 const AuthContext = createContext({
@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
           signOut().catch(() => {});
           return;
         }
-        setState({ user: profile, role: profile.role ?? null, loading: false });
+        setState({ user: profile, role: profile.role ?? null, loading: false, isDemo: false });
       } catch (error) {
         if (!isCurrent()) return;
         console.warn('Could not load the user profile:', error);
@@ -67,16 +67,12 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
+  const isDemoSession = state.isDemo;
   const handleSignOut = useCallback(async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      // Firebase not configured, or already logged out (demo login). Either way
-      // the app should end up on the login screen.
-    }
+    if (!isDemoSession) await signOut();
     latestEvent.current += 1;
     setState(signedOut);
-  }, []);
+  }, [isDemoSession]);
 
   const signInDemo = useCallback((role) => {
     latestEvent.current += 1;
@@ -91,6 +87,7 @@ export function AuthProvider({ children }) {
       },
       role,
       loading: false,
+      isDemo: true,
     });
   }, []);
 

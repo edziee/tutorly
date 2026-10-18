@@ -16,11 +16,13 @@ import * as ImagePicker from 'expo-image-picker';
 import AppButton from '../../components/AppButton';
 import AppInput from '../../components/AppInput';
 import ScreenContainer from '../../components/ScreenContainer';
+import { useAuth } from '../../context/AuthContext';
 import { mockStudentProfile } from '../../data/mockStudentProfile';
 import { colors } from '../../theme/colors';
 import { radius } from '../../theme/spacing';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { getAuthErrorMessage } from '../../utils/errors';
 
 const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -28,6 +30,8 @@ export default function StudentProfileScreen({
   profileImageUri,
   onProfileImageChange,
 }) {
+  const { signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
   const [streakRemindersEnabled, setStreakRemindersEnabled] = useState(true);
   const [meetingPreference, setMeetingPreference] = useState('campus');
   const [profile, setProfile] = useState({
@@ -40,6 +44,25 @@ export default function StudentProfileScreen({
   const [profileDraft, setProfileDraft] = useState(profile);
   const [editVisible, setEditVisible] = useState(false);
   const showProfileMessage = (message) => Alert.alert('Student Profile', message);
+  const confirmSignOut = () => {
+    if (signingOut) return;
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          setSigningOut(true);
+          try {
+            await signOut();
+          } catch (error) {
+            Alert.alert('Unable to log out', getAuthErrorMessage(error));
+            setSigningOut(false);
+          }
+        },
+      },
+    ]);
+  };
   const pickProfileImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -295,10 +318,10 @@ export default function StudentProfileScreen({
         </View>
 
         <Pressable
-          onPress={() => Alert.alert('Log Out', 'Are you sure you want to log out?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Log Out', style: 'destructive' },
-          ])}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: signingOut, busy: signingOut }}
+          disabled={signingOut}
+          onPress={confirmSignOut}
           style={styles.logoutButton}
         >
           <View style={styles.logoutIcon}>
