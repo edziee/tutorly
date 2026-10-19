@@ -16,6 +16,7 @@ test('known auth codes give a readable message', () => {
   assert.match(getAuthErrorMessage({ code: 'auth/too-many-requests' }), /Too many/);
   assert.match(getAuthErrorMessage({ code: 'auth/profile-missing' }), /not set up yet/);
   assert.match(getAuthErrorMessage({ code: 'auth/not-admin' }), /not authorized for admin access/);
+  assert.match(getAuthErrorMessage({ code: 'auth/role-mismatch' }), /different portal/);
 });
 
 test('unknown errors never show raw developer text to a student', () => {

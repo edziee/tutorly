@@ -4,9 +4,9 @@
 // Plan tasks: "Build the UI for login and sign-up" (Member 3, Week 1) and
 // "Sign-up and login logic for students and tutors" (Member 1, Week 1).
 //
-// The Student / Tutor cards only choose the wording on the screen. Tutors and
-// professional tutors both choose "Tutor", and the account's own role decides
-// which dashboard opens. The role can be passed in with
+// The Student / Tutor cards choose the portal. Tutors and professional tutors
+// both use "Tutor"; signIn checks the account role matches the selected portal.
+// The role can be passed in with
 // navigation.navigate(ROUTES.LOGIN, { role: 'tutor' }).
 //
 // Hidden admin login: a long press (1.5 seconds) on the logo opens it. There is
@@ -73,7 +73,7 @@ export default function LoginScreen({ navigation, route }) {
 
     setSubmitting(true);
     try {
-      await signIn(email.trim(), password);
+      await signIn(email.trim(), password, portal);
     } catch (error) {
       setFormError(getAuthErrorMessage(error));
     } finally {

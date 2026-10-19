@@ -25,6 +25,7 @@ export function AppHeaderActions({
   initials,
   imageUri,
   onProfilePress,
+  profileAccessibilityLabel = 'Open student profile',
   onNotificationsPress,
 }) {
   return (
@@ -46,7 +47,7 @@ export function AppHeaderActions({
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open student profile"
+        accessibilityLabel={profileAccessibilityLabel}
         hitSlop={8}
         onPress={onProfilePress}
         style={styles.avatarButton}
@@ -63,6 +64,7 @@ export default function AppHeader({
   initials,
   imageUri,
   onProfilePress,
+  profileAccessibilityLabel,
   onNotificationsPress,
 }) {
   return (
@@ -73,6 +75,7 @@ export default function AppHeader({
           initials={initials}
           imageUri={imageUri}
           onProfilePress={onProfilePress}
+          profileAccessibilityLabel={profileAccessibilityLabel}
           onNotificationsPress={onNotificationsPress}
         />
       </View>

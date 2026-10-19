@@ -10,11 +10,11 @@ You make the database and the logins work. Members 2, 3 and 4 cannot use real da
 | --- | --- | --- |
 | `src/config/firebase.js` | Ready | Connects the app to Firebase from `.env.local`. You should not need to edit it |
 | `.env.example` | Ready | Copy to `.env.local` and fill in |
-| `src/services/authService.js` | Placeholders | `signUp`, `signIn`, `signInAdmin`, `signOut`, `subscribeToAuthState` |
-| `src/services/userService.js` | Placeholders | `getUserProfile`, `createUserProfile`, `updateUserProfile` |
-| `src/services/storageService.js` | Reserved | Do not implement Firebase Storage uploads on Spark; store approved external proof/photo URLs instead |
-| `src/services/tutorService.js` | Placeholders | Yours: `getTutorApplication`, `saveTutorApplication` |
-| `src/context/AuthContext.jsx` | Starter | Finish `AuthProvider` (steps in the comment at the top) |
+| `src/services/authService.js` | Implemented | `signUp`, `signIn`, `signInAdmin`, `signOut`, `subscribeToAuthState` |
+| `src/services/userService.js` | Implemented | `getUserProfile`, `createUserProfile`, `updateUserProfile` |
+| `src/services/storageService.js` | Reserved, unused | Do not implement Firebase Storage uploads on Spark; tutor proof uses Google Drive URLs and photos use approved external URLs or initials |
+| `src/services/tutorService.js` | Partly implemented | Member 2 owns `getTutors`, `getTutorById`; Member 1 owns `getTutorApplication`, `saveTutorApplication` |
+| `src/context/AuthContext.jsx` | Implemented | Loads Firebase user profiles, handles sign-out, and persists profile updates |
 | `src/navigation/AppNavigator.jsx` | Ready | Chooses the screens for the role. You switch `App.js` to it |
 | `src/screens/auth/*` | Placeholders | Member 3 builds the layout, you connect `Login`, `SignUp` and `AdminLogin` |
 | `src/screens/professional/ProfessionalDashboardScreen.jsx` | Placeholder | Member 3 builds it, you connect it to Firestore in Week 2 |
@@ -30,12 +30,12 @@ The required features still work with these Spark-compatible replacements:
 
 | Feature | Spark-compatible approach |
 | --- | --- |
-| Tutor transcript or verification proof | Let the tutor enter the course, grade and document title, then provide a reviewable URL from an instructor-approved free file host. Store only the URL and metadata in the tutor document. Never store a device-local `file://` URI because admins and other devices cannot open it. |
+| Tutor transcript or verification proof | Peer tutors list courses and provide a qualifying grade, proof description and Drive URL for each course. Alumni/Professors list courses, may omit grades, and provide one application-level proof description and Drive URL. Store only URLs and metadata in Firestore. The tutor must grant the assigned reviewer access, and the admin must open the link before review. Never store a device-local `file://` URI because admins and other devices cannot open it. |
 | Profile photo | Store an instructor-approved external image URL in `photoUrl`. If no URL is available, use the user's initials/avatar placeholder. Do not add a Firebase Storage upload path. |
 | Booking, message and verification alerts | Write an in-app notification document from the client service immediately after the related Firestore write succeeds. Do not create a Cloud Function, scheduled function or Firebase Extension. |
 | Session reminders | Keep using local `expo-notifications` scheduling on the user's device. This is separate from Firebase and does not require a paid plan. |
 
-The external file host is not part of Firebase. Do not add credentials or private API keys for it to `EXPO_PUBLIC_*` variables. A tutor must confirm that the submitted URL is accessible to the assigned admin before the application can be reviewed. If the instructor does not approve an external host, keep the proof as structured text and mark the file attachment as unavailable rather than enabling Blaze.
+Google Drive is external to Firebase. Do not add Google Drive credentials, OAuth tokens, or private API keys to `EXPO_PUBLIC_*` variables. Prefer sharing a proof file with the assigned reviewer's Google account rather than making it public to anyone with the link; confirm the team's sharing policy and reviewer account first. A tutor must confirm that the reviewer can open the submitted URL, and the admin must check it before approving the application. If the link is missing or inaccessible, leave the application pending and request a usable link rather than enabling Blaze or treating the proof as verified.
 
 **Important limitation:** client-created notifications are not guaranteed if the app is closed or offline. The booking/message write is the source of truth; notification creation is best effort and must show an error state without rolling back the main action. Security rules must still restrict notification documents to authenticated users and the allowed schema. Do not describe these client-created alerts as trusted server events.
 
@@ -69,8 +69,8 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 **Week 2**
 - Professional tutor login and sign-up with verification documents, and the hidden admin login (`signInAdmin` signs the person out and throws if the role is not `admin`).
 - Each role opens its own dashboard (this is `AppNavigator`).
-- Profiles save to and load from Firestore. `StudentProfileScreen` and `TutorProfileScreen` stop using their mock data.
-- Verification: `saveTutorApplication` sets `verificationStatus` to `pending` and saves structured proof metadata plus the reviewable URL. There is no file upload.
+- Student profile fields and tutor applications save to and load from Firestore. Tutor proof is a Google Drive URL and metadata; profile photos use an external HTTPS URL or initials.
+- Verification: `saveTutorApplication` sets `verificationStatus` to `pending` and saves proof metadata using the evidence rules for the tutor type. Peer tutors need a qualifying 1.00–1.50 grade and course-level proof per course; Alumni/Professors need one application-level proof description and Drive URL, while grades are optional. There is no file upload.
 - Connect `ProfessionalDashboardScreen` to Firestore once Member 3 has built it.
 
 **Week 3**
@@ -79,7 +79,9 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 
 ## Mock data you remove
 
-`src/data/mockStudentProfile.jsx` (replaced by `users`) and `src/data/mockMentorApplication.jsx` (replaced by the tutor's profile). Delete each file in the same pull request that stops using it, and tick it in `MOCK_DATA_INVENTORY.md`. `StudentNavigator.jsx` also reads `mockStudentProfile` for the header initials. Do not replace these with Firebase Storage uploads.
+`src/data/mockStudentProfile.jsx` and `src/data/mockMentorApplication.jsx` have been removed from the profile screens. Student details and tutor application data now load from Firestore. Do not replace external photo URLs with Firebase Storage uploads.
+
+The shared tutor dashboard profile summary also reads the tutor application from Firestore for Peer Tutors, Alumni and Professors, including category, credentials, courses, proof details, verification status and application availability. Its booking-request and session panels still contain mock data; booking/schedule data integration belongs to Member 2, and chat integration belongs to Member 4. Do not mark the broader dashboard task complete until those respective owners connect their data and the remaining Member 1-owned professional dashboard work is verified.
 
 ## Watch out for
 

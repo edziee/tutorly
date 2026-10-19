@@ -19,6 +19,9 @@ export const LOGIN_ROLES = [...SIGNUP_ROLES, ROLES.PROFESSIONAL];
 
 export const isValidRole = (value) => ROLE_VALUES.includes(value);
 export const isTutorRole = (value) => value === ROLES.TUTOR || value === ROLES.PROFESSIONAL;
+export const isRoleAllowedInPortal = (role, portal) =>
+  (portal === ROLES.STUDENT && role === ROLES.STUDENT) ||
+  (portal === ROLES.TUTOR && isTutorRole(role));
 
 // Names to show on screen for each role.
 export const ROLE_LABELS = {

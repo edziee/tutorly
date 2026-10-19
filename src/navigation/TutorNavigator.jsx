@@ -8,9 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '../constants/routes';
 import TutorWorkspaceProfileScreen from '../screens/tutor/TutorWorkspaceProfileScreen';
+import TutorProfileScreen from '../screens/tutor/TutorProfileScreen';
 import TutorScheduleScreen from '../screens/tutor/TutorScheduleScreen';
 import TutorChatScreen from '../screens/tutor/TutorChatScreen';
 import AppHeader from '../components/AppHeader';
+import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -23,6 +25,15 @@ const tabs = {
 };
 
 function TutorTabs() {
+  const { user } = useAuth();
+  const initials = (user?.name ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('') || 'T';
+
   return (
     <Tab.Navigator
       initialRouteName="TutorProfile"
@@ -36,7 +47,8 @@ function TutorTabs() {
         header: () => (
           <AppHeader
             title={tabs[route.name].title}
-            initials="MC"
+            initials={initials}
+            imageUri={user?.photoUrl}
           />
         ),
         tabBarActiveTintColor: colors.primary,
@@ -66,6 +78,11 @@ export default function TutorNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="TutorTabs" component={TutorTabs} />
+      <Stack.Screen
+        name="TutorApplication"
+        component={TutorProfileScreen}
+        options={{ headerShown: true, title: 'Tutor Application' }}
+      />
     </Stack.Navigator>
   );
 }

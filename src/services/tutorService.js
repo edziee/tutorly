@@ -5,7 +5,12 @@
 //   Member 2: getTutors, getTutorById   (replaces src/data/mockTutors.jsx)
 //   Member 1: getTutorApplication, saveTutorApplication
 //             (replaces src/data/mockMentorApplication.jsx)
-import { notImplemented } from './notImplemented';
+import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+
+import { requireFirebase } from '../config/firebase';
+import { COLLECTIONS } from '../constants/collections';
+import { TUTOR_TIERS, TUTOR_TYPES } from '../constants/statuses';
+import { getTutorApplicationEvidenceError } from '../utils/validation';
 
 /**
  * Tutors for the list and the map. Only approved tutors are shown to students.
@@ -32,16 +37,78 @@ export async function getTutorById(tutorId) {
  * @returns {Promise<object | null>}
  */
 export async function getTutorApplication(uid) {
-  throw notImplemented('tutorService.getTutorApplication', 'Member 1');
+  if (!uid) throw new Error('getTutorApplication needs a uid.');
+
+  const { db } = requireFirebase();
+  const snapshot = await getDoc(doc(db, COLLECTIONS.TUTORS, uid));
+  return snapshot.exists() ? { ...snapshot.data(), id: snapshot.id, uid: snapshot.id } : null;
 }
 
 /**
  * Save the application and set verificationStatus to 'pending' so it shows up
- * in the admin's review list. Proof files are uploaded with storageService.
+ * in the admin's review list. Save proof metadata and a Google Drive sharing
+ * URL only; do not upload proof files to Firebase Storage on the Spark plan.
  * @param {string} uid
  * @param {object} application
  * @returns {Promise<void>}
  */
 export async function saveTutorApplication(uid, application) {
-  throw notImplemented('tutorService.saveTutorApplication', 'Member 1');
+  if (!uid) throw new Error('saveTutorApplication needs a uid.');
+  if (!application || !Array.isArray(application.courses)) {
+    throw new Error('saveTutorApplication needs application details and courses.');
+  }
+  const evidenceError = getTutorApplicationEvidenceError(application);
+  if (evidenceError) throw new Error(evidenceError);
+  if (!Object.values(TUTOR_TIERS).includes(application.tier)) {
+    throw new Error('Choose a valid tutor category before saving the application.');
+  }
+
+  const courses = application.courses.map((course) => {
+    const id = (course.id ?? '').trim();
+    const code = (course.code ?? '').trim();
+    const title = (course.title ?? '').trim();
+    const grade = (course.grade ?? '').trim();
+    const courseDetails = {
+      id,
+      code,
+      title,
+      grade,
+    };
+    if (application.tutorType === TUTOR_TYPES.PEER) {
+      courseDetails.proofName = course.proofName.trim();
+      courseDetails.proofUrl = course.proofUrl.trim();
+    }
+    return courseDetails;
+  });
+
+  const { db } = requireFirebase();
+  const tutorRef = doc(db, COLLECTIONS.TUTORS, uid);
+  const existing = await getDoc(tutorRef);
+  await setDoc(
+    tutorRef,
+    {
+      name: (application.name ?? '').trim(),
+      tutorType: application.tutorType,
+      tier: application.tier,
+      credentials: (application.credentials ?? '').trim(),
+      preferredDays: application.preferredDays ?? [],
+      preferredTimeSlots: application.preferredTimeSlots ?? [],
+      courses,
+      applicationProofName: application.tutorType === TUTOR_TYPES.PROFESSIONAL
+        ? application.applicationProofName.trim()
+        : deleteField(),
+      applicationProofUrl: application.tutorType === TUTOR_TYPES.PROFESSIONAL
+        ? application.applicationProofUrl.trim()
+        : deleteField(),
+      teachingPhilosophy: (application.teachingPhilosophy ?? '').trim(),
+      formats: application.formats ?? [],
+      verificationStatus: 'pending',
+      verificationNote: '',
+      verificationReviewedBy: deleteField(),
+      verificationReviewedAt: deleteField(),
+      updatedAt: serverTimestamp(),
+      ...(!existing.exists() ? { createdAt: serverTimestamp() } : {}),
+    },
+    { merge: true },
+  );
 }

@@ -13,7 +13,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { signOut, subscribeToAuthState } from '../services/authService';
-import { getUserProfile } from '../services/userService';
+import { getUserProfile, updateUserProfile } from '../services/userService';
 
 const signedOut = {
   user: null, // the user's profile document, or null when logged out
@@ -25,6 +25,7 @@ const signedOut = {
 const AuthContext = createContext({
   ...signedOut,
   signOut: async () => {},
+  updateProfile: async () => {},
   signInDemo: () => {},
   signOutDemo: () => {},
 });
@@ -74,6 +75,18 @@ export function AuthProvider({ children }) {
     setState(signedOut);
   }, [isDemoSession]);
 
+  const handleUpdateProfile = useCallback(async (changes) => {
+    const uid = state.user?.uid;
+    if (!uid || state.isDemo) throw new Error('A signed-in Firebase account is required.');
+    await updateUserProfile(uid, changes);
+    const safeChanges = { ...changes };
+    ['id', 'uid', 'role', 'email', 'createdAt', 'tutorType'].forEach((field) => delete safeChanges[field]);
+    setState((current) => ({
+      ...current,
+      user: { ...current.user, ...safeChanges },
+    }));
+  }, [state.isDemo, state.user?.uid]);
+
   const signInDemo = useCallback((role) => {
     latestEvent.current += 1;
     setState({
@@ -93,7 +106,13 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ ...state, signOut: handleSignOut, signInDemo, signOutDemo: handleSignOut }}
+      value={{
+        ...state,
+        signOut: handleSignOut,
+        updateProfile: handleUpdateProfile,
+        signInDemo,
+        signOutDemo: handleSignOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

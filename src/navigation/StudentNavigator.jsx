@@ -2,10 +2,10 @@ import { BottomTabBar, createBottomTabNavigator } from '@react-navigation/bottom
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
 
 import AppHeader from '../components/AppHeader';
 import StudentAvatar from '../components/StudentAvatar';
+import { useAuth } from '../context/AuthContext';
 import { ROUTES } from '../constants/routes';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import StudentDashboardScreen from '../screens/student/StudentDashboardScreen';
@@ -14,7 +14,6 @@ import ChatScreen from '../screens/shared/ChatScreen';
 import ScheduleScreen from '../screens/student/ScheduleScreen';
 import StudentProfileScreen from '../screens/student/StudentProfileScreen';
 import TutorProfileScreen from '../screens/tutor/TutorProfileScreen';
-import { mockStudentProfile } from '../data/mockStudentProfile';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
@@ -28,16 +27,21 @@ const tabConfig = {
   Chat: { icon: 'chatbubble', inactiveIcon: 'chatbubble-outline', title: 'Messages' },
 };
 
-const studentInitials = mockStudentProfile.name
-  .split(' ')
-  .map((part) => part[0])
-  .join('')
-  .slice(0, 2);
+function getInitials(name) {
+  return (name ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('');
+}
 
 // The five tabs. They sit inside the stack below so that Notifications and the
 // dashboard can open on top of them with a back button.
 function StudentTabs() {
-  const [profileImageUri, setProfileImageUri] = useState(null);
+  const { user } = useAuth();
+  const studentInitials = getInitials(user?.name) || 'S';
 
   return (
     <Tab.Navigator
@@ -56,7 +60,7 @@ function StudentTabs() {
           <AppHeader
             title={tabConfig[route.name].title}
             initials={studentInitials}
-            imageUri={profileImageUri}
+            imageUri={user?.photoUrl}
             onProfilePress={() => navigation.navigate('Profile')}
             onNotificationsPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}
           />
@@ -81,7 +85,7 @@ function StudentTabs() {
           if (route.name === 'Profile') {
             return (
               <StudentAvatar
-                imageUri={profileImageUri}
+                imageUri={user?.photoUrl}
                 initials={studentInitials}
                 size={size}
               />
@@ -97,12 +101,7 @@ function StudentTabs() {
       </Tab.Screen>
 
       <Tab.Screen name="Profile" options={{ title: 'Profile' }}>
-        {() => (
-          <StudentProfileScreen
-            profileImageUri={profileImageUri}
-            onProfileImageChange={setProfileImageUri}
-          />
-        )}
+        {() => <StudentProfileScreen />}
       </Tab.Screen>
 
       <Tab.Screen name="Schedule" options={{ title: 'Schedule' }}>
@@ -119,6 +118,9 @@ function StudentTabs() {
 }
 
 export default function StudentNavigator() {
+  const { user } = useAuth();
+  const studentInitials = getInitials(user?.name) || 'S';
+
   return (
     <Stack.Navigator initialRouteName="StudentTabs">
       <Stack.Screen

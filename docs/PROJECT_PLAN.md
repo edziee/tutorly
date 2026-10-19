@@ -72,7 +72,7 @@ The four members split the work by area. Member 3 builds the screens and customi
 ### Member 1: Firebase setup, logins for all roles and security
 
 - **Week 1:** create the Firebase project on the free Spark plan, turn on Authentication and Firestore, and share the config with everyone. Do not enable Storage or add Cloud Functions. Agree with the team on the collections (users, tutors, bookings, messages, notifications) and on a role field for each user: student, tutor, professional or admin. Build the sign-up and login logic for students and tutors. Make the list of every place in the repo that uses mock data.
-- **Week 2:** build the professional tutor login logic (professors and alumni) and the hidden admin login, and make each role open its own dashboard. Save profiles to Firestore, let tutors submit structured verification details and an approved external proof URL, and build the eligibility check. Connect the professional tutor dashboard (built by Member 3) to Firestore. Replace the mock data in the login, profile and professional dashboard screens.
+- **Week 2:** build the professional tutor login logic (professors and alumni) and the hidden admin login, and make each role open its own dashboard. Save profiles to Firestore, let tutors submit structured verification details and a Google Drive proof URL, and build the eligibility check. Connect the professional tutor dashboard (built by Member 3) to Firestore. Replace the mock data in the login, profile and professional dashboard screens.
 - **Week 3:** write the security rules so each role can only reach its own data, and coordinate the final mock-data sweep.
 - **Done when:** all four roles can log in and land on the right dashboard, profiles and the professional dashboard use Firestore data, and no mock data is left in those screens.
 
@@ -113,7 +113,7 @@ Week 1 sets up Firebase and the shared data structure first, because everything 
 | --- | --- | --- |
 | Figma prototype, all 16 screens | Everyone | Done |
 | Create Firebase project, connect it to the app, share config with the team | Member 1 | Not started |
-| Design Firestore structure (users with a role field, tutors, bookings, messages, notifications) | Member 1 (with all) | Not started |
+| Design Firestore structure (users with a role field, tutors, bookings, messages, notifications) | Member 1 (with all) | In progress — schema proposal documented in [FIRESTORE_SCHEMA.md](FIRESTORE_SCHEMA.md); team review and open decisions remain |
 | List every file and screen in the repo that uses mock data, and which Firestore collection will replace it | Everyone (Member 1 compiles) | Draft ready in [MOCK_DATA_INVENTORY.md](MOCK_DATA_INVENTORY.md), team to review |
 | Sign-up and login logic for students and tutors | Member 1 | Not started |
 | Set up the shared UI theme and reusable components to match Figma | Member 3 | In progress (theme, form, card, badge, filter and state components are in; `ScreenHeader` and `SessionCard` are still empty) |
@@ -129,12 +129,12 @@ Week 2 connects each area to real Firebase data and builds the two new logins an
 
 | Task | Owner | Status |
 | --- | --- | --- |
-| Student and tutor profiles save to and load from Firestore | Member 1 | Not started |
-| Tutor verification proof metadata/URL and eligibility check | Member 1 | Not started (the eligibility screen exists but stores nothing) |
-| Build the professional tutor login logic (professors and alumni) with its verification documents | Member 1 | Not started |
-| Build the hidden admin login (no public sign-up; admin accounts created by the team in Firebase) | Member 1 | Not started |
+| Student and tutor profiles save to and load from Firestore | Member 1 | Done — verified by signing out and back in; saved student profile and tutor application persisted |
+| Tutor verification proof metadata/URL and eligibility check | Member 1 | Done — both types list courses and submit Google Drive proof; Peer Tutors require grades 1.00–1.50 and per-course proof, while Alumni/Professors submit one application-level proof and may omit grades |
+| Build the professional tutor login logic (professors and alumni) with its verification documents | Member 1 | Done — professors and alumni use the shared tutor sign-up/login; sign-up type is saved and determines the application evidence requirements |
+| Build the hidden admin login (no public sign-up; admin accounts created by the team in Firebase) | Member 1 | Done — admin accounts are created in Firebase, and admin sign-in verifies the Firestore role; Firestore security rules are a separate Week 3 task |
 | Role-based access: each role (student, tutor, professional tutor, admin) opens its own dashboard | Member 1 | Not started |
-| Connect the professional tutor dashboard to Firestore and replace mock data in the login, profile and professional dashboard screens | Member 1 | Not started |
+| Connect the professional tutor dashboard to Firestore and replace mock data in the login, profile and professional dashboard screens | Member 1 | In progress — the shared tutor dashboard profile/application summary reads from Firestore for Peer Tutors, Alumni and Professors, including category, proof details and availability. Booking requests and session panels still show mock data; booking/schedule integration belongs to Member 2 and chat integration belongs to Member 4 |
 | Booking flow and schedule saved to Firestore | Member 2 | Not started (schedule screen exists on mock data and device storage) |
 | Connect the student dashboard and tutors list to Firestore and replace mock data in them, in booking and in the schedule | Member 2 | Not started |
 | Build the booking, schedule, payment and chat screens | Member 3 | In progress (schedule and chat screens exist; booking and payment not built) |

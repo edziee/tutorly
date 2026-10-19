@@ -1,23 +1,20 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppButton from '../../components/AppButton';
+import ErrorState from '../../components/ErrorState';
+import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import { ROLES } from '../../constants/roles';
+import { TUTOR_TYPES } from '../../constants/statuses';
 import { useAuth } from '../../context/AuthContext';
-import { getAuthErrorMessage } from '../../utils/errors';
-import { mockMentorApplication } from '../../data/mockMentorApplication';
+import { getTutorApplication } from '../../services/tutorService';
+import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
 import { mockTutorSessions } from '../../data/mockTutorWorkspace';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
-
-const week = [
-  ['Mon', '2 slots', true],
-  ['Tue', '3 slots', false],
-  ['Wed', '3 slots', true],
-  ['Thu', '1 slot', false],
-  ['Fri', '2 slots', true],
-];
 
 const requests = [
   { name: 'Devon Miller', course: 'CS 240', detail: '1:1 session', amount: 'P280.00', tone: 'primary' },
@@ -54,11 +51,60 @@ function RequestCard({ request }) {
   );
 }
 
-export default function TutorWorkspaceProfileScreen() {
-  const { tutor, courses, preferredDays, preferredTimeSlots } = mockMentorApplication;
-  const { signOut } = useAuth();
+export default function TutorWorkspaceProfileScreen({ navigation }) {
+  const { user, signOut } = useAuth();
   const [instantHelp, setInstantHelp] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
+  const [application, setApplication] = useState(null);
+  const [loadStatus, setLoadStatus] = useState('loading');
+  const [loadError, setLoadError] = useState(null);
+  const uid = user?.uid;
+  const tutorName = application?.name || user?.name || 'Tutor';
+  const tutorType = application?.tutorType
+    ?? user?.tutorType
+    ?? (user?.role === ROLES.PROFESSIONAL ? TUTOR_TYPES.PROFESSIONAL : null);
+  const tutorCategory = application?.tier
+    ?? (tutorType === TUTOR_TYPES.PROFESSIONAL
+      ? 'Professional Tutor'
+      : tutorType === TUTOR_TYPES.PEER
+        ? 'Peer Tutor'
+        : 'Category not set');
+  const courses = application?.courses ?? [];
+  const preferredDays = application?.preferredDays ?? [];
+  const preferredTimeSlots = application?.preferredTimeSlots ?? [];
+  const verificationStatus = application?.verificationStatus ?? 'not_submitted';
+
+  const loadApplication = useCallback(async () => {
+    if (!uid) {
+      setLoadError(new Error('Sign in again to load your tutor profile.'));
+      setLoadStatus('error');
+      return;
+    }
+    setLoadStatus('loading');
+    setLoadError(null);
+    try {
+      setApplication(await getTutorApplication(uid));
+      setLoadStatus('ready');
+    } catch (error) {
+      setLoadError(error);
+      setLoadStatus('error');
+    }
+  }, [uid]);
+
+  useFocusEffect(useCallback(() => {
+    loadApplication();
+  }, [loadApplication]));
+
+  if (loadStatus === 'loading') return <LoadingState message="Loading your tutor profile..." />;
+  if (loadStatus === 'error') {
+    return (
+      <ErrorState
+        title="Could not load your tutor profile"
+        message={getErrorMessage(loadError)}
+        onRetry={loadApplication}
+      />
+    );
+  }
 
   const handleSignOut = async () => {
     if (signingOut) return;
@@ -76,37 +122,91 @@ export default function TutorWorkspaceProfileScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.activeBanner}>
           <View style={styles.activeDot} />
-          <Text style={styles.activeText}>Tutor Workspace Active</Text>
+          <Text style={styles.activeText}>Tutor Workspace</Text>
         </View>
 
         <View style={styles.profileCard}>
           <View style={styles.profileRow}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{tutor.name.charAt(0)}</Text><View style={styles.verified}><Ionicons name="checkmark" size={11} color={colors.white} /></View></View>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{tutorName.charAt(0)}</Text>
+              {verificationStatus === 'approved' ? (
+                <View style={styles.verified}><Ionicons name="checkmark" size={11} color={colors.white} /></View>
+              ) : null}
+            </View>
             <View style={styles.identity}>
-              <View style={styles.nameRow}><Text style={styles.name}>{tutor.name}</Text><Badge>Alumni</Badge></View>
-              <Text style={styles.education}>B.S. Computer Science '23 · State Univ.</Text>
-              <View style={styles.rating}><Ionicons name="star" size={13} color={colors.warning} /><Text style={styles.ratingValue}>5.0</Text><Text style={styles.ratingMeta}>· 5.0 (48 observances)</Text></View>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{tutorName}</Text>
+                <Badge>{tutorCategory}</Badge>
+              </View>
+              <Text style={styles.education}>
+                {application?.credentials || 'Add your academic credentials in the tutor application.'}
+              </Text>
             </View>
           </View>
-          <View style={styles.rateRow}><Text style={styles.rateLabel}>Hourly rate</Text><Text style={styles.rate}>P280.00</Text><Text style={styles.rateUnit}>/session</Text></View>
-          <Text style={styles.profileDescription}>Verified tutor profile with {courses.length} approved courses and reliable campus availability.</Text>
-          <View style={styles.courseList}>
-            {courses.map((course) => <View key={course.id} style={styles.courseRow}><Ionicons name="checkmark-circle" size={16} color={colors.secondary} /><Text style={styles.courseText}>{course.code} {course.title}</Text><Badge>{course.grade}</Badge></View>)}
+          <View style={styles.rateRow}>
+            <Text style={styles.rateLabel}>Verification status</Text>
+            <Text style={styles.rate}>{verificationStatus.replace('_', ' ')}</Text>
           </View>
-          <Pressable style={styles.addCourse}><Ionicons name="add" size={15} color={colors.primary} /><Text style={styles.addCourseText}>Add Course / Submit Grade Transcript</Text></Pressable>
+          <Text style={styles.profileDescription}>
+            {verificationStatus === 'approved'
+              ? `${courses.length} course${courses.length === 1 ? '' : 's'} approved.`
+              : verificationStatus === 'pending'
+                ? 'Your application is waiting for admin review.'
+                : verificationStatus === 'rejected'
+                  ? application?.verificationNote || 'Your application needs changes before approval.'
+                  : 'Submit your tutor application and course proof for admin review.'}
+          </Text>
+          <View style={styles.courseList}>
+            {courses.map((course) => (
+              <View key={`${course.code}-${course.title}`} style={styles.courseItem}>
+                <View style={styles.courseRow}>
+                  <Ionicons name="school-outline" size={16} color={colors.secondary} />
+                  <Text style={styles.courseText}>{course.code} {course.title}</Text>
+                  {course.grade ? <Badge>{course.grade}</Badge> : null}
+                </View>
+                {tutorType === TUTOR_TYPES.PEER && course.proofName ? (
+                  <Text style={styles.proofDetails}>
+                    Proof: {course.proofName}{course.proofUrl ? `\n${course.proofUrl}` : ''}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+            {courses.length === 0 ? (
+              <Text style={styles.courseText}>No courses submitted yet.</Text>
+            ) : null}
+          </View>
+          {tutorType === TUTOR_TYPES.PROFESSIONAL && application?.applicationProofName ? (
+            <View style={styles.proofSummary}>
+              <Text style={styles.profileDescription}>
+                Application proof: {application.applicationProofName}
+              </Text>
+              {application.applicationProofUrl ? (
+                <Text style={styles.proofDetails}>{application.applicationProofUrl}</Text>
+              ) : null}
+            </View>
+          ) : null}
+          <Pressable
+            style={styles.addCourse}
+            onPress={() => navigation.navigate('TutorApplication')}
+          >
+            <Ionicons name="create-outline" size={15} color={colors.primary} />
+            <Text style={styles.addCourseText}>Manage tutor application and course proof</Text>
+          </Pressable>
         </View>
 
-        <SectionTitle title="Schedule & Availability" subtitle="Spring Semester Office Hours" action="Edit Grid" />
+        <SectionTitle title="Schedule & Availability" subtitle="Your application availability" action="Edit Grid" />
         <View style={styles.availabilityCard}>
           <View style={styles.instantRow}>
             <View style={styles.instantIcon}><Ionicons name="flash" size={16} color={colors.secondary} /></View>
             <View style={styles.instantCopy}><Text style={styles.instantTitle}>Accept Instant Help</Text><Text style={styles.instantSubtitle}>Allows 15-min drop-in ping</Text></View>
             <Switch value={instantHelp} onValueChange={setInstantHelp} trackColor={{ false: colors.border, true: colors.secondary }} thumbColor={colors.white} />
           </View>
-          <View style={styles.weekRow}>
-            {week.map(([day, slots, active]) => <View key={day} style={[styles.day, active && styles.dayActive]}><Text style={[styles.dayName, active && styles.dayNameActive]}>{day}</Text><Text style={styles.daySlots}>{slots}</Text><View style={[styles.dayDot, active && styles.dayDotActive]} /></View>)}
-          </View>
-          <Text style={styles.availabilityMeta}>{preferredDays.join(' · ')} · {preferredTimeSlots[0]}</Text>
+          <Text style={styles.availabilityMeta}>
+            Days: {preferredDays.length ? preferredDays.join(' · ') : 'Not set'}
+          </Text>
+          <Text style={styles.availabilityMeta}>
+            Times: {preferredTimeSlots.length ? preferredTimeSlots.join(' · ') : 'Not set'}
+          </Text>
         </View>
 
         <SectionTitle title="Booking Requests" subtitle="2 pending" action="Requires action" />
@@ -157,8 +257,11 @@ const styles = StyleSheet.create({
   rateUnit: { color: colors.mutedText, fontSize: 11 },
   profileDescription: { marginTop: spacing.sm, color: colors.mutedText, fontSize: 11, lineHeight: 16 },
   courseList: { marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.background },
+  courseItem: { paddingVertical: 4 },
   courseRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
   courseText: { flex: 1, color: colors.text, fontSize: 11 },
+  proofSummary: { marginTop: spacing.xs },
+  proofDetails: { flexShrink: 1, marginTop: 3, color: colors.mutedText, fontSize: 10, lineHeight: 15 },
   addCourse: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.background },
   addCourseText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm },

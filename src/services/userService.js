@@ -6,10 +6,11 @@ import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firest
 import { requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
 import { isValidRole } from '../constants/roles';
+import { TUTOR_TYPES } from '../constants/statuses';
 
 // Fields a screen must never change through updateUserProfile. `role` is set
 // once at sign-up (the Week 3 security rules enforce this on the server too).
-const PROTECTED_FIELDS = ['id', 'uid', 'role', 'email', 'createdAt'];
+const PROTECTED_FIELDS = ['id', 'uid', 'role', 'email', 'createdAt', 'tutorType'];
 
 /**
  * @param {string} uid
@@ -29,12 +30,18 @@ export async function getUserProfile(uid) {
  * security rules (Week 3) must stop users from changing it later.
  * Only known fields are saved, so a caller cannot slip extra data in.
  * @param {string} uid
- * @param {{ email: string, role: string, name?: string, campusId?: string }} data
+ * @param {{ email: string, role: string, name?: string, campusId?: string, tutorType?: string }} data
  * @returns {Promise<void>}
  */
 export async function createUserProfile(uid, data) {
   if (!uid) throw new Error('createUserProfile needs a uid.');
   if (!isValidRole(data?.role)) throw new Error(`createUserProfile: invalid role "${data?.role}".`);
+  if (
+    data.role === 'tutor' &&
+    !Object.values(TUTOR_TYPES).includes(data.tutorType)
+  ) {
+    throw new Error('createUserProfile needs a valid tutor type for tutor accounts.');
+  }
 
   const { db } = requireFirebase();
   await setDoc(doc(db, COLLECTIONS.USERS, uid), {
@@ -42,6 +49,7 @@ export async function createUserProfile(uid, data) {
     role: data.role,
     name: data.name ?? '',
     campusId: data.campusId ?? '',
+    ...(data.role === 'tutor' ? { tutorType: data.tutorType } : {}),
     createdAt: serverTimestamp(),
   });
 }

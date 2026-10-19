@@ -1,27 +1,39 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
-  Text,
   TextInput,
+  Text,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
 
 import AppButton from '../../components/AppButton';
+import ErrorState from '../../components/ErrorState';
+import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
-import { mockMentorApplication } from '../../data/mockMentorApplication';
+import { TUTOR_TIERS, TUTOR_TYPES } from '../../constants/statuses';
+import { useAuth } from '../../context/AuthContext';
+import { getTutorApplication, saveTutorApplication } from '../../services/tutorService';
 import { colors } from '../../theme/colors';
 import styles from '../../theme/tutorProfileScreenStyles';
+import { getErrorMessage } from '../../utils/errors';
+import {
+  getTutorApplicationEvidenceError,
+  getTutorCourseValidationError,
+} from '../../utils/validation';
 
 const gradeOptions = ['1.00', '1.25', '1.50'];
 const minimumPhilosophyLength = 80;
 const tutoringDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const tutoringTimeSlots = ['8:00 AM - 10:00 AM', '10:00 AM - 12:00 PM', '2:00 PM - 4:00 PM', '4:00 PM - 6:00 PM', '6:00 PM - 8:00 PM'];
+
+function createCourseId() {
+  return `course-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 function Section({ children, style }) {
   return <View style={[styles.section, style]}>{children}</View>;
@@ -47,7 +59,7 @@ function FieldLabel({ children, required = false }) {
   );
 }
 
-function MentorHeader({ tutor }) {
+function MentorHeader({ tutor, statusLabel }) {
   return (
     <View style={styles.hero}>
       <View style={styles.heroTopLine}>
@@ -61,7 +73,7 @@ function MentorHeader({ tutor }) {
         </View>
         <View style={styles.statusBadge}>
           <View style={styles.statusDot} />
-          <Text style={styles.statusText}>Ready to apply</Text>
+          <Text style={styles.statusText}>{statusLabel}</Text>
         </View>
       </View>
       <View style={styles.heroRule} />
@@ -72,7 +84,23 @@ function MentorHeader({ tutor }) {
   );
 }
 
-function EligibilityCard() {
+function EligibilityCard({ tutorType }) {
+  if (tutorType === TUTOR_TYPES.PROFESSIONAL) {
+    return (
+      <View style={styles.eligibilityCard}>
+        <View style={styles.eligibilityIcon}>
+          <Ionicons name="ribbon-outline" size={18} color={colors.error} />
+        </View>
+        <View style={styles.eligibilityCopy}>
+          <Text style={styles.eligibilityTitle}>Professional Tutor Verification</Text>
+          <Text style={styles.eligibilityBody}>
+            List each course you want to tutor. Grades are optional. Submit one description of your professional proof and a Google Drive link for the application.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.eligibilityCard}>
       <View style={styles.eligibilityIcon}>
@@ -81,7 +109,7 @@ function EligibilityCard() {
       <View style={styles.eligibilityCopy}>
         <Text style={styles.eligibilityTitle}>Academic Eligibility Rule</Text>
         <Text style={styles.eligibilityBody}>
-          Applicants must hold a final grade of 1.50 or better in the course they wish to mentor.
+          Applicants must hold a final grade from 1.00 to 1.50 in each course they wish to mentor.
         </Text>
         <View style={styles.thresholdBox}>
           <View style={styles.thresholdHeader}>
@@ -106,7 +134,7 @@ function EligibilityCard() {
   );
 }
 
-function CourseRow({ course, onRemove }) {
+function CourseRow({ course, onRemove, tutorType }) {
   return (
     <View style={styles.courseRow}>
       <View style={styles.courseIcon}>
@@ -115,63 +143,64 @@ function CourseRow({ course, onRemove }) {
       <View style={styles.courseDetails}>
         <Text style={styles.courseCode}>{course.code}</Text>
         <Text style={styles.courseTitle}>{course.title}</Text>
-        <Text style={styles.proofText}>
-          <Ionicons name="document-attach-outline" size={12} color={colors.secondary} />{' '}
-          TOR Proof attached ({course.proof})
-        </Text>
+        {tutorType === TUTOR_TYPES.PEER ? (
+          <Text style={styles.proofText}>
+            <Ionicons name="document-attach-outline" size={12} color={colors.secondary} />{' '}
+            Grade {course.grade} · Proof: {course.proofName}
+          </Text>
+        ) : course.grade ? (
+          <Text style={styles.proofText}>Grade provided (optional): {course.grade}</Text>
+        ) : null}
       </View>
       <View style={styles.courseStatus}>
         <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel={`Remove ${course.code}`}>
           <Ionicons name="trash-outline" size={16} color={colors.mutedText} />
         </Pressable>
-        <Text style={styles.courseReady}>Ready to{`\n`}Tutor</Text>
+        <Text style={styles.courseReady}>
+          {tutorType === TUTOR_TYPES.PEER ? `Proof${'\n'}added` : `Course${'\n'}added`}
+        </Text>
       </View>
     </View>
   );
 }
 
-function CourseForm({ onAdd }) {
+function CourseForm({ onAdd, tutorType }) {
   const [code, setCode] = useState('');
   const [title, setTitle] = useState('');
   const [grade, setGrade] = useState('');
-  const [proof, setProof] = useState(null);
-
-  async function pickProof() {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ['image/*', 'application/pdf'],
-      copyToCacheDirectory: true,
-      multiple: false,
-    });
-
-    if (!result.canceled && result.assets?.[0]) {
-      setProof(result.assets[0]);
-    }
-  }
+  const [proofName, setProofName] = useState('');
+  const [proofUrl, setProofUrl] = useState('');
+  const isPeerTutor = tutorType === TUTOR_TYPES.PEER;
 
   function addCourse() {
-    if (!code.trim() || !title.trim() || !grade || !proof) {
-      Alert.alert('Incomplete course', 'Add the course details and upload its transcript proof first.');
-      return;
-    }
-    onAdd({
-      id: `course-${Date.now()}`,
+    const course = {
+      id: createCourseId(),
       code: code.trim().toUpperCase(),
       title: title.trim(),
-      grade,
-      proof: proof.name,
-    });
+      grade: grade.trim(),
+      ...(isPeerTutor ? { proofName: proofName.trim(), proofUrl: proofUrl.trim() } : {}),
+    };
+    const validationError = getTutorCourseValidationError(tutorType, course);
+    if (validationError) {
+      Alert.alert(isPeerTutor ? 'Course not eligible or incomplete' : 'Course incomplete', validationError);
+      return;
+    }
+    onAdd(course);
     setCode('');
     setTitle('');
     setGrade('');
-    setProof(null);
+    setProofName('');
+    setProofUrl('');
   }
 
   return (
     <View style={styles.courseForm}>
       <View style={styles.addCourseHeading}>
         <Ionicons name="add-circle-outline" size={17} color={colors.primary} />
-        <Text style={styles.addCourseText}>Add Subject for Review</Text>
-        <Text style={styles.gradeScaleText}>Collegiate Scale: 1.00 - 1.50 Cutoff</Text>
+        <Text style={styles.addCourseText}>Add Course</Text>
+        {isPeerTutor ? (
+          <Text style={styles.gradeScaleText}>Grade cutoff: 1.00–1.50</Text>
+        ) : null}
       </View>
       <FieldLabel required>Course Code or Subject Title</FieldLabel>
       <View style={styles.inputWithIcon}>
@@ -184,32 +213,38 @@ function CourseForm({ onAdd }) {
           style={styles.input}
         />
       </View>
-      <FieldLabel required>Final Collegiate Grade</FieldLabel>
+      <FieldLabel required={isPeerTutor}>
+        Final Collegiate Grade{isPeerTutor ? '' : ' (optional)'}
+      </FieldLabel>
       <View style={styles.inputWithIcon}>
         <Ionicons name="star-outline" size={17} color={colors.mutedText} />
         <TextInput
           value={grade}
           onChangeText={setGrade}
-          placeholder="e.g., 1.25 (1.00 - 1.50 Max)"
+          placeholder={isPeerTutor ? '1.00 - 1.50' : 'Optional'}
           placeholderTextColor={colors.placeholder}
           keyboardType="decimal-pad"
           style={styles.input}
         />
       </View>
-      <Text style={styles.fieldLabel}>Quick grade selection</Text>
-      <View style={styles.gradeOptions}>
-        {gradeOptions.map((option) => (
-          <Pressable
-            key={option}
-            onPress={() => setGrade(option)}
-            style={[styles.gradeOption, grade === option && styles.gradeOptionActive]}
-          >
-            <Text style={[styles.gradeOptionText, grade === option && styles.gradeOptionTextActive]}>
-              {option}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      {isPeerTutor ? (
+        <>
+          <Text style={styles.fieldLabel}>Quick grade selection</Text>
+          <View style={styles.gradeOptions}>
+            {gradeOptions.map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => setGrade(option)}
+                style={[styles.gradeOption, grade === option && styles.gradeOptionActive]}
+              >
+                <Text style={[styles.gradeOptionText, grade === option && styles.gradeOptionTextActive]}>
+                  {option}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
       <FieldLabel required>Course Title</FieldLabel>
       <TextInput
         value={title}
@@ -218,13 +253,34 @@ function CourseForm({ onAdd }) {
         placeholderTextColor={colors.placeholder}
         style={styles.textInput}
       />
-      <Pressable style={styles.uploadBox} onPress={pickProof}>
-        <Ionicons name="cloud-upload-outline" size={24} color={colors.secondary} />
-        <Text style={styles.uploadTitle}>
-          {proof ? `Selected: ${proof.name}` : 'Tap to upload SIS portal screenshot'}
-        </Text>
-        <Text style={styles.uploadHint}>{proof ? 'Tap to replace file' : 'PNG, JPG, or PDF (Max 10MB)'}</Text>
-      </Pressable>
+      {isPeerTutor ? (
+        <>
+          <FieldLabel required>Proof document title</FieldLabel>
+          <TextInput
+            value={proofName}
+            onChangeText={setProofName}
+            placeholder="e.g., CS 201 transcript"
+            placeholderTextColor={colors.placeholder}
+            style={styles.textInput}
+          />
+          <FieldLabel required>Google Drive sharing link</FieldLabel>
+          <TextInput
+            value={proofUrl}
+            onChangeText={setProofUrl}
+            placeholder="https://drive.google.com/file/d/..."
+            placeholderTextColor={colors.placeholder}
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.textInput}
+          />
+        </>
+      ) : null}
+      <Text style={styles.fieldLabel}>
+        {isPeerTutor
+          ? 'Share the course proof with the assigned reviewer. The app stores its link and details, not the file.'
+          : 'Add the course or courses you want to tutor. Your professional proof is submitted once for the application below.'}
+      </Text>
       <Pressable style={styles.addButton} onPress={addCourse}>
         <Ionicons name="add" size={18} color={colors.white} />
         <Text style={styles.addButtonText}>Add Course to Mentorship List</Text>
@@ -234,21 +290,94 @@ function CourseForm({ onAdd }) {
 }
 
 export default function TutorProfileScreen() {
-  const {
-    tutor,
-    credentials: initialCredentials,
-    preferredDays: initialPreferredDays,
-    preferredTimeSlots: initialPreferredTimeSlots,
-    courses: initialCourses,
-    teachingPhilosophy,
-  } = mockMentorApplication;
-  const [courses, setCourses] = useState(initialCourses);
-  const [selectedFormats, setSelectedFormats] = useState(['Online Synchronous']);
-  const [credentials, setCredentials] = useState([initialCredentials]);
-  const [preferredDays, setPreferredDays] = useState(initialPreferredDays);
-  const [preferredTimeSlots, setPreferredTimeSlots] = useState(initialPreferredTimeSlots);
-  const [philosophy, setPhilosophy] = useState(teachingPhilosophy);
+  const { user } = useAuth();
+  const [loadStatus, setLoadStatus] = useState('loading');
+  const [loadError, setLoadError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [applicationStatus, setApplicationStatus] = useState('not_submitted');
+  const [tutorType, setTutorType] = useState(user?.tutorType ?? TUTOR_TYPES.PEER);
+  const [needsTutorTypeChoice, setNeedsTutorTypeChoice] = useState(false);
+  const [tier, setTier] = useState(TUTOR_TIERS.PEER);
+  const [courses, setCourses] = useState([]);
+  const [selectedFormats, setSelectedFormats] = useState([]);
+  const [credentials, setCredentials] = useState(['']);
+  const [preferredDays, setPreferredDays] = useState([]);
+  const [preferredTimeSlots, setPreferredTimeSlots] = useState([]);
+  const [philosophy, setPhilosophy] = useState('');
   const [isCertified, setIsCertified] = useState(false);
+  const [applicationProofName, setApplicationProofName] = useState('');
+  const [applicationProofUrl, setApplicationProofUrl] = useState('');
+  const uid = user?.uid;
+
+  const loadApplication = useCallback(async () => {
+    if (!uid) {
+      setLoadError(new Error('Sign in again to load your tutor profile.'));
+      setLoadStatus('error');
+      return;
+    }
+
+    setLoadStatus('loading');
+    setLoadError(null);
+    try {
+      const application = await getTutorApplication(uid);
+      setApplicationStatus(application?.verificationStatus ?? 'not_submitted');
+      const savedTutorType = user?.tutorType
+        ?? application?.tutorType
+        ?? (user?.role === 'professional' ? TUTOR_TYPES.PROFESSIONAL : null)
+        ?? (application?.tier
+          ? application.tier === TUTOR_TIERS.PEER
+            ? TUTOR_TYPES.PEER
+            : TUTOR_TYPES.PROFESSIONAL
+          : null);
+      setNeedsTutorTypeChoice(!savedTutorType);
+      setTutorType(savedTutorType ?? TUTOR_TYPES.PEER);
+      setTier(
+        application?.tier
+        ?? (savedTutorType === TUTOR_TYPES.PROFESSIONAL ? TUTOR_TIERS.ALUMNI : TUTOR_TIERS.PEER),
+      );
+      const savedCredentials = application?.credentials;
+      setCredentials(
+        Array.isArray(savedCredentials)
+          ? (savedCredentials.length ? savedCredentials : [''])
+          : typeof savedCredentials === 'string' && savedCredentials.trim()
+            ? savedCredentials.split('\n')
+            : [''],
+      );
+      setPreferredDays(application?.preferredDays ?? []);
+      setPreferredTimeSlots(application?.preferredTimeSlots ?? []);
+      setCourses(
+        (application?.courses ?? []).map((course) => ({
+          ...course,
+          id: course.id || createCourseId(),
+          proofName: course.proofName ?? '',
+          proofUrl: course.proofUrl ?? '',
+        })),
+      );
+      setSelectedFormats(application?.formats ?? []);
+      setPhilosophy(application?.teachingPhilosophy ?? '');
+      setApplicationProofName(application?.applicationProofName ?? '');
+      setApplicationProofUrl(application?.applicationProofUrl ?? '');
+      setLoadStatus('ready');
+    } catch (error) {
+      setLoadError(error);
+      setLoadStatus('error');
+    }
+  }, [uid, user?.tutorType]);
+
+  useEffect(() => {
+    loadApplication();
+  }, [loadApplication]);
+
+  const tutor = {
+    name: user?.name || 'Tutor',
+    subject: courses[0] ? `${courses[0].code}: ${courses[0].title}` : 'Add your first course',
+  };
+  const statusLabel = ({
+    not_submitted: 'Not submitted',
+    pending: 'Awaiting review',
+    approved: 'Approved',
+    rejected: 'Changes requested',
+  })[applicationStatus] ?? 'Not submitted';
 
   function toggleFormat(format) {
     setSelectedFormats((current) =>
@@ -279,19 +408,64 @@ export default function TutorProfileScreen() {
     });
   }
 
-  function submitApplication() {
+  async function submitApplication() {
     if (
       courses.length === 0 ||
       credentials.some((credential) => !credential.trim()) ||
       preferredDays.length === 0 ||
       preferredTimeSlots.length === 0 ||
+      selectedFormats.length === 0 ||
       philosophy.trim().length < minimumPhilosophyLength ||
       !isCertified
     ) {
       Alert.alert('Application incomplete', 'Complete your credentials, availability, teaching statement, and record confirmation.');
       return;
     }
-    Alert.alert('Application ready', 'Your mentor application has been submitted for review.');
+    const evidenceError = getTutorApplicationEvidenceError({
+      tutorType,
+      tier,
+      courses,
+      applicationProofName,
+      applicationProofUrl,
+    });
+    if (evidenceError) {
+      Alert.alert('Application proof incomplete', evidenceError);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await saveTutorApplication(uid, {
+        name: user?.name ?? '',
+        tutorType,
+        tier,
+        credentials: credentials.map((credential) => credential.trim()).join('\n'),
+        preferredDays,
+        preferredTimeSlots,
+        courses,
+        teachingPhilosophy: philosophy.trim(),
+        formats: selectedFormats,
+        applicationProofName: applicationProofName.trim(),
+        applicationProofUrl: applicationProofUrl.trim(),
+      });
+      Alert.alert('Application submitted', 'Your application is saved and waiting for admin review.');
+      await loadApplication();
+    } catch (error) {
+      Alert.alert('Unable to submit application', getErrorMessage(error, 'Please try again.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loadStatus === 'loading') return <LoadingState message="Loading your tutor profile..." />;
+  if (loadStatus === 'error') {
+    return (
+      <ErrorState
+        title="Could not load your tutor profile"
+        message={getErrorMessage(loadError)}
+        onRetry={loadApplication}
+      />
+    );
   }
 
   return (
@@ -305,12 +479,71 @@ export default function TutorProfileScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          <MentorHeader tutor={tutor} />
+          <MentorHeader tutor={tutor} statusLabel={statusLabel} />
           <View style={styles.pageIntro}>
-            <Text style={styles.pageTitle}>Become a Verified Peer Mentor</Text>
+            <Text style={styles.pageTitle}>Tutor application</Text>
             <Text style={styles.pageSubtitle}>Share your strengths, support your peers, and earn certified campus recognition.</Text>
           </View>
-          <EligibilityCard />
+          <EligibilityCard tutorType={tutorType} />
+
+          <Section>
+            <SectionTitle
+              title="Tutor category"
+              subtitle={needsTutorTypeChoice
+                ? 'Choose your sign-up category to use the correct proof requirements'
+                : 'Category selected at sign-up'}
+            />
+            {needsTutorTypeChoice ? (
+              <View style={styles.selectionGrid}>
+                {[
+                  [TUTOR_TYPES.PEER, TUTOR_TIERS.PEER],
+                  [TUTOR_TYPES.PROFESSIONAL, 'Alumni / Professor'],
+                ].map(([type, label]) => {
+                  const selected = tutorType === type;
+                  return (
+                    <Pressable
+                      key={type}
+                      onPress={() => {
+                        setTutorType(type);
+                        setTier(type === TUTOR_TYPES.PEER ? TUTOR_TIERS.PEER : TUTOR_TIERS.ALUMNI);
+                        setNeedsTutorTypeChoice(false);
+                      }}
+                      style={[styles.selectionChip, selected && styles.selectionChipActive]}
+                    >
+                      <Text style={[styles.selectionChipText, selected && styles.selectionChipTextActive]}>
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : tutorType === TUTOR_TYPES.PEER ? (
+              <View style={styles.selectionGrid}>
+                <Pressable style={[styles.selectionChip, styles.selectionChipActive]}>
+                  <Text style={[styles.selectionChipText, styles.selectionChipTextActive]}>
+                    {TUTOR_TIERS.PEER}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.selectionGrid}>
+                {[TUTOR_TIERS.ALUMNI, TUTOR_TIERS.PROFESSOR].map((option) => {
+                const selected = tier === option;
+                return (
+                  <Pressable
+                    key={option}
+                    onPress={() => setTier(option)}
+                    style={[styles.selectionChip, selected && styles.selectionChipActive]}
+                  >
+                    <Text style={[styles.selectionChipText, selected && styles.selectionChipTextActive]}>
+                      {option}
+                    </Text>
+                  </Pressable>
+                );
+                })}
+              </View>
+            )}
+          </Section>
 
           <Section>
             <SectionTitle title="Credentials & Academic Background" subtitle="Give students confidence in your subject expertise" />
@@ -339,28 +572,63 @@ export default function TutorProfileScreen() {
             </Pressable>
             <View style={styles.credentialHintRow}>
               <Ionicons name="shield-checkmark-outline" size={15} color={colors.secondary} />
-              <Text style={styles.credentialHint}>Credentials are reviewed alongside your uploaded academic records.</Text>
+              <Text style={styles.credentialHint}>Credentials are reviewed alongside the Google Drive proof links you provide.</Text>
             </View>
           </Section>
 
           <Section>
             <SectionTitle
               title="Courses You Wish to Tutor"
-              subtitle="Select subjects where you earned 1.00 - 1.50 collegiate honor standing"
+              subtitle={tutorType === TUTOR_TYPES.PEER
+                ? 'Each course requires a final grade from 1.00 to 1.50 and its own Drive proof'
+                : 'List each course you want to tutor. Grades are optional for Alumni/Professor applicants.'}
               action={<View style={styles.auditBadge}><Ionicons name="document-text-outline" size={14} color={colors.primary} /><Text style={styles.auditText}>Manual{`\n`}Entry & Audit</Text></View>}
             />
-            <CourseForm onAdd={(course) => setCourses((current) => [...current, course])} />
+            {tutorType === TUTOR_TYPES.PROFESSIONAL ? (
+              <View style={styles.courseForm}>
+                <FieldLabel required>Type or description of professional proof</FieldLabel>
+                <TextInput
+                  value={applicationProofName}
+                  onChangeText={setApplicationProofName}
+                  placeholder="e.g., Faculty ID and employment certificate"
+                  placeholderTextColor={colors.placeholder}
+                  style={styles.textInput}
+                />
+                <FieldLabel required>Application Google Drive link</FieldLabel>
+                <TextInput
+                  value={applicationProofUrl}
+                  onChangeText={setApplicationProofUrl}
+                  placeholder="https://drive.google.com/file/d/..."
+                  placeholderTextColor={colors.placeholder}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={styles.textInput}
+                />
+                <Text style={styles.fieldLabel}>
+                  One Drive link should contain the proof covering your application and listed courses.
+                </Text>
+              </View>
+            ) : null}
+            <CourseForm
+              tutorType={tutorType}
+              onAdd={(course) => setCourses((current) => [...current, course])}
+            />
             <Text style={styles.listTitle}>Courses Added to Application</Text>
             {courses.map((course) => (
               <CourseRow
                 key={course.id}
                 course={course}
+                tutorType={tutorType}
                 onRemove={() => setCourses((current) => current.filter((item) => item.id !== course.id))}
               />
             ))}
             <View style={styles.courseSummary}>
               <Text style={styles.summaryLabel}>Subject{`\n`}Summary</Text>
-              <Text style={styles.summaryValue}>{courses.length} Courses Added{`\n`}({courses.length ? 'Eligible' : 'None yet'})</Text>
+              <Text style={styles.summaryValue}>
+                {courses.length} Courses Listed{`\n`}
+                ({courses.length ? 'Proof required' : 'None yet'})
+              </Text>
             </View>
           </Section>
 
@@ -465,11 +733,10 @@ export default function TutorProfileScreen() {
           </Pressable>
 
           <View style={styles.submitPanel}>
-            <AppButton title="Submit Mentor Application" onPress={submitApplication} />
+            <AppButton title="Submit Tutor Application" onPress={submitApplication} loading={saving} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
-

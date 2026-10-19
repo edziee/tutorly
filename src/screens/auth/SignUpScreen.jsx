@@ -14,9 +14,8 @@
 // Choosing "Tutor" shows a second switch: Peer Tutor or Professor / Alumni.
 // Both choices create a 'tutor' account; Professor / Alumni do not need a campus ID.
 //
-// Tutors and professional tutors send their verification documents after
-// signing up, from the tutor application (storageService.uploadVerificationDocument),
-// not on this screen.
+// Tutor type is saved at sign-up. Applicants submit Google Drive proof links
+// later through the tutor application; file bytes are not uploaded to Firebase.
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -38,6 +37,7 @@ import Checkbox from '../../components/Checkbox';
 import RoleCard from '../../components/RoleCard';
 import SegmentedControl from '../../components/SegmentedControl';
 import { ROLES, ROLE_LABELS } from '../../constants/roles';
+import { TUTOR_TYPES } from '../../constants/statuses';
 import { ROUTES } from '../../constants/routes';
 import { signUp } from '../../services/authService';
 import { colors } from '../../theme/colors';
@@ -50,14 +50,9 @@ const modeOptions = [
   { value: 'signUp', label: 'Sign Up / Register' },
 ];
 
-const TUTOR_KINDS = {
-  PEER: 'peer',
-  PROFESSIONAL: 'professional',
-};
-
 const tutorKindOptions = [
-  { value: TUTOR_KINDS.PEER, label: 'Peer Tutor' },
-  { value: TUTOR_KINDS.PROFESSIONAL, label: 'Professor / Alumni' },
+  { value: TUTOR_TYPES.PEER, label: 'Peer Tutor' },
+  { value: TUTOR_TYPES.PROFESSIONAL, label: 'Professor / Alumni' },
 ];
 
 // What each consent covers, from the Figma "Academic Permissions & Privacy Consent" box.
@@ -85,7 +80,7 @@ export default function SignUpScreen({ navigation, route }) {
     requestedRole && requestedRole !== ROLES.STUDENT ? ROLES.TUTOR : ROLES.STUDENT,
   );
   const [tutorKind, setTutorKind] = useState(
-    requestedRole === ROLES.PROFESSIONAL ? TUTOR_KINDS.PROFESSIONAL : TUTOR_KINDS.PEER,
+    requestedRole === ROLES.PROFESSIONAL ? TUTOR_TYPES.PROFESSIONAL : TUTOR_TYPES.PEER,
   );
   const [name, setName] = useState('');
   const [campusId, setCampusId] = useState('');
@@ -101,7 +96,7 @@ export default function SignUpScreen({ navigation, route }) {
   const isStudent = portal === ROLES.STUDENT;
   const role = isStudent ? ROLES.STUDENT : ROLES.TUTOR;
   // Professors and alumni may not have a campus ID number, so it is optional for them.
-  const campusIdRequired = isStudent || tutorKind !== TUTOR_KINDS.PROFESSIONAL;
+  const campusIdRequired = isStudent || tutorKind !== TUTOR_TYPES.PROFESSIONAL;
 
   const handleSubmit = async () => {
     const nextErrors = {
@@ -122,7 +117,11 @@ export default function SignUpScreen({ navigation, route }) {
         email: email.trim(),
         password,
         role,
-        profile: { name: name.trim(), campusId: campusId.trim() },
+        profile: {
+          name: name.trim(),
+          campusId: campusId.trim(),
+          ...(!isStudent ? { tutorType: tutorKind } : {}),
+        },
       });
     } catch (error) {
       setFormError(getAuthErrorMessage(error));

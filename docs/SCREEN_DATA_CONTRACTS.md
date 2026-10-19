@@ -16,8 +16,10 @@ The function names and inputs are the ones already in `src/services` and are not
 
 | Screen | Service function | Fields the screen reads |
 | --- | --- | --- |
-| `LoginScreen` | `authService.signIn(email, password)` | The result is ignored. It does not navigate: `AuthContext` sees the new user and `AppNavigator` switches role |
-| `SignUpScreen` | `authService.signUp({ email, password, role, profile: { name, campusId } })` | The result is ignored. `role` is `student` or `tutor`. Peer tutors and Professor / Alumni sign-ups both use `tutor`; Professor / Alumni do not need a `campusId` |
+| `LoginScreen` | `authService.signIn(email, password, portal)` | `portal` must be `student` or `tutor` and must match the account role; legacy `professional` accounts match the tutor portal. A mismatch signs the account out and shows an error. On success, `AuthContext` and `AppNavigator` route by the saved role |
+| `SignUpScreen` | `authService.signUp({ email, password, role, profile: { name, campusId, tutorType? } })` | The result is ignored. `role` is `student` or `tutor`. Peer tutors and Professor / Alumni both use `tutor`; tutor sign-ups also save `tutorType: 'peer'` or `'professional'` to `users/{uid}`. Professor / Alumni do not need a `campusId` |
+| `StudentProfileScreen` | `useAuth().user`, `useAuth().updateProfile(changes)` | Profile fields are loaded from `users/{uid}`. Editable fields include `name`, `age`, `location`, `phone`, and an optional HTTPS `photoUrl`; email and role are read-only |
+| `TutorProfileScreen` | `tutorService.getTutorApplication(uid)`, `saveTutorApplication(uid, application)` | Tutor application data is stored in `tutors/{uid}`. Both tutor types list courses. Peer tutors require a 1.00–1.50 grade and course-level proof description/Drive URL; Alumni/Professors may omit grades and instead require one application-level proof description/Drive URL. Submitted applications have `verificationStatus: 'pending'` |
 | `StudentDashboardScreen` | `useAuth().user.stats` | `streakDays`, `weeklyActivity` (7 true or false values, Monday first), `scholarLevel`, `scholarProgress` (0 to 100), `studyHours`, `completedSessions`, `rating`. Missing values show as 0 |
 | `StudentDashboardScreen` | `bookingService.subscribeToStudentBookings(userId, callback)` | `id`, `status`, `dateKey`, `startTime`, `endTime`, `tutorName`, `subject`, `location`. The "next session" is the earliest booking with status `upcoming` or `requested` that has not ended |
 | `NotificationsScreen` | `notificationService.subscribeToNotifications(userId, callback)` | `id`, `title`, `message`, `read`, `createdAt`. Newest first |
@@ -26,13 +28,13 @@ The function names and inputs are the ones already in `src/services` and are not
 | `AdminDashboardScreen` | `adminService.getBookingsOverview()` | `status` of every booking |
 | `AdminDashboardScreen` | `adminService.subscribeToPendingVerifications(callback)` | Only the length of the list |
 | `AdminUsersScreen` | `adminService.getUsers({ role })` | `id`, `name`, `email`, `role`, `verificationStatus` (tutors only). Called with `{}` for "All" |
-| `AdminVerificationsScreen` | `adminService.subscribeToPendingVerifications(callback)` | `id`, `name`, `tier`, `subject`, `courses: [{ code, title, grade }]`. A tutor must leave this list once approved or rejected |
+| `AdminVerificationsScreen` | `adminService.subscribeToPendingVerifications(callback)` | `id`, `name`, `tutorType`, `tier`, `subject`, `courses: [{ id, code, title, grade, proofName?, proofUrl? }]`, and optional application-level `applicationProofName` / `applicationProofUrl`. A tutor must leave this list once approved or rejected |
 | `AdminVerificationsScreen` | `adminService.setVerificationStatus(tutorId, status, { reviewerId, reason })` | `status` is `approved` or `rejected`. `reason` is only sent when rejecting |
 | `AdminBookingsScreen` | `adminService.getBookingsOverview()` | `id`, `subject`, `studentName`, `tutorName`, `dateKey`, `startTime`, `endTime`, `status`, `totalAmount` (a number in pesos) |
 
 ## Not built yet
 
-- **Verification proof:** the verification screen shows the submitted courses and may open `courses[].proofUrl` when present. `courses[].proofName` is descriptive only; there is no Firebase file upload on the Spark plan. See [FIRESTORE_SCHEMA.md](FIRESTORE_SCHEMA.md).
+- **Verification proof:** peer tutor evidence is attached to each course at `courses[].proofUrl` and `courses[].proofName`; Alumni/Professor evidence is attached once to the application at `applicationProofUrl` and `applicationProofName`. These are tutor-submitted Google Drive links and descriptions; the app stores no file bytes and does not upload to Firebase Storage on the Spark plan. The tutor-side form and service enforce the evidence rules, but an admin must still verify proof. See [FIRESTORE_SCHEMA.md](FIRESTORE_SCHEMA.md).
 - **Opening a notification:** tapping one only marks it read. Going to the booking or chat it is about needs those screens. `data` (`{ bookingId }` or `{ conversationId }`) is where the target will come from.
 - **Google login and "Forgot password?":** left out because there is no service function for them. Ask Member 1 to add `signInWithGoogle` and `sendPasswordReset` and tell Member 3.
 - **Leaderboard on the dashboard:** there is no service function for it.

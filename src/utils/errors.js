@@ -18,6 +18,8 @@ const AUTH_MESSAGES = {
   'auth/user-disabled': 'This account has been disabled. Contact the team.',
   'auth/profile-missing': 'This account is not set up yet. Sign up again or contact the team.',
   'auth/not-admin': 'This account is not authorized for admin access.',
+  'auth/role-mismatch': 'This account is registered for a different portal. Select the correct portal and try again.',
+  'auth/invalid-portal': 'Choose Student or Tutor to sign in.',
 };
 
 const GENERIC = 'Something went wrong. Please try again.';

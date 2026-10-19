@@ -10,6 +10,11 @@ export const TUTOR_TIERS = {
   PROFESSOR: 'Professor',
 };
 
+export const TUTOR_TYPES = {
+  PEER: 'peer',
+  PROFESSIONAL: 'professional',
+};
+
 // Booking life cycle. "upcoming" and "completed" are the values the schedule
 // screen already uses; the others are new.
 //   requested -> student asked, tutor has not answered yet

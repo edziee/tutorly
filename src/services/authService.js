@@ -14,7 +14,7 @@ import {
 } from 'firebase/auth';
 
 import { isFirebaseConfigured, requireFirebase } from '../config/firebase';
-import { LOGIN_ROLES, ROLES, SIGNUP_ROLES } from '../constants/roles';
+import { isRoleAllowedInPortal, LOGIN_ROLES, ROLES, SIGNUP_ROLES } from '../constants/roles';
 import { createUserProfile, getUserProfile } from './userService';
 
 // Errors we throw ourselves use Firebase-style codes so src/utils/errors.js can
@@ -70,6 +70,7 @@ export async function signUp({ email, password, role, profile = {} } = {}) {
         role,
         name: profile.name,
         campusId: profile.campusId,
+        tutorType: profile.tutorType,
       });
     } catch (error) {
       // The login exists but the profile could not be saved. Remove the login
@@ -88,14 +89,17 @@ export async function signUp({ email, password, role, profile = {} } = {}) {
 }
 
 /**
- * Log in with email and password (student, tutor and professional login).
- * The account's own role decides which dashboard opens. Admins must use
- * signInAdmin, so they are refused here.
+ * Log in with email and password from the selected student or tutor portal.
+ * Admins must use signInAdmin, so they are refused here.
  * @param {string} email
  * @param {string} password
+ * @param {'student'|'tutor'} portal
  * @returns {Promise<{ uid: string, role: string }>}
  */
-export async function signIn(email, password) {
+export async function signIn(email, password, portal) {
+  if (![ROLES.STUDENT, ROLES.TUTOR].includes(portal)) {
+    throw authError('auth/invalid-portal', 'Choose Student or Tutor to sign in.');
+  }
   const { auth } = requireFirebase();
 
   return runAuthFlow(async () => {
@@ -117,6 +121,14 @@ export async function signIn(email, password) {
       throw authError(
         'auth/profile-missing',
         'This account is not set up yet. Sign up again or contact the team.',
+      );
+    }
+
+    if (!isRoleAllowedInPortal(profile.role, portal)) {
+      await firebaseSignOut(auth);
+      throw authError(
+        'auth/role-mismatch',
+        'This account is registered for a different portal. Select the correct portal and try again.',
       );
     }
 

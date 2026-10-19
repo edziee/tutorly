@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -11,38 +11,60 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 
 import AppButton from '../../components/AppButton';
 import AppInput from '../../components/AppInput';
+import ErrorState from '../../components/ErrorState';
+import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
 import { useAuth } from '../../context/AuthContext';
-import { mockStudentProfile } from '../../data/mockStudentProfile';
 import { colors } from '../../theme/colors';
 import { radius } from '../../theme/spacing';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { getAuthErrorMessage } from '../../utils/errors';
+import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
+import { isHttpsUrl } from '../../utils/validation';
 
 const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-export default function StudentProfileScreen({
-  profileImageUri,
-  onProfileImageChange,
-}) {
-  const { signOut } = useAuth();
+export default function StudentProfileScreen() {
+  const { user, signOut, updateProfile, loading } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [streakRemindersEnabled, setStreakRemindersEnabled] = useState(true);
   const [meetingPreference, setMeetingPreference] = useState('campus');
   const [profile, setProfile] = useState({
-    name: mockStudentProfile.name,
-    age: mockStudentProfile.age,
-    location: mockStudentProfile.location,
-    email: mockStudentProfile.email,
-    phone: mockStudentProfile.phone,
+    name: user?.name ?? '',
+    age: user?.age == null ? '' : String(user.age),
+    location: user?.location ?? '',
+    email: user?.email ?? '',
+    phone: user?.phone ?? '',
+    photoUrl: user?.photoUrl ?? '',
   });
   const [profileDraft, setProfileDraft] = useState(profile);
   const [editVisible, setEditVisible] = useState(false);
+  useEffect(() => {
+    const currentProfile = {
+      name: user?.name ?? '',
+      age: user?.age == null ? '' : String(user.age),
+      location: user?.location ?? '',
+      email: user?.email ?? '',
+      phone: user?.phone ?? '',
+      photoUrl: user?.photoUrl ?? '',
+    };
+    setProfile(currentProfile);
+    setProfileDraft(currentProfile);
+  }, [user?.uid, user?.name, user?.age, user?.location, user?.email, user?.phone, user?.photoUrl]);
+  const stats = user?.stats ?? {};
+  const streakDays = Number(stats.streakDays) || 0;
+  const nextStreakMilestone = Number(stats.nextStreakMilestone) || streakDays + 1;
+  const weeklyActivity = Array.isArray(stats.weeklyActivity)
+    ? stats.weeklyActivity.slice(0, 7)
+    : [];
+  const scholarLevel = Number(stats.scholarLevel) || 1;
+  const scholarProgress = Math.min(100, Math.max(0, Number(stats.scholarProgress) || 0));
+  const leaderboard = Array.isArray(stats.leaderboard) ? stats.leaderboard : [];
+  const subjectHonors = Array.isArray(stats.subjectHonors) ? stats.subjectHonors : [];
   const showProfileMessage = (message) => Alert.alert('Student Profile', message);
   const confirmSignOut = () => {
     if (signingOut) return;
@@ -63,44 +85,53 @@ export default function StudentProfileScreen({
       },
     ]);
   };
-  const pickProfileImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.9,
-      });
-
-      if (!result.canceled && result.assets?.[0]?.uri) {
-        onProfileImageChange(result.assets[0].uri);
-      }
-    } catch {
-      Alert.alert('Unable to open photos', 'Please try selecting your profile picture again.');
-    }
-  };
   const openProfileEditor = () => {
     setProfileDraft(profile);
     setEditVisible(true);
   };
-  const saveProfile = () => {
-    const updatedProfile = Object.fromEntries(
-      Object.entries(profileDraft).map(([field, value]) => [field, value.trim()]),
-    );
+  const saveProfile = async () => {
+    const updatedProfile = {
+      name: profileDraft.name.trim(),
+      age: profileDraft.age.trim(),
+      location: profileDraft.location.trim(),
+      phone: profileDraft.phone.trim(),
+      photoUrl: profileDraft.photoUrl.trim(),
+    };
 
-    if (Object.values(updatedProfile).some((value) => !value)) {
-      Alert.alert('Missing information', 'Complete all profile fields before saving.');
+    if (!updatedProfile.name) {
+      Alert.alert('Missing information', 'Enter your name before saving.');
       return;
     }
 
-    if (!Number.isInteger(Number(updatedProfile.age)) || Number(updatedProfile.age) < 1) {
-      Alert.alert('Invalid age', 'Enter your age as a whole number.');
+    if (
+      updatedProfile.age &&
+      (!Number.isInteger(Number(updatedProfile.age)) || Number(updatedProfile.age) < 1)
+    ) {
+      Alert.alert('Invalid age', 'Enter your age as a positive whole number, or leave it blank.');
       return;
     }
 
-    setProfile(updatedProfile);
-    setEditVisible(false);
+    if (updatedProfile.photoUrl && !isHttpsUrl(updatedProfile.photoUrl)) {
+      Alert.alert('Invalid photo URL', 'Enter a valid HTTPS image URL, or leave it blank.');
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      await updateProfile(updatedProfile);
+      setProfile({ ...updatedProfile, email: user?.email ?? '' });
+      setEditVisible(false);
+    } catch (error) {
+      Alert.alert('Unable to save profile', getErrorMessage(error, 'Please try again.'));
+    } finally {
+      setSavingProfile(false);
+    }
   };
+
+  if (loading) return <LoadingState message="Loading your profile..." />;
+  if (!user?.uid) {
+    return <ErrorState title="Profile unavailable" message="Sign in again to view your profile." />;
+  }
 
   return (
     <ScreenContainer>
@@ -111,8 +142,8 @@ export default function StudentProfileScreen({
         >
         <View style={styles.profileCard}>
           <View style={styles.avatarFrame}>
-            {profileImageUri ? (
-              <Image source={{ uri: profileImageUri }} style={styles.profilePhoto} />
+            {profile.photoUrl ? (
+              <Image source={{ uri: profile.photoUrl }} style={styles.profilePhoto} />
             ) : (
               <>
                 <View style={styles.avatarHead} />
@@ -123,21 +154,11 @@ export default function StudentProfileScreen({
           <Pressable
             accessibilityLabel="Change profile photo"
             accessibilityRole="button"
-            onPress={pickProfileImage}
+            onPress={openProfileEditor}
             style={styles.editButton}
           >
             <Ionicons name="pencil" size={17} color={colors.primary} />
           </Pressable>
-          <View style={styles.badges}>
-            <View style={[styles.badge, styles.scholarBadge]}>
-              <Ionicons name="ribbon" size={13} color="#754000" />
-              <Text style={styles.badgeText}>Honor Scholar</Text>
-            </View>
-            <View style={[styles.badge, styles.collaboratorBadge]}>
-              <Ionicons name="people" size={13} color="#006F69" />
-              <Text style={styles.badgeText}>Top Peer Collaborator</Text>
-            </View>
-          </View>
         </View>
 
         <View style={styles.personalInfoCard}>
@@ -149,10 +170,22 @@ export default function StudentProfileScreen({
           </View>
           <View style={styles.personalInfoGrid}>
             <PersonalDetail icon="person-outline" label="Name" value={profile.name} />
-            <PersonalDetail icon="calendar-outline" label="Age" value={`${profile.age} years`} />
-            <PersonalDetail icon="location-outline" label="Location" value={profile.location} />
+            <PersonalDetail
+              icon="calendar-outline"
+              label="Age"
+              value={profile.age ? `${profile.age} years old` : 'Not set'}
+            />
+            <PersonalDetail
+              icon="location-outline"
+              label="Location"
+              value={profile.location || 'Not set'}
+            />
             <PersonalDetail icon="mail-outline" label="Email" value={profile.email} />
-            <PersonalDetail icon="call-outline" label="Phone" value={profile.phone} />
+            <PersonalDetail
+              icon="call-outline"
+              label="Phone"
+              value={profile.phone || 'Not set'}
+            />
           </View>
         </View>
 
@@ -163,17 +196,19 @@ export default function StudentProfileScreen({
             </View>
             <View style={styles.streakTitleGroup}>
               <View style={styles.titleAndTag}>
-                <Text style={styles.streakTitle}>{mockStudentProfile.streakDays}-Day Streak</Text>
-                <Text style={styles.activeTag}>Active</Text>
+                <Text style={styles.streakTitle}>{streakDays}-Day Streak</Text>
+                {streakDays > 0 ? <Text style={styles.activeTag}>Active</Text> : null}
               </View>
-              <Text style={styles.mutedText}>Next Milestone: {mockStudentProfile.nextStreakMilestone} Days</Text>
+              <Text style={styles.mutedText}>Next Milestone: {nextStreakMilestone} Days</Text>
             </View>
           </View>
 
           <View style={styles.weekRow}>
-            {mockStudentProfile.weeklyActivity.map((isActive, index) => (
+            {weekdays.map((day, index) => {
+              const isActive = weeklyActivity[index] ?? false;
+              return (
               <View key={`${weekdays[index]}-${index}`} style={styles.weekItem}>
-                <Text style={[styles.weekday, index === 5 && styles.todayLabel]}>{weekdays[index]}</Text>
+                <Text style={[styles.weekday, index === 5 && styles.todayLabel]}>{day}</Text>
                 <View style={[styles.dayCircle, isActive ? styles.activeDay : styles.inactiveDay]}>
                   <Ionicons
                     name={isActive ? 'checkmark' : index === 5 ? 'flash' : 'ellipse'}
@@ -182,22 +217,23 @@ export default function StudentProfileScreen({
                   />
                 </View>
               </View>
-            ))}
+              );
+            })}
           </View>
 
           <View style={styles.progressLabels}>
-            <Text style={styles.progressTitle}>Level {mockStudentProfile.scholarLevel} Scholar Shield</Text>
-            <Text style={styles.progressPercent}>{mockStudentProfile.scholarProgress}% Complete</Text>
+            <Text style={styles.progressTitle}>Level {scholarLevel} Scholar Shield</Text>
+            <Text style={styles.progressPercent}>{scholarProgress}% Complete</Text>
           </View>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${mockStudentProfile.scholarProgress}%` }]} />
+            <View style={[styles.progressFill, { width: `${scholarProgress}%` }]} />
           </View>
         </View>
 
         <View style={styles.statsRow}>
-          <StatTile icon="hourglass" label="Hours" value={mockStudentProfile.studyHours} detail="Studied" />
-          <StatTile icon="calendar" label="Sessions" value={mockStudentProfile.completedSessions} detail="Completed" />
-          <StatTile icon="star" label="Rating" value={mockStudentProfile.rating} detail="Mutual Peer" />
+          <StatTile icon="hourglass" label="Hours" value={Number(stats.studyHours) || 0} detail="Studied" />
+          <StatTile icon="calendar" label="Sessions" value={Number(stats.completedSessions) || 0} detail="Completed" />
+          <StatTile icon="star" label="Rating" value={Number(stats.rating) || 0} detail="Peer rating" />
         </View>
 
         <View style={styles.sectionCard}>
@@ -208,23 +244,11 @@ export default function StudentProfileScreen({
               </View>
               <Text style={styles.sectionTitle}>Study Leaderboard</Text>
             </View>
-            <Text style={styles.weekTag}>Week 8</Text>
+            {stats.leaderboardWeek ? <Text style={styles.weekTag}>{stats.leaderboardWeek}</Text> : null}
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.courseScroller}>
-            <View style={[styles.courseChip, styles.selectedCourse]}>
-              <Text style={styles.selectedCourseText}>CS 240 Algorithms</Text>
-            </View>
-            <View style={styles.courseChip}>
-              <Text style={styles.courseText}>MATH 215 Linear Algebra</Text>
-            </View>
-            <View style={styles.courseChip}>
-              <Text style={styles.courseText}>STAT 350</Text>
-            </View>
-          </ScrollView>
-
           <View style={styles.leaderList}>
-            {mockStudentProfile.leaderboard.map((leader) => (
+            {leaderboard.map((leader) => (
               <View key={leader.id} style={[styles.leaderRow, leader.currentUser && styles.currentLeaderRow]}>
                 <Text style={[styles.rank, leader.rank === 1 && styles.firstRank]}>
                   {leader.rank === 1 ? '♜' : leader.rank}
@@ -248,17 +272,23 @@ export default function StudentProfileScreen({
                 </View>
               </View>
             ))}
+            {leaderboard.length === 0 ? (
+              <Text style={styles.emptyProfileData}>Leaderboard information is not available yet.</Text>
+            ) : null}
           </View>
 
           <Text style={styles.subsectionLabel}>UNLOCKED SUBJECT HONORS</Text>
           <View style={styles.honorsRow}>
-            {mockStudentProfile.subjectHonors.map((honor) => (
+            {subjectHonors.map((honor) => (
               <View key={honor.id} style={styles.honorTile}>
                 <Ionicons name={honor.icon} size={19} color={colors.primary} />
                 <Text numberOfLines={1} style={styles.honorTitle}>{honor.title}</Text>
                 <Text style={styles.honorSubject}>{honor.subject}</Text>
               </View>
             ))}
+            {subjectHonors.length === 0 ? (
+              <Text style={styles.emptyProfileData}>No subject honors yet.</Text>
+            ) : null}
           </View>
         </View>
 
@@ -275,8 +305,8 @@ export default function StudentProfileScreen({
             <PreferenceOption
               selected={meetingPreference === 'campus'}
               icon="location-outline"
-              title={mockStudentProfile.campus}
-              description={mockStudentProfile.campusAddress}
+              title={user.campus || 'Campus not set'}
+              description={user.campusAddress || 'Add your campus details to your profile.'}
               onPress={() => setMeetingPreference('campus')}
             />
             <PreferenceOption
@@ -372,28 +402,32 @@ export default function StudentProfileScreen({
                   placeholder="City or area"
                 />
                 <AppInput
-                  label="Email"
-                  value={profileDraft.email}
-                  handleChangeText={(value) => setProfileDraft({ ...profileDraft, email: value })}
-                  placeholder="name@example.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                <AppInput
                   label="Phone"
                   value={profileDraft.phone}
                   handleChangeText={(value) => setProfileDraft({ ...profileDraft, phone: value })}
                   placeholder="Your contact number"
                   keyboardType="phone-pad"
                 />
+                <AppInput
+                  label="Photo URL (optional)"
+                  value={profileDraft.photoUrl}
+                  handleChangeText={(value) => setProfileDraft({ ...profileDraft, photoUrl: value })}
+                  placeholder="https://example.com/photo.jpg"
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Text style={styles.photoUrlHint}>
+                  Use an HTTPS image link. Firebase Storage uploads are not used.
+                </Text>
               </ScrollView>
               <View style={styles.modalActions}>
                 <Pressable style={styles.cancelButton} onPress={() => setEditVisible(false)}>
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </Pressable>
-                <Pressable style={styles.saveButton} onPress={saveProfile}>
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
-                </Pressable>
+                <View style={styles.saveButton}>
+                  <AppButton title="Save Changes" onPress={saveProfile} loading={savingProfile} />
+                </View>
               </View>
             </View>
           </View>
@@ -691,11 +725,12 @@ const styles = StyleSheet.create({
   cancelButtonText: { color: colors.text, fontSize: 14, fontWeight: '600' },
   saveButton: {
     flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
   },
-  saveButtonText: { color: colors.white, fontSize: 14, fontWeight: '600' },
+  photoUrlHint: {
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+    color: colors.mutedText,
+    fontSize: 12,
+  },
 });

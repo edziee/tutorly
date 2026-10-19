@@ -8,7 +8,7 @@ import { ROUTES } from '../constants/routes';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import AdminVerificationsScreen from '../screens/admin/AdminVerificationsScreen';
 import AdminReviewHistoryScreen from '../screens/admin/AdminReviewHistoryScreen';
-import AppHeader from '../components/AppHeader';
+import AdminHeader from '../components/AdminHeader';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
@@ -31,7 +31,7 @@ export default function AdminNavigator() {
       initialRouteName={ROUTES.ADMIN_DASHBOARD}
       screenOptions={({ route }) => ({
         headerShown: true,
-        header: () => <AppHeader title={tabTitles[route.name]} initials="DA" />,
+        header: () => <AdminHeader title={tabTitles[route.name]} />,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
         tabBarIcon: ({ color, size }) => (

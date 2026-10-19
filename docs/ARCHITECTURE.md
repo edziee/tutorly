@@ -66,7 +66,7 @@ src/
   data/                        Mock data. Temporary: every file here is deleted by the end of Week 3
 ```
 
-Screens marked "built" are finished. The older ones (tutors, schedule, chat, profiles) still use mock data; the ones built in the `member3/ui-screens` branch read only from services (see [SCREEN_DATA_CONTRACTS.md](SCREEN_DATA_CONTRACTS.md)). The rest are placeholders that show a title and "Coming soon", each with a comment at the top saying who builds the layout, who connects the data, and which plan task it belongs to.
+Screens marked "built" are finished. The tutors list, schedule and chat still use mock data; student profile fields and tutor application/profile data load through services (see [SCREEN_DATA_CONTRACTS.md](SCREEN_DATA_CONTRACTS.md)). The tutor workspace still includes mock booking requests and sessions. The rest are placeholders that show a title and "Coming soon", each with a comment at the top saying who builds the layout, who connects the data, and which plan task it belongs to.
 
 ## Services
 
@@ -94,24 +94,9 @@ App.js  ->  splash  ->  onboarding  ->  NavigationContainer
                                                admin          -> AdminNavigator
 ```
 
-## Switching on login
+## Login routing
 
-Today `App.js` shows `StudentNavigator` directly, because there is no login yet, and `AuthProvider` always says nobody is logged in. If we switched to `AppNavigator` now, the app would show the placeholder login screen and nothing else.
-
-Member 1 does the switch when login works:
-
-1. Finish `AuthProvider` in `src/context/AuthContext.jsx` (the steps are in the comment at the top of that file).
-2. In `App.js`, import `AuthProvider` and `AppNavigator`, and replace the `StudentNavigator` line:
-
-```jsx
-<NavigationContainer>
-  <AuthProvider>
-    <AppNavigator />
-  </AuthProvider>
-</NavigationContainer>
-```
-
-3. Replace `mockStudentProfile` in `StudentNavigator.jsx` (the header initials) with the logged-in user from `useAuth()`.
+`App.js` wraps `AppNavigator` in `AuthProvider`. The provider loads the Firestore user profile and the navigator routes by role. Student profile fields load and save through `userService`; tutors can open and update their Firestore application from the tutor workspace. Add further profile fields through the service and update [FIRESTORE_SCHEMA.md](FIRESTORE_SCHEMA.md) alongside the code.
 
 ## How to add things
 

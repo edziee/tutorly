@@ -8,11 +8,9 @@ The collection names below come from the plan (users with a role field, tutors, 
 
 | File | What it holds | Used by | Replaced by | Owner |
 | --- | --- | --- | --- | --- |
-| `mockTutors.jsx` | 7 tutors: name, tier, subject, rating, hourly rate, location, availability, online flag | `TutorsScreen`, `ChatScreen`, `mockMentorApplication` | `tutors` | Member 2 (tutors list), Member 4 (chat) |
+| `mockTutors.jsx` | 7 tutors: name, tier, subject, rating, hourly rate, location, availability, online flag | `TutorsScreen`, `ChatScreen` | `tutors` | Member 2 (tutors list), Member 4 (chat) |
 | `mockSchedules.jsx` | Sample sessions with date, time, status, location, total, payment status | `ScheduleScreen` | `bookings` | Member 2 |
 | `mockConversations.jsx` | Chat conversations linked to tutors | `ChatScreen` | `messages` | Member 4 |
-| `mockStudentProfile.jsx` | Student name, contact, campus, streak, level, study hours, leaderboard, honors | `StudentProfileScreen`, `StudentNavigator` (header initials) | `users` | Member 1 |
-| `mockMentorApplication.jsx` | Tutor application: credentials, preferred days, courses with grades and proof file names, philosophy | `TutorProfileScreen` | `users`/`tutors` profile data with proof metadata and an optional approved external URL | Member 1 |
 | `mockNotifications.jsx` | Two sample notifications | Nothing yet | `notifications` | Member 4 |
 | `courseCategories.jsx` | Subject filter chips | `TutorsScreen` | Can stay as app configuration, or be built from the subjects in `tutors` | Member 2 |
 | `tierCategories.jsx` | Tier filter chips (All, Professors, Alumni, ...) | `TutorsScreen` | Same as above | Member 2 |
@@ -41,7 +39,7 @@ These screens read their data only through the functions in `src/services`, so t
 
 - [x] Login, sign-up, student dashboard, notifications screen and the 4 admin screens (branch `member3/ui-screens`) contain no mock data
 
-`mockNotifications.jsx` is still not used by anything. Delete it in the Week 3 sweep.
+`mockStudentProfile.jsx` and `mockMentorApplication.jsx` were replaced by Firestore-backed profile data in Week 2 and are no longer used. `mockNotifications.jsx` is still not used by anything; delete it in the Week 3 sweep.
 
 ## Final sweep checklist (Week 3)
 
