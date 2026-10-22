@@ -153,7 +153,7 @@ export async function updateBookingStatus(bookingId, status) {
       }
       if (status === BOOKING_STATUS.UPCOMING) {
         const tutorSnapshot = await transaction.get(
-          doc(db, COLLECTIONS.TUTORS, booking.tutorId),
+          doc(db, COLLECTIONS.TUTOR_APPLICATIONS, booking.tutorId),
         );
         const tutor = tutorSnapshot.exists() ? tutorSnapshot.data() : null;
         if (!tutor || !isHttpsUrl(tutor.paymentQrUrl)) {

@@ -1,36 +1,659 @@
 rules_version = '2';
 
-// Firestore security rules for Tutorly. Owner: Member 1 (Week 3).
-//
-// This file is LOCKED on purpose: it allows nothing. If someone publishes it as
-// it is, the app cannot read or write any data, which is safe but useless. That
-// is better than a file that is open by accident.
-//
-// During Weeks 1 and 2 the team builds in the console's "test mode", which
-// allows everything for a limited time. Before submission, replace the lines
-// below with real rules and publish them (Firebase console > Firestore Database
-// > Rules). Test every rule in the Rules Playground in the same page.
-//
-// What the real rules must do (see docs/FIRESTORE_SCHEMA.md for the fields):
-//   users/{uid}           the owner reads and edits their own document, but can
-//                         never change `role`. Nobody can create a user with
-//                         role 'admin' from the app. Admins can read all.
-//   tutors/{uid}          the owner edits their own profile but not
-//                         `verificationStatus`. Logged-in students read tutors
-//                         whose verificationStatus is 'approved'. Only admins
-//                         change verification fields.
-//   bookings/{id}         only the student and the tutor of that booking read
-//                         it; only the student creates it; only the tutor
-//                         accepts or rejects it. Admins can read all.
-//   conversations/{id}    only the two people in `participantIds`, and the same
-//   and messages          for the messages inside.
-//   notifications/{id}    a user reads and marks as read only their own.
-//   everything else       denied.
-//
-// A rule can read another document with get(), for example to find the caller's
-// role in users/{request.auth.uid}. Docs: https://firebase.google.com/docs/firestore/security/get-started
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function tutorPath(uid) {
+      return /databases/$(database)/documents/tutors/$(uid);
+    }
+
+    function applicationPath(uid) {
+      return /databases/$(database)/documents/tutorApplications/$(uid);
+    }
+
+    function hasAccount() {
+      return signedIn() && exists(userPath(request.auth.uid));
+    }
+
+    function accountRole() {
+      return hasAccount() ? get(userPath(request.auth.uid)).data.get('role', '') : '';
+    }
+
+    function isAdmin() {
+      return accountRole() == 'admin';
+    }
+
+    function isStudent() {
+      return accountRole() == 'student';
+    }
+
+    function isTutor() {
+      return accountRole() in ['tutor', 'professional'];
+    }
+
+    function isTutorAccountType(tutorType) {
+      return (
+        (accountRole() == 'tutor' &&
+          get(userPath(request.auth.uid)).data.get('tutorType', '') == tutorType) ||
+        (accountRole() == 'professional' && tutorType == 'professional')
+      );
+    }
+
+    function validProfileVersion(data) {
+      return data.get('publicProfileVersion', 0) == 2;
+    }
+
+    function validPublicTutor(data) {
+      return data.keys().hasOnly([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courseNames',
+          'teachingPhilosophy',
+          'formats',
+          'verificationStatus',
+          'verificationNote',
+          'publicProfileVersion',
+          'createdAt',
+          'updatedAt',
+          'photoUrl',
+          'location',
+          'coordinates',
+          'availability',
+          'online',
+          'rating',
+          'reviewCount',
+          'hourlyRate',
+          'bio',
+          'subject'
+        ]) &&
+        data.keys().hasAll([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courseNames',
+          'teachingPhilosophy',
+          'formats',
+          'verificationStatus',
+          'verificationNote',
+          'publicProfileVersion',
+          'subject',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.name is string &&
+        data.tutorType in ['peer', 'professional'] &&
+        ((data.tutorType == 'peer' && data.tier == 'Peer Tutor') ||
+          (data.tutorType == 'professional' && data.tier in ['Alumni', 'Professor'])) &&
+        data.credentials is string &&
+        data.preferredDays is list &&
+        data.preferredTimeSlots is list &&
+        data.courseNames is string &&
+        data.courseNames.size() <= 2000 &&
+        data.teachingPhilosophy is string &&
+        data.formats is list &&
+        data.verificationStatus in ['pending', 'approved', 'rejected'] &&
+        data.verificationNote is string &&
+        validProfileVersion(data) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        (!('photoUrl' in data) ||
+          data.photoUrl == '' ||
+          data.photoUrl.matches('^https://.+')) &&
+        (!('hourlyRate' in data) ||
+          (data.hourlyRate is number && data.hourlyRate > 0)) &&
+        (!('rating' in data) ||
+          (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
+        (!('reviewCount' in data) ||
+          (data.reviewCount is int && data.reviewCount >= 0)) &&
+        (!('online' in data) || data.online is bool) &&
+        data.subject is string &&
+        !('courses' in data) &&
+        !('applicationProofName' in data) &&
+        !('applicationProofUrl' in data) &&
+        !('paymentQrUrl' in data);
+    }
+
+    function validApplication(data) {
+      return data.keys().hasOnly([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courses',
+          'applicationProofName',
+          'applicationProofUrl',
+          'teachingPhilosophy',
+          'formats',
+          'paymentQrUrl',
+          'verificationStatus',
+          'verificationNote',
+          'verificationReviewedBy',
+          'verificationReviewedAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courses',
+          'teachingPhilosophy',
+          'formats',
+          'verificationStatus',
+          'verificationNote',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.name is string &&
+        data.tutorType in ['peer', 'professional'] &&
+        ((data.tutorType == 'peer' && data.tier == 'Peer Tutor') ||
+          (data.tutorType == 'professional' && data.tier in ['Alumni', 'Professor'])) &&
+        data.credentials is string &&
+        data.preferredDays is list &&
+        data.preferredTimeSlots is list &&
+        data.courses is list &&
+        data.courses.size() > 0 &&
+        data.courses.size() <= 30 &&
+        data.teachingPhilosophy is string &&
+        data.formats is list &&
+        data.verificationStatus in ['pending', 'approved', 'rejected'] &&
+        data.verificationNote is string &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        (!('paymentQrUrl' in data) ||
+          data.paymentQrUrl == '' ||
+          data.paymentQrUrl.matches('^https://.+')) &&
+        (data.tutorType != 'professional' ||
+          (data.applicationProofName is string &&
+            data.applicationProofUrl is string &&
+            data.applicationProofUrl.matches('^https://.+')));
+    }
+
+    function validProfileUpdate() {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      return changes.hasOnly([
+          'name',
+          'phone',
+          'age',
+          'location',
+          'year',
+          'campus',
+          'campusAddress',
+          'photoUrl',
+          'campusId',
+          'notificationPreferences'
+        ]) &&
+        request.resource.data.get('role', '') == resource.data.get('role', '') &&
+        request.resource.data.get('tutorType', '') == resource.data.get('tutorType', '') &&
+        (!('name' in request.resource.data) ||
+          (request.resource.data.name is string && request.resource.data.name.size() <= 120)) &&
+        (!('phone' in request.resource.data) ||
+          (request.resource.data.phone is string && request.resource.data.phone.size() <= 40)) &&
+        (!('age' in request.resource.data) ||
+          (request.resource.data.age is string &&
+            request.resource.data.age.matches('^[1-9][0-9]{0,2}$'))) &&
+        (!('photoUrl' in request.resource.data) ||
+          request.resource.data.photoUrl == '' ||
+          request.resource.data.photoUrl.matches('^https://.+'));
+    }
+
+    function validAccountCreate() {
+      return request.resource.data.keys().hasOnly([
+          'email',
+          'role',
+          'name',
+          'campusId',
+          'tutorType',
+          'createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'email',
+          'role',
+          'name',
+          'campusId',
+          'createdAt'
+        ]) &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.role in ['student', 'tutor'] &&
+        (request.resource.data.role != 'tutor' ||
+          (request.resource.data.tutorType in ['peer', 'professional'])) &&
+        (request.resource.data.role == 'tutor' ||
+          !('tutorType' in request.resource.data)) &&
+        request.resource.data.name is string &&
+        request.resource.data.campusId is string &&
+        request.resource.data.createdAt == request.time;
+    }
+
+    function validTutorApplicationCreate(uid) {
+      return signedIn() &&
+        request.auth.uid == uid &&
+        isTutor() &&
+        isTutorAccountType(request.resource.data.tutorType) &&
+        request.resource.data.verificationStatus == 'pending' &&
+        !('verificationReviewedBy' in request.resource.data) &&
+        !('verificationReviewedAt' in request.resource.data) &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        getAfter(tutorPath(uid)).data.verificationStatus == 'pending' &&
+        validApplication(request.resource.data);
+    }
+
+    function validTutorApplicationUpdate(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      return signedIn() &&
+        request.auth.uid == uid &&
+        isTutor() &&
+        isTutorAccountType(request.resource.data.tutorType) &&
+        request.resource.data.verificationStatus == 'pending' &&
+        request.resource.data.verificationNote == '' &&
+        !('verificationReviewedBy' in request.resource.data) &&
+        !('verificationReviewedAt' in request.resource.data) &&
+        changes.hasOnly([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courses',
+          'applicationProofName',
+          'applicationProofUrl',
+          'teachingPhilosophy',
+          'formats',
+          'paymentQrUrl',
+          'verificationStatus',
+          'verificationNote',
+          'verificationReviewedBy',
+          'verificationReviewedAt',
+          'updatedAt',
+          'createdAt'
+        ]) &&
+        request.resource.data.createdAt ==
+          resource.data.get('createdAt', request.time) &&
+        request.resource.data.updatedAt == request.time &&
+        getAfter(tutorPath(uid)).data.verificationStatus == 'pending' &&
+        validApplication(request.resource.data);
+    }
+
+    function validTutorPaymentDetailsUpdate(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      return signedIn() &&
+        request.auth.uid == uid &&
+        isTutor() &&
+        isTutorAccountType(resource.data.tutorType) &&
+        request.resource.data.verificationStatus == resource.data.verificationStatus &&
+        changes.hasOnly(['paymentQrUrl', 'updatedAt']) &&
+        request.resource.data.updatedAt == request.time &&
+        (request.resource.data.paymentQrUrl == '' ||
+          request.resource.data.paymentQrUrl.matches('^https://.+'));
+    }
+
+    function validPublicApplicationCreate(uid) {
+      return signedIn() &&
+        request.auth.uid == uid &&
+        isTutor() &&
+        isTutorAccountType(request.resource.data.tutorType) &&
+        request.resource.data.verificationStatus == 'pending' &&
+        request.resource.data.publicProfileVersion == 2 &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        getAfter(applicationPath(uid)).data.verificationStatus == 'pending' &&
+        validPublicTutor(request.resource.data);
+    }
+
+    function validPublicApplicationUpdate(uid) {
+      return signedIn() &&
+        request.auth.uid == uid &&
+        isTutor() &&
+        isTutorAccountType(request.resource.data.tutorType) &&
+        request.resource.data.verificationStatus == 'pending' &&
+        request.resource.data.verificationNote == '' &&
+        request.resource.data.publicProfileVersion == 2 &&
+        request.resource.data.createdAt ==
+          resource.data.get('createdAt', request.time) &&
+        request.resource.data.updatedAt == request.time &&
+        !('verificationReviewedBy' in request.resource.data) &&
+        !('verificationReviewedAt' in request.resource.data) &&
+        getAfter(applicationPath(uid)).data.verificationStatus == 'pending' &&
+        validPublicTutor(request.resource.data);
+    }
+
+    function validTutorBookingDetailsUpdate(uid) {
+      return signedIn() &&
+        request.auth.uid == uid &&
+        isTutor() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['hourlyRate', 'updatedAt']) &&
+        request.resource.data.hourlyRate is number &&
+        request.resource.data.hourlyRate > 0 &&
+        request.resource.data.updatedAt == request.time;
+    }
+
+    function validAdminTutorReview(uid) {
+      return isAdmin() &&
+        request.resource.data.verificationStatus in ['approved', 'rejected'] &&
+        request.resource.data.updatedAt == request.time &&
+        getAfter(applicationPath(uid)).data.verificationReviewedBy == request.auth.uid &&
+        getAfter(applicationPath(uid)).data.verificationReviewedAt == request.time &&
+        getAfter(applicationPath(uid)).data.verificationStatus ==
+          request.resource.data.verificationStatus &&
+        validPublicTutor(request.resource.data);
+    }
+
+    function validAdminApplicationCreate(uid) {
+      return isAdmin() &&
+        exists(userPath(uid)) &&
+        get(userPath(uid)).data.get('role', '') in ['tutor', 'professional'] &&
+        request.resource.data.verificationStatus in ['approved', 'rejected'] &&
+        request.resource.data.verificationReviewedBy == request.auth.uid &&
+        request.resource.data.verificationReviewedAt == request.time &&
+        getAfter(tutorPath(uid)).data.verificationStatus ==
+          request.resource.data.verificationStatus &&
+        validApplication(request.resource.data);
+    }
+
+    function validAdminApplicationUpdate(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      return isAdmin() &&
+        resource.data.verificationStatus == 'pending' &&
+        request.resource.data.verificationStatus in ['approved', 'rejected'] &&
+        request.resource.data.verificationReviewedBy == request.auth.uid &&
+        request.resource.data.verificationReviewedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        getAfter(tutorPath(uid)).data.verificationStatus ==
+          request.resource.data.verificationStatus &&
+        changes.hasOnly([
+          'verificationStatus',
+          'verificationNote',
+          'verificationReviewedBy',
+          'verificationReviewedAt',
+          'updatedAt'
+        ]);
+    }
+
+    function validBookingCreate() {
+      let data = request.resource.data;
+      let publicTutor = get(tutorPath(data.tutorId)).data;
+      let student = get(userPath(request.auth.uid)).data;
+      let expectedStudentName = student.get('name', '') == ''
+        ? student.get('email', 'Student')
+        : student.get('name', '');
+      return isStudent() &&
+        data.studentId == request.auth.uid &&
+        exists(tutorPath(data.tutorId)) &&
+        publicTutor.verificationStatus == 'approved' &&
+        validProfileVersion(publicTutor) &&
+        publicTutor.hourlyRate is number &&
+        publicTutor.hourlyRate > 0 &&
+        data.totalAmount == publicTutor.hourlyRate &&
+        data.studentName == expectedStudentName &&
+        data.tutorName == publicTutor.name &&
+        data.tutorTier == publicTutor.tier &&
+        data.subject == publicTutor.subject &&
+        data.keys().hasOnly([
+          'studentId',
+          'tutorId',
+          'studentName',
+          'tutorName',
+          'tutorTier',
+          'subject',
+          'dateKey',
+          'startTime',
+          'endTime',
+          'durationHours',
+          'location',
+          'sessionMode',
+          'notes',
+          'totalAmount',
+          'tutorPhotoUrl',
+          'status',
+          'paymentStatus',
+          'paymentReportedAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'studentId',
+          'tutorId',
+          'studentName',
+          'tutorName',
+          'tutorTier',
+          'subject',
+          'dateKey',
+          'startTime',
+          'endTime',
+          'durationHours',
+          'location',
+          'sessionMode',
+          'notes',
+          'totalAmount',
+          'tutorPhotoUrl',
+          'status',
+          'paymentStatus',
+          'paymentReportedAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.status == 'requested' &&
+        data.paymentStatus == 'awaiting_tutor_acceptance' &&
+        data.paymentReportedAt == null &&
+        data.totalAmount is number &&
+        data.totalAmount > 0 &&
+        data.durationHours is number &&
+        data.durationHours > 0 &&
+        data.durationHours <= 8 &&
+        data.dateKey is string &&
+        data.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        data.startTime is string &&
+        data.endTime is string &&
+        data.createdAt == request.time &&
+        data.updatedAt == request.time;
+    }
+
+    function isBookingStudent() {
+      return isStudent() && resource.data.studentId == request.auth.uid;
+    }
+
+    function isBookingTutor() {
+      return isTutor() && resource.data.tutorId == request.auth.uid;
+    }
+
+    function validTutorResponse() {
+      let data = request.resource.data;
+      let changes = data.diff(resource.data).affectedKeys();
+      return isBookingTutor() &&
+        resource.data.status == 'requested' &&
+        data.status in ['upcoming', 'rejected'] &&
+        changes.hasOnly([
+          'status',
+          'paymentStatus',
+          'tutorQrUrl',
+          'tutorPhotoUrl',
+          'updatedAt'
+        ]) &&
+        data.updatedAt == request.time &&
+        ((data.status == 'upcoming' &&
+            data.paymentStatus == 'awaiting_payment' &&
+            data.tutorQrUrl is string &&
+            data.tutorQrUrl.matches('^https://.+') &&
+            data.tutorQrUrl ==
+              get(applicationPath(request.auth.uid)).data.get('paymentQrUrl', '')) ||
+          (data.status == 'rejected' &&
+            data.paymentStatus == 'not_applicable'));
+    }
+
+    function validBookingCancellation() {
+      let data = request.resource.data;
+      return (isBookingStudent() || isBookingTutor()) &&
+        resource.data.status in ['requested', 'upcoming'] &&
+        !(resource.data.paymentStatus in ['pending_verification', 'settled']) &&
+        data.status == 'cancelled' &&
+        data.paymentStatus == 'not_applicable' &&
+        data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'paymentStatus', 'updatedAt']) &&
+        data.updatedAt == request.time;
+    }
+
+    function validBookingCompletion() {
+      let data = request.resource.data;
+      return isBookingTutor() &&
+        resource.data.status == 'upcoming' &&
+        data.status == 'completed' &&
+        data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt']) &&
+        data.updatedAt == request.time;
+    }
+
+    function validPaymentReport() {
+      let data = request.resource.data;
+      return isBookingStudent() &&
+        resource.data.status == 'upcoming' &&
+        resource.data.paymentStatus == 'awaiting_payment' &&
+        data.paymentStatus == 'pending_verification' &&
+        data.paymentReportedAt == request.time &&
+        data.diff(resource.data).affectedKeys()
+          .hasOnly(['paymentStatus', 'paymentReportedAt', 'updatedAt']) &&
+        data.updatedAt == request.time;
+    }
+
+    function validPaymentVerification() {
+      let data = request.resource.data;
+      return isBookingTutor() &&
+        resource.data.status in ['upcoming', 'completed'] &&
+        resource.data.paymentStatus == 'pending_verification' &&
+        data.paymentStatus == 'settled' &&
+        data.paymentVerifiedAt == request.time &&
+        data.diff(resource.data).affectedKeys()
+          .hasOnly(['paymentStatus', 'paymentVerifiedAt', 'updatedAt']) &&
+        data.updatedAt == request.time;
+    }
+
+    function validReschedule() {
+      let data = request.resource.data;
+      return isBookingStudent() &&
+        resource.data.status == 'upcoming' &&
+        resource.data.paymentStatus == 'awaiting_payment' &&
+        data.dateKey is string &&
+        data.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        data.startTime is string &&
+        data.endTime is string &&
+        data.durationHours is number &&
+        data.durationHours > 0 &&
+        data.durationHours <= 8 &&
+        data.diff(resource.data).affectedKeys()
+          .hasOnly(['dateKey', 'startTime', 'endTime', 'durationHours', 'updatedAt']) &&
+        data.updatedAt == request.time;
+    }
+
+    function validCheckIn() {
+      let data = request.resource.data;
+      let coordinates = data.checkInCoordinates;
+      return isBookingStudent() &&
+        resource.data.status == 'upcoming' &&
+        !('checkedInAt' in resource.data) &&
+        data.checkedInAt == request.time &&
+        coordinates is map &&
+        coordinates.keys().hasOnly(['latitude', 'longitude']) &&
+        coordinates.keys().hasAll(['latitude', 'longitude']) &&
+        coordinates.latitude is number &&
+        coordinates.longitude is number &&
+        coordinates.latitude >= -90 &&
+        coordinates.latitude <= 90 &&
+        coordinates.longitude >= -180 &&
+        coordinates.longitude <= 180 &&
+        data.diff(resource.data).affectedKeys()
+          .hasOnly(['checkedInAt', 'checkInCoordinates', 'updatedAt']) &&
+        data.updatedAt == request.time;
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() &&
+        request.auth.uid == uid &&
+        validAccountCreate();
+      allow update: if signedIn() &&
+        request.auth.uid == uid &&
+        validProfileUpdate();
+      allow delete: if false;
+    }
+
+    match /tutors/{uid} {
+      allow get: if isAdmin() ||
+        (signedIn() && request.auth.uid == uid) ||
+        (isStudent() &&
+          resource.data.get('verificationStatus', '') == 'approved' &&
+          validProfileVersion(resource.data));
+      allow list: if isAdmin() ||
+        (isStudent() &&
+          resource.data.get('verificationStatus', '') == 'approved' &&
+          validProfileVersion(resource.data));
+      allow create: if validPublicApplicationCreate(uid);
+      allow update: if validAdminTutorReview(uid) ||
+        validPublicApplicationUpdate(uid) ||
+        validTutorBookingDetailsUpdate(uid);
+      allow delete: if false;
+    }
+
+    match /tutorApplications/{uid} {
+      allow get: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow list: if isAdmin();
+      allow create: if validTutorApplicationCreate(uid) ||
+        validAdminApplicationCreate(uid);
+      allow update: if validTutorApplicationUpdate(uid) ||
+        validTutorPaymentDetailsUpdate(uid) ||
+        validAdminApplicationUpdate(uid);
+      allow delete: if false;
+    }
+
+    match /bookings/{bookingId} {
+      allow get, list: if isAdmin() ||
+        (isBookingStudent()) ||
+        (isBookingTutor());
+      allow create: if validBookingCreate();
+      allow update: if validTutorResponse() ||
+        validBookingCancellation() ||
+        validBookingCompletion() ||
+        validPaymentReport() ||
+        validPaymentVerification() ||
+        validReschedule() ||
+        validCheckIn();
+      allow delete: if false;
+    }
+
+    // Chat and in-app notification services are not implemented yet. Keep
+    // these collections closed until their ownership rules are verified.
+    match /conversations/{conversationId} {
+      allow read, write: if false;
+
+      match /messages/{messageId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /notifications/{notificationId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

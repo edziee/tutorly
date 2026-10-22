@@ -28,6 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import { VERIFICATION_STATUS } from '../../constants/statuses';
 import { useSubscription } from '../../hooks/useSubscription';
 import {
+  migrateLegacyApprovedTutors,
   setVerificationStatus,
   subscribeToPendingVerifications,
 } from '../../services/adminService';
@@ -48,6 +49,29 @@ export default function AdminVerificationsScreen() {
 
   // Which tutor is being saved right now, and which one has the reject box open.
   const [busyId, setBusyId] = useState(null);
+  const [migrating, setMigrating] = useState(false);
+  const [migrationMessage, setMigrationMessage] = useState('');
+
+  const migrateApprovedTutors = async () => {
+    if (migrating) return;
+    setMigrating(true);
+    setMigrationMessage('');
+    try {
+      const count = await migrateLegacyApprovedTutors();
+      setMigrationMessage(
+        count === 0
+          ? 'All approved tutor profiles are already migrated.'
+          : `Migrated ${count} approved tutor profile${count === 1 ? '' : 's'}.`,
+      );
+    } catch (error) {
+      Alert.alert(
+        'Migration incomplete',
+        getErrorMessage(error, 'Could not migrate approved tutor profiles.'),
+      );
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   const review = async (tutorId, newStatus, reason) => {
     if (!reviewerId) {
@@ -78,33 +102,50 @@ export default function AdminVerificationsScreen() {
   }
 
   const pending = Array.isArray(data) ? data : [];
-  if (pending.length === 0) {
-    return (
-      <EmptyState
-        icon="shield-checkmark-outline"
-        title="Nothing to review"
-        message="Tutors who submit their documents will show up here."
-      />
-    );
-  }
 
   return (
     <ScreenContainer>
-      <FlatList
-        data={pending}
-        keyExtractor={(item, index) => String(item.id ?? index)}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <PendingCard
-            tutor={item}
-            busy={busyId === item.id}
-            disabled={busyId !== null}
-            onApprove={() => review(item.id, VERIFICATION_STATUS.APPROVED)}
-            onReject={(reason) => review(item.id, VERIFICATION_STATUS.REJECTED, reason)}
-          />
-        )}
-      />
+      <View style={styles.migration}>
+        <Text style={styles.migrationTitle}>Existing approved tutors</Text>
+        <Text style={styles.migrationDescription}>
+          Move legacy verification evidence into private application records before publishing secure Firestore rules.
+        </Text>
+        <AppButton
+          title="Migrate approved tutors"
+          variant="outline"
+          loading={migrating}
+          disabled={migrating}
+          onPress={migrateApprovedTutors}
+        />
+        {migrationMessage ? (
+          <Text accessibilityRole="alert" style={styles.migrationMessage}>
+            {migrationMessage}
+          </Text>
+        ) : null}
+      </View>
+      {pending.length === 0 ? (
+        <EmptyState
+          icon="shield-checkmark-outline"
+          title="Nothing to review"
+          message="Tutors who submit their documents will show up here."
+        />
+      ) : (
+        <FlatList
+          data={pending}
+          keyExtractor={(item, index) => String(item.id ?? index)}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <PendingCard
+              tutor={item}
+              busy={busyId === item.id}
+              disabled={busyId !== null || migrating}
+              onApprove={() => review(item.id, VERIFICATION_STATUS.APPROVED)}
+              onReject={(reason) => review(item.id, VERIFICATION_STATUS.REJECTED, reason)}
+            />
+          )}
+        />
+      )}
     </ScreenContainer>
   );
 }
@@ -210,6 +251,30 @@ function PendingCard({ tutor, busy, disabled, onApprove, onReject }) {
 }
 
 const styles = StyleSheet.create({
+  migration: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  migrationTitle: {
+    color: colors.heading,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  migrationDescription: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+    color: colors.mutedText,
+    fontSize: 12,
+  },
+  migrationMessage: {
+    marginTop: spacing.sm,
+    color: colors.text,
+    fontSize: 12,
+  },
   list: {
     paddingBottom: spacing.xxl,
   },

@@ -22,7 +22,7 @@ App.js                         App entry: splash, onboarding, then the student n
 index.jsx                      Registers the root component
 app.json                       Expo configuration and plugins
 .env.example                   Names of the settings you copy to .env.local (never commit .env.local)
-firebase-rules/                Firestore security rules (locked by default, Member 1 writes them)
+firebase-rules/                Firestore security rules (review before publishing)
 docs/                          Plan, schema, mock data list, this file, one brief per member
 .github/                       Pull request checklist
 
@@ -76,6 +76,7 @@ Screens marked "built" are finished. The tutors list, schedule and chat still us
 | `userService.js` | Read and write the user document | Member 1 |
 | `storageService.js` | Reserved; not used on the Spark plan. Proof and profile images use approved external URLs | Member 1 |
 | `tutorService.js` | Tutors list and detail (Member 2); tutor application (Member 1) | Members 2 and 1 |
+| `tutorApplications/{uid}` | Private tutor evidence and payment QR; accessed through `tutorService.js` | Members 1 and 4 |
 | `bookingService.js` | Create, list, reschedule, pay for, check in to bookings | Member 2 |
 | `locationService.js` | Location permission, current position, "am I at campus" | Member 2 |
 | `chatService.js` | Conversations and real-time messages | Member 4 |

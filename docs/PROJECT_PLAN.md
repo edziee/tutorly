@@ -159,7 +159,7 @@ Week 3 adds payment and geolocation, locks down Firebase for each role, finishes
 | Compare the finished app to the Figma design and fix mismatches | Member 3 (with everyone) | Not started |
 | Notification preferences and read/unread states | Member 4 | Not started |
 | Notify tutors in the app when an admin approves or rejects their verification | Member 4 | Not started |
-| Firestore security rules so each role only reaches its own data (admin data only for admins) | Member 1 | Not started |
+| Firestore security rules so each role only reaches its own data (admin data only for admins) | Member 1 | Drafted and checked in the Firestore Emulator; not yet reviewed or published |
 | Final mock-data sweep: search the whole repo for mock or sample data files and fake values, delete them, and confirm every screen loads real Firestore data | Everyone (Member 1 coordinates) | Not started |
 | Full app testing with accounts for all four roles (student, tutor, professional tutor, admin) and bug fixes | Everyone | Not started |
 | Documentation, demo script and submission | Member 4 (coordinates) | Not started |

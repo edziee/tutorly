@@ -47,7 +47,7 @@ Sources: [Firebase pricing](https://firebase.google.com/pricing), [Cloud Storage
 2. In the [Firebase console](https://console.firebase.google.com), create a project.
 3. Add an app, choose **Web** (`</>`), and copy the config values it shows.
 4. **Build > Authentication > Get started > Sign-in method**: turn on **Email/Password**.
-5. **Build > Firestore Database > Create database**. Start in **test mode** so the team can build. Test mode lets anyone read and write until a date Firebase shows you (usually 30 days), so it must be replaced with real rules in Week 3.
+5. **Build > Firestore Database > Create database**. Do not leave the database in test mode or use it for real user data: test mode allows anyone to read and write until the configured expiry date. Use disposable test data until the reviewed rules in `firebase-rules/firestore.rules` are published.
 6. Do not enable Storage, add Storage imports, or create a Storage bucket. Use the Spark-compatible proof and photo URL fields described above.
 7. Copy `.env.example` to `.env.local` and paste the config values. Restart Expo with `npx expo start -c`, because Expo only reads the variables when it starts.
 8. Share the values with the team in your group chat. Never commit `.env.local`. These values are settings and not secrets, but the repo should not carry them.
@@ -74,7 +74,7 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 - Connect `ProfessionalDashboardScreen` to Firestore once Member 3 has built it.
 
 **Week 3**
-- Security rules for Firestore. Each role only reaches its own data, only admins reach admin data, users cannot change their own `role`, and notification documents follow the allowed schema. Write them in `firebase-rules/firestore.rules`, test them in the console's Rules Playground, then publish.
+- Security rules for Firestore. Each role only reaches its own data, only admins reach admin data, users cannot change their own `role`, and unimplemented chat/notification collections remain closed. Review `firebase-rules/firestore.rules`, test it in the Rules Playground or Emulator Suite, then publish. Before publishing, sign in as admin and use **Migrate approved tutors** on the verification screen so approved legacy profiles remain visible without exposing their proof fields.
 - Run the final mock-data sweep for the whole team (checklist at the end of [MOCK_DATA_INVENTORY](../MOCK_DATA_INVENTORY.md)).
 
 ## Mock data you remove
