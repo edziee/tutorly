@@ -1,25 +1,35 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppButton from '../../components/AppButton';
+import AppInput from '../../components/AppInput';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
 import { ROLES } from '../../constants/roles';
-import { TUTOR_TYPES } from '../../constants/statuses';
+import {
+  BOOKING_PAYMENT_STATUS,
+  BOOKING_STATUS,
+  TUTOR_TYPES,
+} from '../../constants/statuses';
 import { useAuth } from '../../context/AuthContext';
-import { getTutorApplication } from '../../services/tutorService';
+import { useSubscription } from '../../hooks/useSubscription';
+import {
+  getTutorApplication,
+  updateTutorBookingDetails,
+} from '../../services/tutorService';
+import {
+  confirmBookingPayment,
+  subscribeToTutorBookings,
+  updateBookingStatus,
+} from '../../services/bookingService';
 import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
 import { mockTutorSessions } from '../../data/mockTutorWorkspace';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
-
-const requests = [
-  { name: 'Devon Miller', course: 'CS 240', detail: '1:1 session', amount: 'P280.00', tone: 'primary' },
-  { name: 'Samantha Rios', course: 'MATH 215', detail: 'Review session', amount: 'P230.00', tone: 'secondary' },
-];
+import { isHttpsUrl } from '../../utils/validation';
 
 function SectionTitle({ title, subtitle, action }) {
   return (
@@ -37,16 +47,22 @@ function Badge({ children }) {
   return <View style={styles.badge}><Text style={styles.badgeText}>{children}</Text></View>;
 }
 
-function RequestCard({ request }) {
+function RequestCard({ request, onAccept, onDecline, working }) {
   return (
-    <View style={styles.requestCard}>
-      <View style={styles.requestAvatar}><Text style={styles.requestInitial}>{request.name.charAt(0)}</Text></View>
-      <View style={styles.requestCopy}>
-        <Text style={styles.requestName}>{request.name}</Text>
-        <Text style={styles.requestMeta}>{request.course} · {request.detail}</Text>
-        <Text style={styles.requestNote}>“Looking for help with this week's problem set.”</Text>
+    <View>
+      <View style={styles.requestCard}>
+        <View style={styles.requestAvatar}><Text style={styles.requestInitial}>{(request.studentName || 'S').charAt(0)}</Text></View>
+        <View style={styles.requestCopy}>
+          <Text style={styles.requestName}>{request.studentName || 'Student'}</Text>
+          <Text style={styles.requestMeta}>{request.subject} · {request.dateKey} · {request.startTime}</Text>
+          {request.notes ? <Text style={styles.requestNote}>{request.notes}</Text> : null}
+        </View>
+        <Text style={styles.requestAmount}>₱{Number(request.totalAmount || 0).toFixed(2)}</Text>
       </View>
-      <Text style={styles.requestAmount}>+{request.amount}</Text>
+      <View style={styles.requestActions}>
+        <AppButton title="Accept" variant="secondary" onPress={onAccept} loading={working} />
+        <AppButton title="Decline" variant="outline" onPress={onDecline} disabled={working} />
+      </View>
     </View>
   );
 }
@@ -55,10 +71,27 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   const { user, signOut } = useAuth();
   const [instantHelp, setInstantHelp] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
   const [application, setApplication] = useState(null);
+  const [paymentQrUrl, setPaymentQrUrl] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [savingBookingDetails, setSavingBookingDetails] = useState(false);
+  const [bookingDetailsError, setBookingDetailsError] = useState('');
+  const [bookingActionError, setBookingActionError] = useState('');
+  const [workingBookingId, setWorkingBookingId] = useState('');
   const [loadStatus, setLoadStatus] = useState('loading');
   const [loadError, setLoadError] = useState(null);
   const uid = user?.uid;
+  const bookingResults = useSubscription(
+    (onData, onError) => (uid ? subscribeToTutorBookings(uid, onData, onError) : undefined),
+    [uid],
+  );
+  const pendingRequests = (bookingResults.data ?? []).filter((booking) => booking.status === 'requested');
+  const paymentsToVerify = (bookingResults.data ?? []).filter(
+    (booking) =>
+      [BOOKING_STATUS.UPCOMING, BOOKING_STATUS.COMPLETED].includes(booking.status) &&
+      booking.paymentStatus === BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION,
+  );
   const tutorName = application?.name || user?.name || 'Tutor';
   const tutorType = application?.tutorType
     ?? user?.tutorType
@@ -83,7 +116,12 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     setLoadStatus('loading');
     setLoadError(null);
     try {
-      setApplication(await getTutorApplication(uid));
+      const tutorApplication = await getTutorApplication(uid);
+      setApplication(tutorApplication);
+      setPaymentQrUrl(tutorApplication?.paymentQrUrl ?? '');
+      setHourlyRate(
+        Number.isFinite(tutorApplication?.hourlyRate) ? String(tutorApplication.hourlyRate) : '',
+      );
       setLoadStatus('ready');
     } catch (error) {
       setLoadError(error);
@@ -109,11 +147,56 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   const handleSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
+    setSignOutError('');
     try {
       await signOut();
     } catch (error) {
-      Alert.alert('Unable to log out', getAuthErrorMessage(error));
+      setSignOutError(getAuthErrorMessage(error));
       setSigningOut(false);
+    }
+  };
+
+  const saveBookingDetails = async () => {
+    if (savingBookingDetails) return;
+    setSavingBookingDetails(true);
+    setBookingDetailsError('');
+    try {
+      await updateTutorBookingDetails(uid, {
+        paymentQrUrl: paymentQrUrl.trim(),
+        hourlyRate: Number(hourlyRate),
+      });
+      Alert.alert('Payment details saved', 'Students can use your session price and QR after you accept their request.');
+      await loadApplication();
+    } catch (error) {
+      setBookingDetailsError(getErrorMessage(error, 'Could not save your booking details.'));
+    } finally {
+      setSavingBookingDetails(false);
+    }
+  };
+
+  const respondToBooking = async (bookingId, status) => {
+    if (workingBookingId) return;
+    setWorkingBookingId(bookingId);
+    setBookingActionError('');
+    try {
+      await updateBookingStatus(bookingId, status);
+    } catch (error) {
+      setBookingActionError(getErrorMessage(error, 'Could not update this booking.'));
+    } finally {
+      setWorkingBookingId('');
+    }
+  };
+
+  const verifyPayment = async (bookingId) => {
+    if (workingBookingId) return;
+    setWorkingBookingId(bookingId);
+    setBookingActionError('');
+    try {
+      await confirmBookingPayment(bookingId);
+    } catch (error) {
+      setBookingActionError(getErrorMessage(error, 'Could not verify this payment.'));
+    } finally {
+      setWorkingBookingId('');
     }
   };
 
@@ -209,9 +292,92 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           </Text>
         </View>
 
-        <SectionTitle title="Booking Requests" subtitle="2 pending" action="Requires action" />
-        {requests.map((request) => <RequestCard key={request.name} request={request} />)}
-        <View style={styles.requestActions}><AppButton title="Accept" variant="secondary" onPress={() => {}} /><AppButton title="Decline" variant="outline" onPress={() => {}} /></View>
+        <View style={styles.paymentSetupCard}>
+          <SectionTitle title="Booking & QR Payment" subtitle="Set the session price and hosted QR image students will use after you accept." />
+          <AppInput
+            label="Session price (up to 3 hours)"
+            value={hourlyRate}
+            handleChangeText={setHourlyRate}
+            placeholder="e.g. 280"
+            keyboardType="decimal-pad"
+          />
+          <AppInput
+            label="Public HTTPS QR image URL"
+            value={paymentQrUrl}
+            handleChangeText={setPaymentQrUrl}
+            placeholder="https://example.com/your-payment-qr.png"
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+          {paymentQrUrl && isHttpsUrl(paymentQrUrl) ? (
+            <Image source={{ uri: paymentQrUrl }} style={styles.qrPreview} resizeMode="contain" />
+          ) : null}
+          {bookingDetailsError ? (
+            <Text accessibilityRole="alert" style={styles.formError}>{bookingDetailsError}</Text>
+          ) : null}
+          <AppButton
+            title="Save booking details"
+            variant="outline"
+            onPress={saveBookingDetails}
+            loading={savingBookingDetails}
+          />
+        </View>
+
+        <SectionTitle
+          title="Booking Requests"
+          subtitle={bookingResults.status === 'ready' ? `${pendingRequests.length} pending` : 'Live requests'}
+          action="Requires action"
+        />
+        {bookingResults.status === 'loading' ? (
+          <LoadingState compact message="Loading booking requests..." />
+        ) : bookingResults.status === 'error' ? (
+          <ErrorState
+            compact
+            title="Could not load booking requests"
+            message={getErrorMessage(bookingResults.error)}
+            onRetry={bookingResults.retry}
+          />
+        ) : pendingRequests.length ? (
+          pendingRequests.map((request) => (
+            <View key={request.id} style={styles.requestContainer}>
+              <RequestCard
+                request={request}
+                working={workingBookingId === request.id}
+                onAccept={() => respondToBooking(request.id, BOOKING_STATUS.UPCOMING)}
+                onDecline={() => respondToBooking(request.id, BOOKING_STATUS.REJECTED)}
+              />
+            </View>
+          ))
+        ) : (
+          <Text style={styles.emptyRequests}>New session requests will appear here.</Text>
+        )}
+        {bookingActionError ? (
+          <Text accessibilityRole="alert" style={styles.formError}>{bookingActionError}</Text>
+        ) : null}
+
+        <SectionTitle
+          title="Payment Verification"
+          subtitle={`${paymentsToVerify.length} transfer${paymentsToVerify.length === 1 ? '' : 's'} reported`}
+          action="Review before confirming"
+        />
+        {paymentsToVerify.map((booking) => (
+          <View key={booking.id} style={styles.paymentVerificationCard}>
+            <View style={styles.requestCopy}>
+              <Text style={styles.requestName}>{booking.studentName || 'Student'}</Text>
+              <Text style={styles.requestMeta}>{booking.subject} · ₱{Number(booking.totalAmount || 0).toFixed(2)}</Text>
+              <Text style={styles.requestNote}>Confirm only after you have verified the transfer in your payment app.</Text>
+            </View>
+            <AppButton
+              title="Confirm received"
+              variant="secondary"
+              onPress={() => verifyPayment(booking.id)}
+              loading={workingBookingId === booking.id}
+            />
+          </View>
+        ))}
+        {bookingResults.status === 'ready' && !paymentsToVerify.length ? (
+          <Text style={styles.emptyRequests}>Student payment reports will appear here for your review.</Text>
+        ) : null}
 
         <SectionTitle title="Session Ledger" subtitle="Upcoming (3)" action="Past (42)" />
         {mockTutorSessions.map((session) => (
@@ -221,6 +387,11 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           </View>
         ))}
 
+        {signOutError ? (
+          <Text accessibilityRole="alert" style={styles.signOutError}>
+            {signOutError}
+          </Text>
+        ) : null}
         <AppButton
           title="Log Out"
           variant="danger"
@@ -234,6 +405,13 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   content: { paddingBottom: spacing.xxl },
+  signOutError: { marginBottom: spacing.sm, color: colors.error, fontSize: 13 },
+  paymentSetupCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  qrPreview: { alignSelf: 'center', width: 132, height: 132, marginBottom: spacing.md, borderRadius: radius.sm },
+  formError: { marginBottom: spacing.sm, color: colors.errorText, fontSize: 12, lineHeight: 17 },
+  requestContainer: { marginBottom: spacing.sm },
+  paymentVerificationCard: { gap: spacing.sm, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },
+  emptyRequests: { padding: spacing.md, borderRadius: radius.md, color: colors.mutedText, backgroundColor: colors.surface, fontSize: 12 },
   activeBanner: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: 999, backgroundColor: '#E6E8EA' },
   activeDot: { width: 7, height: 7, borderRadius: 4, marginRight: 6, backgroundColor: colors.secondary },
   activeText: { color: colors.text, fontSize: 11, fontWeight: '600' },

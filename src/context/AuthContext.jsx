@@ -70,9 +70,9 @@ export function AuthProvider({ children }) {
 
   const isDemoSession = state.isDemo;
   const handleSignOut = useCallback(async () => {
+    const signOutEventId = ++latestEvent.current;
     if (!isDemoSession) await signOut();
-    latestEvent.current += 1;
-    setState(signedOut);
+    if (latestEvent.current === signOutEventId) setState(signedOut);
   }, [isDemoSession]);
 
   const handleUpdateProfile = useCallback(async (changes) => {

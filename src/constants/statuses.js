@@ -30,6 +30,14 @@ export const BOOKING_STATUS = {
   CANCELLED: 'cancelled',
 };
 
+export const BOOKING_PAYMENT_STATUS = {
+  AWAITING_TUTOR_ACCEPTANCE: 'awaiting_tutor_acceptance',
+  AWAITING_PAYMENT: 'awaiting_payment',
+  PENDING_VERIFICATION: 'pending_verification',
+  SETTLED: 'settled',
+  NOT_APPLICABLE: 'not_applicable',
+};
+
 // Verification of tutors and professional tutors, reviewed by an admin.
 export const VERIFICATION_STATUS = {
   NOT_SUBMITTED: 'not_submitted',

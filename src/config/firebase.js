@@ -81,3 +81,12 @@ export function requireFirebase() {
   }
   return { auth, db, storage };
 }
+
+export function requireAuth() {
+  if (!auth) {
+    throw new Error(
+      'Firebase Authentication is not configured. Copy .env.example to .env.local, fill in the values from the Firebase console, then restart Expo with "npx expo start -c".',
+    );
+  }
+  return auth;
+}

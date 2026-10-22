@@ -3,6 +3,7 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,6 +31,7 @@ const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export default function StudentProfileScreen() {
   const { user, signOut, updateProfile, loading } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [streakRemindersEnabled, setStreakRemindersEnabled] = useState(true);
   const [meetingPreference, setMeetingPreference] = useState('campus');
@@ -66,23 +68,25 @@ export default function StudentProfileScreen() {
   const leaderboard = Array.isArray(stats.leaderboard) ? stats.leaderboard : [];
   const subjectHonors = Array.isArray(stats.subjectHonors) ? stats.subjectHonors : [];
   const showProfileMessage = (message) => Alert.alert('Student Profile', message);
-  const confirmSignOut = () => {
+  const handleSignOut = async () => {
     if (signingOut) return;
+    setSigningOut(true);
+    setSignOutError('');
+    try {
+      await signOut();
+    } catch (error) {
+      setSignOutError(getAuthErrorMessage(error));
+      setSigningOut(false);
+    }
+  };
+  const confirmSignOut = () => {
+    if (Platform.OS === 'web') {
+      handleSignOut();
+      return;
+    }
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log Out',
-        style: 'destructive',
-        onPress: async () => {
-          setSigningOut(true);
-          try {
-            await signOut();
-          } catch (error) {
-            Alert.alert('Unable to log out', getAuthErrorMessage(error));
-            setSigningOut(false);
-          }
-        },
-      },
+      { text: 'Log Out', style: 'destructive', onPress: handleSignOut },
     ]);
   };
   const openProfileEditor = () => {
@@ -347,8 +351,14 @@ export default function StudentProfileScreen() {
           />
         </View>
 
+        {signOutError ? (
+          <Text accessibilityRole="alert" style={styles.signOutError}>
+            {signOutError}
+          </Text>
+        ) : null}
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Log out"
           accessibilityState={{ disabled: signingOut, busy: signingOut }}
           disabled={signingOut}
           onPress={confirmSignOut}
@@ -692,6 +702,7 @@ const styles = StyleSheet.create({
   schoolIcon: { position: 'absolute', right: spacing.lg, top: spacing.lg },
   ctaTitle: { ...typography.heading, color: colors.white, fontSize: 18, marginVertical: spacing.md },
   logoutButton: { minHeight: 80, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface },
+  signOutError: { marginBottom: spacing.sm, color: colors.error, fontSize: 13 },
   logoutIcon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: '#FFF1F1', alignItems: 'center', justifyContent: 'center' },
   logoutText: { color: colors.error, fontSize: 14, fontWeight: '700', flex: 1 },
   modalBackdrop: {

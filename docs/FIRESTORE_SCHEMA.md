@@ -42,7 +42,6 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `tier` | `'Peer Tutor'` \| `'Alumni'` \| `'Professor'` | `TUTOR_TIERS` in `statuses.js` |
 | `tutorType` | `'peer'` \| `'professional'` | Mirrors the sign-up type and controls evidence validation |
 | `subject` | string | Main subject shown on the card, for example `CS 240: Algorithms` |
-| `hourlyRate` | number | Pesos, a number and not text like `₱250.00`. The screen formats it |
 | `rating`, `reviewCount` | number | |
 | `location` | string | City name shown on the card |
 | `coordinates` | map `{ latitude, longitude }` | New. Used for the map and nearby sorting (Week 3) |
@@ -54,6 +53,8 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `applicationProofName`, `applicationProofUrl` | string | Alumni/Professor applications only: proof type/description and one HTTPS Google Drive link covering the application |
 | `online` | boolean | |
 | `photoUrl` | string | Optional instructor-approved external image URL; otherwise use initials |
+| `paymentQrUrl` | string | Optional public HTTPS URL for the tutor's QR payment image. No image bytes are uploaded to Firebase Storage. Tutors must configure a valid image URL before accepting a booking request. |
+| `hourlyRate` | number | The tutor's session price in pesos (the current booking flow treats it as the fee for a session of up to 3 hours). |
 | `verificationStatus` | `'not_submitted'` \| `'pending'` \| `'approved'` \| `'rejected'` | `VERIFICATION_STATUS`. Students only see `approved` tutors |
 | `verificationNote` | string | Reason, when an admin rejects |
 | `verificationReviewedBy`, `verificationReviewedAt` | string, timestamp | The admin and the time |
@@ -70,9 +71,12 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `durationHours` | number | |
 | `status` | `'requested'` \| `'upcoming'` \| `'completed'` \| `'rejected'` \| `'cancelled'` | `BOOKING_STATUS` |
 | `location` | string | |
+| `sessionMode` | string | The session format selected by the student, copied from the tutor's listed formats |
 | `notes` | string | |
 | `totalAmount` | number | Pesos. The screen formats it |
-| `paymentStatus` | string | The mock data uses `Escrow protected`, `Released` and `Settled`. Member 2 decides the final set and the screen maps each to its label |
+| `paymentStatus` | `'awaiting_tutor_acceptance'` \| `'awaiting_payment'` \| `'pending_verification'` \| `'settled'` \| `'not_applicable'` | A QR transfer is not considered paid/settled until the tutor manually verifies the student's report |
+| `tutorQrUrl`, `tutorPhotoUrl` | string | QR image and optional tutor photo copied to the booking when the tutor accepts; this preserves the accepted session's payment details |
+| `paymentReportedAt`, `paymentVerifiedAt` | timestamp | Student report time and tutor verification time |
 | `review`, `rating` | string, number | The mock data's `rating` holds review text; a star rating is optional |
 | `checkedInAt`, `checkInCoordinates` | timestamp, map | Week 3 |
 | `createdAt`, `updatedAt` | timestamp | |

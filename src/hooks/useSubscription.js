@@ -14,7 +14,8 @@
 // `subscribe` receives the callback and must return the function that stops
 // listening, which is what every subscribeTo... function in src/services does.
 // Return nothing (undefined) to skip listening, for example when there is no
-// logged-in user yet; the status then stays 'loading'.
+// logged-in user yet; the status then stays 'loading'. Subscriptions may pass
+// an optional second callback to report asynchronous listener errors.
 import { useEffect, useRef, useState } from 'react';
 
 export function useSubscription(subscribe, deps = []) {
@@ -27,15 +28,21 @@ export function useSubscription(subscribe, deps = []) {
     setState({ status: 'loading', data: null, error: null });
 
     let stop;
+    let active = true;
     try {
       stop = subscribeRef.current((data) => {
+        if (!active) return;
         setState({ status: 'ready', data, error: null });
+      }, (error) => {
+        if (!active) return;
+        setState({ status: 'error', data: null, error });
       });
     } catch (error) {
       setState({ status: 'error', data: null, error });
     }
 
     return () => {
+      active = false;
       if (typeof stop === 'function') stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -2,7 +2,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { getNextBooking, parseTimeToMinutes, toDateKey } from './bookings.js';
+import {
+  getBookingTimeError,
+  getNextBooking,
+  parseTimeToMinutes,
+  toDateKey,
+} from './bookings.js';
 
 // Oct 15, 2026, 3:00 PM in the phone's own time zone.
 const NOW = new Date(2026, 9, 15, 15, 0, 0);
@@ -34,6 +39,48 @@ test('parseTimeToMinutes gives null for text it cannot read', () => {
 test('toDateKey writes the local date as YYYY-MM-DD with zero padding', () => {
   assert.equal(toDateKey(new Date(2026, 0, 5)), '2026-01-05');
   assert.equal(toDateKey(NOW), '2026-10-15');
+});
+
+test('getBookingTimeError accepts a future slot whose time matches its duration', () => {
+  assert.equal(
+    getBookingTimeError({
+      dateKey: '2026-10-16',
+      startTime: '4:00 PM',
+      endTime: '6:00 PM',
+      durationHours: 2,
+    }, NOW),
+    '',
+  );
+});
+
+test('getBookingTimeError rejects invalid, past, and mismatched session times', () => {
+  assert.match(
+    getBookingTimeError({
+      dateKey: '2026-02-30',
+      startTime: '4:00 PM',
+      endTime: '5:00 PM',
+      durationHours: 1,
+    }, NOW),
+    /valid session date/,
+  );
+  assert.match(
+    getBookingTimeError({
+      dateKey: '2026-10-15',
+      startTime: '2:00 PM',
+      endTime: '3:00 PM',
+      durationHours: 1,
+    }, NOW),
+    /in the future/,
+  );
+  assert.match(
+    getBookingTimeError({
+      dateKey: '2026-10-16',
+      startTime: '4:00 PM',
+      endTime: '7:00 PM',
+      durationHours: 2,
+    }, NOW),
+    /match a duration/,
+  );
 });
 
 test('getNextBooking returns the earliest session still to come', () => {

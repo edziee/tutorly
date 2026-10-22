@@ -80,7 +80,7 @@ The four members split the work by area. Member 3 builds the screens and customi
 
 - **Week 1:** build the tutors list logic with search and filters. Temporary data is fine for now and gets replaced in Week 2. Member 3 builds the screens.
 - **Week 2:** build the booking flow and the schedule and save bookings to Firestore. Connect the student dashboard and tutors list to Firestore, and replace their mock data, along with the booking and schedule mock data.
-- **Week 3:** connect the payment screen to bookings (a simulated payment is enough unless told otherwise). Then build geolocation: ask for location permission, show tutors on the map using Firestore location data, sort tutors by distance, and add the session check-in that uses the campus proximity check from the prototype.
+- **Week 3:** connect the payment screen to bookings using an in-app booking QR flow. Generate a QR payload containing the booking id, amount and currency; let the student scan or display it and tap "I've paid" to submit a simulated payment claim. Do not integrate a real payment provider or treat the claim as verified money transfer. Then build geolocation: ask for location permission, show tutors on the map using Firestore location data, sort tutors by distance, and add the session check-in that uses the campus proximity check from the prototype.
 - **Done when:** a student can find a tutor, book a session and see it in their schedule from Firestore data, the map shows tutors with nearby ones first, and check-in works only at the campus location.
 
 ### Member 3: Front end and UI customization
@@ -152,7 +152,7 @@ Week 3 adds payment and geolocation, locks down Firebase for each role, finishes
 
 | Task | Owner | Status |
 | --- | --- | --- |
-| Payment screen flow connected to bookings | Member 2 | Not started |
+| Payment screen flow connected to bookings with an in-app booking QR and student self-claim | Member 2 | Not started |
 | Geolocation: location permission, tutors on the map from Firestore location data, nearby-tutor sorting by distance | Member 2 | Not started |
 | Session check-in using campus proximity (location check) | Member 2 | Not started |
 | Fully customize and polish the UI: spacing, animations, responsive layout, consistency across all four user types | Member 3 | Not started |
@@ -169,7 +169,7 @@ Week 3 adds payment and geolocation, locks down Firebase for each role, finishes
 Week 1 comes first because Members 2, 3 and 4 need Member 1's Firebase setup and data structure before they can use real data.
 
 - **Notifications:** only in-app notifications are required, so they can be Firestore documents shown in the app in real time; push notifications are not needed. The repo already schedules local session reminders with `expo-notifications`, which is separate from this requirement.
-- **Payment:** the plan assumes a simulated payment flow. A real payment provider would add work to Week 3.
+- **Payment:** use an in-app booking QR as the demo workaround instead of a real payment provider. The QR must contain only non-sensitive booking data (version, booking id, amount and currency). After scanning or displaying the QR, the student may tap "I've paid"; this records a simulated claim only and does not verify that money was transferred. Use canonical stored statuses such as `unpaid`, `paid` and `released`, mapping them to user-facing labels in the screens.
 - **Geolocation timing:** geolocation is in Week 3, so there is less time to fix problems. If Member 2 finishes early in Week 2, start the Maps setup then.
 - **Front end:** Member 3 builds and customizes the screens for everyone. The member who owns a feature connects its screens to Firebase.
 - **Hidden admin login:** it should not appear on the normal login screens. Admin accounts are created by the team directly in Firebase, and the security rules in Week 3 must block everyone else from admin data.

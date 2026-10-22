@@ -5,12 +5,53 @@
 //   Member 2: getTutors, getTutorById   (replaces src/data/mockTutors.jsx)
 //   Member 1: getTutorApplication, saveTutorApplication
 //             (replaces src/data/mockMentorApplication.jsx)
-import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from 'firebase/firestore';
 
-import { requireFirebase } from '../config/firebase';
+import { requireAuth, requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
 import { TUTOR_TIERS, TUTOR_TYPES } from '../constants/statuses';
-import { getTutorApplicationEvidenceError } from '../utils/validation';
+import { isHttpsUrl, getTutorApplicationEvidenceError } from '../utils/validation';
+
+function toPublicTutor(snapshot) {
+  const data = snapshot.data();
+  const firstCourse = Array.isArray(data.courses) ? data.courses[0] : null;
+  const courseSubjects = (data.courses ?? []).map((course) => ({
+    code: course.code ?? '',
+    title: course.title ?? '',
+    id: course.id ?? '',
+  }));
+  const subject = firstCourse
+    ? [firstCourse.code, firstCourse.title].filter(Boolean).join(': ')
+    : '';
+
+  return {
+    ...data,
+    name: typeof data.name === 'string' && data.name.trim() ? data.name.trim() : 'Tutor',
+    id: snapshot.id,
+    uid: snapshot.id,
+    subject,
+    courses: courseSubjects,
+    availability: Array.isArray(data.availability) ? data.availability : [],
+    preferredDays: Array.isArray(data.preferredDays) ? data.preferredDays : [],
+    preferredTimeSlots: Array.isArray(data.preferredTimeSlots) ? data.preferredTimeSlots : [],
+    formats: Array.isArray(data.formats) ? data.formats : [],
+    photoUrl: data.photoUrl ?? '',
+    rating: Number.isFinite(data.rating) ? data.rating : null,
+    reviewCount: Number.isFinite(data.reviewCount) ? data.reviewCount : 0,
+    hourlyRate: Number.isFinite(data.hourlyRate) ? data.hourlyRate : null,
+    paymentQrUrl: data.paymentQrUrl ?? '',
+  };
+}
 
 /**
  * Tutors for the list and the map. Only approved tutors are shown to students.
@@ -19,7 +60,19 @@ import { getTutorApplicationEvidenceError } from '../utils/validation';
  * @returns {Promise<object[]>}
  */
 export async function getTutors(filters = {}) {
-  throw notImplemented('tutorService.getTutors', 'Member 2');
+  const { db } = requireFirebase();
+  const tutorsQuery = query(
+    collection(db, COLLECTIONS.TUTORS),
+    where('verificationStatus', '==', 'approved'),
+  );
+  const snapshot = await getDocs(tutorsQuery);
+  const tutors = snapshot.docs.map(toPublicTutor);
+  const tierFilter = filters.tier?.trim().toLowerCase();
+  const subjectFilter = filters.subject?.trim().toLowerCase();
+  return tutors.filter((tutor) =>
+    (!tierFilter || tutor.tier?.toLowerCase().includes(tierFilter)) &&
+    (!subjectFilter || tutor.subject.toLowerCase().includes(subjectFilter)),
+  );
 }
 
 /**
@@ -27,7 +80,35 @@ export async function getTutors(filters = {}) {
  * @returns {Promise<object | null>}
  */
 export async function getTutorById(tutorId) {
-  throw notImplemented('tutorService.getTutorById', 'Member 2');
+  if (!tutorId) throw new Error('getTutorById needs a tutor id.');
+  const { db } = requireFirebase();
+  const snapshot = await getDoc(doc(db, COLLECTIONS.TUTORS, tutorId));
+  return snapshot.exists() ? toPublicTutor(snapshot) : null;
+}
+
+export async function updateTutorBookingDetails(uid, { paymentQrUrl, hourlyRate } = {}) {
+  if (!uid) throw new Error('updateTutorBookingDetails needs a tutor id.');
+  const auth = requireAuth();
+  if (auth.currentUser?.uid !== uid) {
+    throw new Error('Only the signed-in tutor can change their payment details.');
+  }
+  if (typeof paymentQrUrl !== 'string') {
+    throw new Error('Enter the public HTTPS link for your payment QR image, or leave it blank.');
+  }
+  const cleanQrUrl = paymentQrUrl.trim();
+  if (cleanQrUrl && !isHttpsUrl(cleanQrUrl)) {
+    throw new Error('The payment QR must be a valid HTTPS image URL.');
+  }
+  if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) {
+    throw new Error('Enter a session price greater than zero.');
+  }
+
+  const { db } = requireFirebase();
+  await setDoc(
+    doc(db, COLLECTIONS.TUTORS, uid),
+    { paymentQrUrl: cleanQrUrl, hourlyRate, updatedAt: serverTimestamp() },
+    { merge: true },
+  );
 }
 
 /**

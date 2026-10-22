@@ -17,10 +17,21 @@ import * as Calendar from 'expo-calendar';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import ErrorState from '../../components/ErrorState';
 import ScreenContainer from '../../components/ScreenContainer';
+import { ROUTES } from '../../constants/routes';
+import { BOOKING_PAYMENT_STATUS, BOOKING_STATUS } from '../../constants/statuses';
+import { useAuth } from '../../context/AuthContext';
 import { mockSchedules } from '../../data/mockSchedules';
+import { useSubscription } from '../../hooks/useSubscription';
+import {
+  rescheduleBooking,
+  subscribeToStudentBookings,
+  updateBookingStatus,
+} from '../../services/bookingService';
 import { colors } from '../../theme/colors';
 import styles from '../../theme/scheduleScreenStyles';
+import { getErrorMessage } from '../../utils/errors';
 
 const initialDate = new Date();
 const storageKey = 'tutorly.schedule.sessions.v3';
@@ -91,6 +102,37 @@ function formatDuration(session) {
   return `${session.durationHours}h`;
 }
 
+function toScheduleBooking(booking) {
+  const amount = Number(booking.totalAmount);
+  const paymentStatus = {
+    [BOOKING_PAYMENT_STATUS.AWAITING_TUTOR_ACCEPTANCE]: 'Awaiting tutor response',
+    [BOOKING_PAYMENT_STATUS.AWAITING_PAYMENT]: 'Tutor accepted · Payment due',
+    [BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION]: 'Payment reported · Awaiting verification',
+    [BOOKING_PAYMENT_STATUS.SETTLED]: 'Payment confirmed by tutor',
+    [BOOKING_PAYMENT_STATUS.NOT_APPLICABLE]: 'No payment due',
+  }[booking.paymentStatus] ?? 'Payment status unavailable';
+
+  return {
+    ...booking,
+    id: booking.id,
+    bookingId: booking.id,
+    tutorName: booking.tutorName || 'Tutor',
+    subject: booking.subject || 'Tutoring session',
+    dateKey: booking.dateKey,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    durationHours: booking.durationHours,
+    status: booking.status === BOOKING_STATUS.COMPLETED ? 'completed' : 'upcoming',
+    approvalStatus: booking.status,
+    location: booking.location || 'Location not specified',
+    role: booking.tutorTier || 'Tutor',
+    total: Number.isFinite(amount) ? `₱${amount.toFixed(2)}` : '',
+    paymentStatus,
+    paymentStatusCode: booking.paymentStatus,
+    image: booking.tutorPhotoUrl || null,
+    rating: booking.review || null,
+  };
+}
 function parseTime(dateKeyValue, time) {
   const [clock, period] = time.split(' ');
   let [hours, minutes] = clock.split(':').map(Number);
@@ -207,7 +249,7 @@ function FilterBar({ filter, onChange, sessions }) {
   );
 }
 
-function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onReschedule, onReminder }) {
+function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onReschedule, onReminder, onPay }) {
   const roleStyle = getRoleStyle(session.role);
   return (
     <Pressable onPress={onPress} style={[styles.sessionCard, session.status === 'completed' ? styles.completedCard : styles.upcomingCard]}>
@@ -215,7 +257,13 @@ function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onRe
         <Text style={styles.sessionDate}>{formatSessionDate(session.dateKey)} • {formatDuration(session)} session</Text>
         <View style={styles.statusBadge}>
           <Ionicons name={session.status === 'completed' ? 'checkmark-circle-outline' : 'time-outline'} size={12} color={colors.success} />
-          <Text style={styles.statusBadgeText}>{session.status === 'completed' ? 'Released' : 'Upcoming'}</Text>
+          <Text style={styles.statusBadgeText}>
+            {session.status === 'completed'
+              ? 'Completed'
+              : session.approvalStatus === BOOKING_STATUS.REQUESTED
+                ? 'Requested'
+                : 'Upcoming'}
+          </Text>
         </View>
       </View>
       <View style={styles.sessionTitleRow}>
@@ -227,7 +275,7 @@ function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onRe
           </View>
           <Text style={styles.tutorName}>{session.tutorName}</Text>
         </View>
-        {session.total ? <View style={styles.totalBox}><Text style={styles.totalAmount}>{session.total}</Text><Text style={styles.totalLabel}>Verified Receipt</Text></View> : null}
+        {session.total ? <View style={styles.totalBox}><Text style={styles.totalAmount}>{session.total}</Text><Text style={styles.totalLabel}>Session fee</Text></View> : null}
       </View>
       <Text style={styles.sessionTime}><Ionicons name="time-outline" size={14} color={colors.mutedText} /> {session.startTime} - {session.endTime}</Text>
       <View style={styles.sessionMeta}><Ionicons name="location-outline" size={15} color={colors.mutedText} /><Text style={styles.sessionMetaText}>{session.location}</Text></View>
@@ -238,8 +286,28 @@ function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onRe
         <Pressable style={styles.secondaryAction} onPress={(event) => { event.stopPropagation(); onCalendar(); }}><Ionicons name="calendar-outline" size={15} color={colors.primary} /><Text style={styles.secondaryActionText}>Add to Calendar</Text></Pressable>
         {session.status === 'upcoming' ? (
           <>
+            {session.bookingId &&
+            session.approvalStatus === BOOKING_STATUS.UPCOMING &&
+            session.paymentStatusCode === BOOKING_PAYMENT_STATUS.AWAITING_PAYMENT ? (
+              session.tutorQrUrl ? (
+                <Pressable
+                  style={styles.primaryAction}
+                  onPress={(event) => { event.stopPropagation(); onPay(); }}
+                >
+                  <Ionicons name="qr-code-outline" size={15} color={colors.white} />
+                  <Text style={styles.primaryActionText}>Pay by tutor QR</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.disabledAction}>
+                  <Ionicons name="alert-circle-outline" size={15} color={colors.mutedText} />
+                  <Text style={styles.disabledActionText}>Tutor QR not set</Text>
+                </View>
+              )
+            ) : null}
             <Pressable style={styles.disabledAction} disabled><Ionicons name="map-outline" size={15} color={colors.mutedText} /><Text style={styles.disabledActionText}>View Map Route</Text></Pressable>
-            <Pressable style={styles.secondaryAction} onPress={(event) => { event.stopPropagation(); onReschedule(); }}><Ionicons name="swap-horizontal-outline" size={15} color={colors.primary} /><Text style={styles.secondaryActionText}>Reschedule</Text></Pressable>
+            {(!session.bookingId || session.approvalStatus === BOOKING_STATUS.UPCOMING) ? (
+              <Pressable style={styles.secondaryAction} onPress={(event) => { event.stopPropagation(); onReschedule(); }}><Ionicons name="swap-horizontal-outline" size={15} color={colors.primary} /><Text style={styles.secondaryActionText}>Reschedule</Text></Pressable>
+            ) : null}
             <Pressable style={styles.cancelAction} onPress={(event) => { event.stopPropagation(); onCancel(); }}><Ionicons name="close-circle-outline" size={15} color={colors.error} /><Text style={styles.cancelActionText}>Cancel</Text></Pressable>
             <Pressable style={styles.reminderAction} onPress={(event) => { event.stopPropagation(); onReminder(); }}><Ionicons name={session.reminderEnabled ? 'notifications' : 'notifications-outline'} size={15} color={colors.success} /><Text style={styles.reminderActionText}>{session.reminderEnabled ? 'Reminder On' : 'Set Reminder'}</Text></Pressable>
             <Pressable style={styles.primaryAction} disabled><Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.white} /><Text style={styles.primaryActionText}>Message {session.tutorName.split(' ')[0]}</Text></Pressable>
@@ -250,7 +318,7 @@ function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onRe
   );
 }
 
-function WeekAgenda({ sessions, onBookAgain, onSelect, onCalendar, onCancel, onReschedule, onReminder }) {
+function WeekAgenda({ sessions, onBookAgain, onSelect, onCalendar, onCancel, onReschedule, onReminder, onPay }) {
   const groupedSessions = sessions.reduce((groups, session) => {
     if (!groups[session.dateKey]) groups[session.dateKey] = [];
     groups[session.dateKey].push(session);
@@ -260,13 +328,20 @@ function WeekAgenda({ sessions, onBookAgain, onSelect, onCalendar, onCancel, onR
   return Object.entries(groupedSessions).sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate)).map(([key, daySessions]) => (
     <View key={key}>
       <Text style={styles.dayGroupTitle}>{formatSessionDate(daySessions[0].dateKey)}</Text>
-      {daySessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => onSelect(session)} onBookAgain={() => onBookAgain(session)} onCalendar={() => onCalendar(session)} onCancel={() => onCancel(session)} onReschedule={() => onReschedule(session)} onReminder={() => onReminder(session)} />)}
+      {daySessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => onSelect(session)} onBookAgain={() => onBookAgain(session)} onCalendar={() => onCalendar(session)} onCancel={() => onCancel(session)} onReschedule={() => onReschedule(session)} onReminder={() => onReminder(session)} onPay={() => onPay(session)} />)}
     </View>
   ));
 }
 
 export default function ScheduleScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
+  const bookingResults = useSubscription(
+    (onData, onError) => (
+      user?.uid ? subscribeToStudentBookings(user.uid, onData, onError) : undefined
+    ),
+    [user?.uid],
+  );
   const [sessions, setSessions] = useState(() => normalizeSessionStatuses(mockSchedules));
   const [hydrated, setHydrated] = useState(false);
   const [selectedDate, setSelectedDate] = useState(initialDate);
@@ -280,6 +355,17 @@ export default function ScheduleScreen() {
   const [draftStartTime, setDraftStartTime] = useState('4:00 PM');
   const [draftEndTime, setDraftEndTime] = useState('7:00 PM');
   const [draftNotes, setDraftNotes] = useState('');
+  const remoteSessions = (bookingResults.data ?? [])
+    .filter((booking) => [
+      BOOKING_STATUS.REQUESTED,
+      BOOKING_STATUS.UPCOMING,
+      BOOKING_STATUS.COMPLETED,
+    ].includes(booking.status))
+    .map(toScheduleBooking);
+  const allSessions = [
+    ...sessions.filter((session) => !session.bookingId),
+    ...remoteSessions,
+  ];
 
   useEffect(() => {
     AsyncStorage.getItem(storageKey).then((stored) => {
@@ -292,7 +378,7 @@ export default function ScheduleScreen() {
     if (hydrated) AsyncStorage.setItem(storageKey, JSON.stringify(sessions));
   }, [hydrated, sessions]);
 
-  const visibleSessions = sessions.filter((session) => filter === 'all' || session.status === filter);
+  const visibleSessions = allSessions.filter((session) => filter === 'all' || session.status === filter);
   const selectedKey = dateKey(selectedDate);
   const weekStart = startOfWeek(selectedDate);
   const weekEnd = new Date(weekStart);
@@ -326,7 +412,7 @@ export default function ScheduleScreen() {
   }
 
   function changeFilter(nextFilter) {
-    const matchingSessions = sessions
+    const matchingSessions = allSessions
       .filter((session) => nextFilter === 'all' || session.status === nextFilter)
       .sort((first, second) => first.dateKey.localeCompare(second.dateKey));
     const targetSession = nextFilter === 'completed'
@@ -348,12 +434,25 @@ export default function ScheduleScreen() {
     setModalMode(mode);
   }
 
-  function saveBooking() {
+  async function saveBooking() {
     if (!draftDate || !draftStartTime || !draftEndTime) {
       Alert.alert('Incomplete booking', 'Choose a date and time before saving.');
       return;
     }
     if (modalMode === 'reschedule') {
+      if (activeSession.bookingId) {
+        try {
+          await rescheduleBooking(activeSession.bookingId, {
+            dateKey: draftDate,
+            startTime: draftStartTime,
+            endTime: draftEndTime,
+          });
+          setModalMode(null);
+        } catch (error) {
+          Alert.alert('Unable to reschedule', error.message || 'Please try again.');
+        }
+        return;
+      }
       setSessions((current) => current.map((session) => session.id === activeSession.id ? {
         ...session,
         dateKey: draftDate,
@@ -380,9 +479,24 @@ export default function ScheduleScreen() {
   }
 
   function cancelSession(session) {
+    const cancel = async () => {
+      if (session.bookingId) {
+        try {
+          await updateBookingStatus(session.bookingId, BOOKING_STATUS.CANCELLED);
+        } catch (error) {
+          Alert.alert('Unable to cancel session', error.message || 'Please try again.');
+        }
+        return;
+      }
+      setSessions((current) => current.filter((item) => item.id !== session.id));
+    };
+    if (Platform.OS === 'web') {
+      cancel();
+      return;
+    }
     Alert.alert('Cancel session?', `Cancel your session with ${session.tutorName}?`, [
       { text: 'Keep session', style: 'cancel' },
-      { text: 'Cancel session', style: 'destructive', onPress: () => setSessions((current) => current.filter((item) => item.id !== session.id)) },
+      { text: 'Cancel session', style: 'destructive', onPress: cancel },
     ]);
   }
 
@@ -488,7 +602,9 @@ export default function ScheduleScreen() {
                     <View style={styles.detailRow}><Ionicons name="time-outline" size={17} color={colors.success} /><Text style={styles.detailText}>{activeSession.startTime} - {activeSession.endTime} ({formatDuration(activeSession)})</Text></View>
                     <View style={styles.detailRow}><Ionicons name="location-outline" size={17} color={colors.success} /><Text style={styles.detailText}>{activeSession.location}</Text></View>
                     <View style={styles.detailNote}><Text style={styles.detailNoteLabel}>Session notes</Text><Text style={styles.detailText}>{activeSession.notes || 'No notes added yet.'}</Text></View>
-                    <Pressable style={styles.primaryAction} onPress={() => openScheduleModal(activeSession, 'reschedule')}><Ionicons name="swap-horizontal-outline" size={16} color={colors.white} /><Text style={styles.primaryActionText}>Reschedule Session</Text></Pressable>
+                    {(!activeSession.bookingId || activeSession.approvalStatus === BOOKING_STATUS.UPCOMING) ? (
+                      <Pressable style={styles.primaryAction} onPress={() => openScheduleModal(activeSession, 'reschedule')}><Ionicons name="swap-horizontal-outline" size={16} color={colors.white} /><Text style={styles.primaryActionText}>Reschedule Session</Text></Pressable>
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -522,17 +638,25 @@ export default function ScheduleScreen() {
           </View>
           <Pressable style={styles.todayButton} onPress={() => selectDate(new Date())}><Text style={styles.todayButtonText}>Today</Text></Pressable>
         </View>
+        {bookingResults.status === 'error' ? (
+          <ErrorState
+            compact
+            title="Could not load live bookings"
+            message={getErrorMessage(bookingResults.error)}
+            onRetry={bookingResults.retry}
+          />
+        ) : null}
         <View style={styles.calendarCard}>
           <CalendarHeader view={view} setView={setView} month={month} onMovePeriod={moveCalendarPeriod} />
-          {view === 'month' ? <MonthGrid month={month} selectedDate={selectedDate} onSelectDate={selectDate} sessions={sessions} /> : <WeekStrip selectedDate={selectedDate} onSelectDate={selectDate} sessions={sessions} />}
+          {view === 'month' ? <MonthGrid month={month} selectedDate={selectedDate} onSelectDate={selectDate} sessions={allSessions} /> : <WeekStrip selectedDate={selectedDate} onSelectDate={selectDate} sessions={allSessions} />}
           <Text style={styles.selectedDateText}>{formatShortDate(selectedDate)} • {view === 'agenda' ? 'Agenda' : `${view.charAt(0).toUpperCase()}${view.slice(1)} view`}</Text>
         </View>
-        <FilterBar filter={filter} onChange={changeFilter} sessions={sessions} />
-        {view === 'week' && displayedSessions.length ? <WeekAgenda sessions={displayedSessions} onSelect={(session) => openScheduleModal(session, 'details')} onBookAgain={(session) => openScheduleModal(session, 'booking')} onCalendar={addToCalendar} onCancel={cancelSession} onReschedule={(session) => openScheduleModal(session, 'reschedule')} onReminder={toggleReminder} /> : null}
+        <FilterBar filter={filter} onChange={changeFilter} sessions={allSessions} />
+        {view === 'week' && displayedSessions.length ? <WeekAgenda sessions={displayedSessions} onSelect={(session) => openScheduleModal(session, 'details')} onBookAgain={(session) => openScheduleModal(session, 'booking')} onCalendar={addToCalendar} onCancel={cancelSession} onReschedule={(session) => openScheduleModal(session, 'reschedule')} onReminder={toggleReminder} onPay={(session) => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} /> : null}
         {view !== 'week' && upcomingSessions.length ? (
           <View>
             <View style={styles.sectionHeading}><Ionicons name="calendar-outline" size={20} color={colors.success} /><Text style={styles.sectionHeadingText}>Upcoming Agenda</Text><Text style={styles.sessionCount}>{upcomingSessions.length} Sessions</Text></View>
-            {upcomingSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => openScheduleModal(session, 'booking')} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} />)}
+            {upcomingSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => openScheduleModal(session, 'booking')} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onPay={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} />)}
           </View>
         ) : null}
         {view !== 'week' && completedSessions.length ? (
@@ -540,7 +664,7 @@ export default function ScheduleScreen() {
             <Pressable style={styles.sectionHeading} onPress={() => setPastExpanded((current) => !current)}>
               <Ionicons name="archive-outline" size={20} color={colors.text} /><Text style={styles.sectionHeadingText}>Past Completed Sessions</Text><Text style={styles.sessionCount}>{completedSessions.length} total</Text><Ionicons name={pastExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.text} />
             </Pressable>
-            {pastExpanded ? completedSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => openScheduleModal(session, 'booking')} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} />) : null}
+            {pastExpanded ? completedSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => openScheduleModal(session, 'booking')} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onPay={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} />) : null}
           </View>
         ) : null}
         {!displayedSessions.length ? <View style={styles.emptyState}><Ionicons name="calendar-clear-outline" size={30} color={colors.mutedText} /><Text style={styles.emptyTitle}>No sessions here</Text><Text style={styles.emptyText}>{view === 'agenda' ? 'Try another filter or choose a different calendar view.' : 'There are no sessions in this selected date range.'}</Text><Pressable style={styles.browseButton} onPress={() => navigation.navigate('Tutors')}><Ionicons name="people-outline" size={16} color={colors.white} /><Text style={styles.browseButtonText}>Browse Tutors</Text></Pressable></View> : null}
@@ -548,4 +672,3 @@ export default function ScheduleScreen() {
     </ScreenContainer>
   );
 }
-

@@ -13,7 +13,7 @@ import {
   signOut as firebaseSignOut,
 } from 'firebase/auth';
 
-import { isFirebaseConfigured, requireFirebase } from '../config/firebase';
+import { isFirebaseConfigured, requireAuth, requireFirebase } from '../config/firebase';
 import { isRoleAllowedInPortal, LOGIN_ROLES, ROLES, SIGNUP_ROLES } from '../constants/roles';
 import { createUserProfile, getUserProfile } from './userService';
 
@@ -168,8 +168,7 @@ export async function signInAdmin(email, password) {
 
 /** Log out the current user. @returns {Promise<void>} */
 export async function signOut() {
-  const { auth } = requireFirebase();
-  await firebaseSignOut(auth);
+  await firebaseSignOut(requireAuth());
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import AntDesign from '@expo/vector-icons/AntDesign';
@@ -7,6 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 export default function TutorCard({ tutor, handlePress }) {
+  const tier = tutor.tier || 'Tutor';
   const styles = StyleSheet.create({
     card: {
       flexDirection: 'column',
@@ -29,9 +30,9 @@ export default function TutorCard({ tutor, handlePress }) {
     },
 
     tier: {
-      backgroundColor: tutor.tier == "Professor" ? "#312E81" :
-        tutor.tier == "Alumni" ? "#006A61" :
-          tutor.tier == "Peer Tutor" ? "#E6E8EA" : "white",
+      backgroundColor: tier === "Professor" ? "#312E81" :
+        tier === "Alumni" ? "#006A61" :
+          tier === "Peer Tutor" ? "#E6E8EA" : "white",
       borderRadius: 12,
       padding: 7,
       flexDirection: "row",
@@ -40,9 +41,9 @@ export default function TutorCard({ tutor, handlePress }) {
     },
 
     tierText: {
-      color: tutor.tier == "Professor" ? "white" :
-        tutor.tier == "Alumni" ? "white" :
-          tutor.tier == "Peer Tutor" ? "black" : "white",
+      color: tier === "Professor" ? "white" :
+        tier === "Alumni" ? "white" :
+          tier === "Peer Tutor" ? "black" : "white",
       fontWeight: "bold",
       fontSize: 12,
       marginLeft: 5,
@@ -61,6 +62,11 @@ export default function TutorCard({ tutor, handlePress }) {
       color: colors.white,
       fontSize: 22,
       fontWeight: '700',
+    },
+    avatarImage: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
     },
     details: {
       flex: 1,
@@ -105,7 +111,7 @@ export default function TutorCard({ tutor, handlePress }) {
       paddingHorizontal: 15,
 
       borderRadius: 12,
-      alignSelf: 'end',
+      alignSelf: 'flex-end',
       marginLeft: 'auto',
     }
   });
@@ -115,35 +121,44 @@ export default function TutorCard({ tutor, handlePress }) {
       onPress={handlePress}>
       <View style={styles.topDetails}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {tutor.initials ||
-              tutor.name
-                .split(' ')
-                .map((part) => part[0])
-                .join('')
-                .slice(0, 2)}
-          </Text>
+          {tutor.photoUrl ? (
+            <Image source={{ uri: tutor.photoUrl }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>
+              {tutor.initials ||
+                (tutor.name || 'Tutor')
+                  .split(' ')
+                  .map((part) => part[0])
+                  .join('')
+                  .slice(0, 2)}
+            </Text>
+          )}
         </View>
         <View style={styles.details}>
           <Text style={styles.name}>{tutor.name}</Text>
           <View style={styles.tier}>
-            {tutor.tier == "Professor" ? (<FontAwesome5 name="scroll" size={12} color="white" />) :
-              tutor.tier == "Alumni" ? (<FontAwesome5 name="medal" size={12} color="white" />) :
-                tutor.tier == "Peer Tutor" ? (<Ionicons name="person" size={12} color="black" />) : "white"}
-            <Text style={styles.tierText}>Verified {tutor.tier}</Text>
+            {tier === "Professor" ? (<FontAwesome5 name="scroll" size={12} color="white" />) :
+              tier === "Alumni" ? (<FontAwesome5 name="medal" size={12} color="white" />) :
+                tier === "Peer Tutor" ? (<Ionicons name="person" size={12} color="black" />) : null}
+            <Text style={styles.tierText}>Verified {tier}</Text>
           </View>
           <Text style={styles.mutedText}>{tutor.credentials}</Text>
           <Text style={styles.rating}>
-            <AntDesign name="star" size={15} color="gold" />
-            <Text style={{ color: 'gold' }}> {tutor.rating} stars</Text> <Text style={{ color: colors.mutedText, fontSize: 12, }}>({tutor.reviewCount} reviews)</Text>
+            {Number.isFinite(tutor.rating) ? (
+              <>
+                <AntDesign name="star" size={15} color="gold" />
+                <Text style={{ color: 'gold' }}> {tutor.rating} stars</Text>
+              </>
+            ) : <Text style={{ color: colors.mutedText }}>New tutor</Text>}
+            <Text style={{ color: colors.mutedText, fontSize: 12 }}> ({tutor.reviewCount ?? 0} reviews)</Text>
           </Text>
         </View>
       </View>
 
       <View style={styles.bottomDetails}>
-        <View style={{ flex: 'column' }}>
+        <View style={{ flexDirection: 'column' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
-            <Text style={styles.hourlyRate}>₱{tutor.hourlyRate}</Text><Text> / session</Text>
+            <Text style={styles.hourlyRate}>{Number.isFinite(tutor.hourlyRate) ? `₱${tutor.hourlyRate}` : 'Fee not set'}</Text><Text> / session</Text>
           </View>
           <View style={styles.overTime}>
             <Text style={{ fontSize: 11, color: "#1A146B" }}>+₱50/hr overtime option</Text>
@@ -163,4 +178,3 @@ export default function TutorCard({ tutor, handlePress }) {
     </Pressable>
   );
 }
-

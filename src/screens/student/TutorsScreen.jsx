@@ -1,20 +1,28 @@
-import { View, FlatList, StyleSheet, Text, TextInput, Pressable, Button, TouchableHighlight, ScrollView, TouchableOpacity } from "react-native";
-import { mockTutors } from "../../data/mockTutors"
-import { useEffect, useState } from "react";
+import { View, FlatList, StyleSheet, Text, TextInput, Pressable } from "react-native";
+import { useState } from "react";
+import { useNavigation } from '@react-navigation/native';
 import TutorCard from "../../components/TutorCard"
+import EmptyState from '../../components/EmptyState';
+import ErrorState from '../../components/ErrorState';
+import LoadingState from '../../components/LoadingState';
 import { SafeAreaView } from "react-native-safe-area-context";
 import Feather from '@expo/vector-icons/Feather';
 import { colors } from '../../theme/colors'
 import { spacing } from '../../theme/spacing'
 import { courseCategories } from "../../data/courseCategories";
-import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { Dimensions } from 'react-native';
 import { tierCategories } from "../../data/tierCategories";
 import Octicons from '@expo/vector-icons/Octicons';
+import { useAsync } from '../../hooks/useAsync';
+import { getTutors } from '../../services/tutorService';
+import { ROUTES } from '../../constants/routes';
+import { getErrorMessage } from '../../utils/errors';
 
 
 export const TutorsScreen = () => { //place tutors prop later
 
+    const navigation = useNavigation();
+    const tutorResults = useAsync(() => getTutors(), []);
     const [textInput, setTextInput] = useState("");
     const [courseCategory, setCourseCategory] = useState("");
     const [tierCategory, setTierCategory] = useState("");
@@ -26,10 +34,6 @@ export const TutorsScreen = () => { //place tutors prop later
         computerScience: {
             keyword: "CS",
         },
-    }
-
-    const handlePress = () => {
-        console.log("");
     }
 
     const handleChangeText = (changedText) => {
@@ -149,6 +153,11 @@ export const TutorsScreen = () => { //place tutors prop later
     });
 
     const sanitizeString = string => string.trim().toLowerCase();
+    const filteredTutors = (tutorResults.data ?? []).filter(tutor =>
+        (sanitizeString(tutor.name ?? '').includes(sanitizeString(textInput)) ||
+            sanitizeString(tutor.subject ?? '').includes(sanitizeString(textInput))) &&
+        sanitizeString(tutor.subject ?? '').includes(sanitizeString(courseCategory)) &&
+        sanitizeString(tutor.tier ?? '').includes(sanitizeString(tierCategory)));
 
     //Implement search functionality later
     //Change CSS styling later
@@ -211,18 +220,36 @@ export const TutorsScreen = () => { //place tutors prop later
                 </View>
 
                 <View>
-                    <FlatList
-                        style={styles.tutorListContainer}
-                        data={mockTutors.filter(tutor =>
-                            (sanitizeString(tutor.name).includes(sanitizeString(textInput)) ||
-                                sanitizeString(tutor.subject).includes(sanitizeString(textInput))) &&
-                            sanitizeString(tutor.subject).includes(sanitizeString(courseCategory)) &&
-                            sanitizeString(tutor.tier).includes(sanitizeString(tierCategory)))}
-                        renderItem={({ item }) =>
-                            <TutorCard tutor={item} handlePress={handlePress} />}
-                        keyExtractor={item => item.id}
-                        showsVerticalScrollIndicator={false}
-                    />
+                    {tutorResults.status === 'loading' ? (
+                        <LoadingState compact message="Loading approved tutors..." />
+                    ) : tutorResults.status === 'error' ? (
+                        <ErrorState
+                            compact
+                            title="Could not load tutors"
+                            message={getErrorMessage(tutorResults.error)}
+                            onRetry={tutorResults.retry}
+                        />
+                    ) : filteredTutors.length ? (
+                        <FlatList
+                            style={styles.tutorListContainer}
+                            data={filteredTutors}
+                            renderItem={({ item }) => (
+                                <TutorCard
+                                    tutor={item}
+                                    handlePress={() => navigation.navigate(ROUTES.BOOKING, { tutor: item })}
+                                />
+                            )}
+                            keyExtractor={item => item.id}
+                            showsVerticalScrollIndicator={false}
+                        />
+                    ) : (
+                        <EmptyState
+                            compact
+                            icon="people-outline"
+                            title="No tutors found"
+                            message="Try another course or check back when more tutors are approved."
+                        />
+                    )}
                 </View>
             </View>
         </SafeAreaView>

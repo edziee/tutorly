@@ -13,6 +13,8 @@ import { TutorsScreen } from '../screens/student/TutorsScreen';
 import ChatScreen from '../screens/shared/ChatScreen';
 import ScheduleScreen from '../screens/student/ScheduleScreen';
 import StudentProfileScreen from '../screens/student/StudentProfileScreen';
+import BookingScreen from '../screens/student/BookingScreen';
+import PaymentScreen from '../screens/student/PaymentScreen';
 import TutorProfileScreen from '../screens/tutor/TutorProfileScreen';
 import { colors } from '../theme/colors';
 
@@ -25,6 +27,8 @@ const tabConfig = {
   Schedule: { icon: 'calendar', inactiveIcon: 'calendar-outline', title: 'Schedule' },
   TutorProfile: { icon: 'school', inactiveIcon: 'school-outline', title: 'Tutor Profile' },
   Chat: { icon: 'chatbubble', inactiveIcon: 'chatbubble-outline', title: 'Messages' },
+  [ROUTES.BOOKING]: { icon: 'calendar', inactiveIcon: 'calendar-outline', title: 'Book Session' },
+  [ROUTES.PAYMENT]: { icon: 'card', inactiveIcon: 'card-outline', title: 'Payment' },
 };
 
 function getInitials(name) {
@@ -55,7 +59,7 @@ function StudentTabs() {
         </SafeAreaView>
       )}
       screenOptions={({ route }) => ({
-        headerShown: true,
+        headerShown: route.name !== ROUTES.BOOKING && route.name !== ROUTES.PAYMENT,
         header: ({ navigation }) => (
           <AppHeader
             title={tabConfig[route.name].title}
@@ -113,6 +117,22 @@ function StudentTabs() {
       </Tab.Screen>
 
       <Tab.Screen name="Chat" component={ChatScreen} />
+      <Tab.Screen
+        name={ROUTES.BOOKING}
+        component={BookingScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
+      <Tab.Screen
+        name={ROUTES.PAYMENT}
+        component={PaymentScreen}
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
+      />
     </Tab.Navigator>
   );
 }

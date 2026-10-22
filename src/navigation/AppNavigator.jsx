@@ -6,10 +6,8 @@
 //   admin         -> AdminNavigator
 // Owner: Member 1 (role routing) with Member 3 (the navigators and screens).
 //
-// App.js still renders StudentNavigator directly, because login does not exist
-// yet. Switch App.js to this navigator when Member 1's login works (see
-// "Switching on login" in docs/ARCHITECTURE.md). Put it inside the
-// NavigationContainer that App.js already has; do not add a second one here.
+// App.js renders this navigator inside the NavigationContainer. Authentication
+// state changes replace the role navigator with AuthNavigator after logout.
 import ErrorState from '../components/ErrorState';
 import LoadingState from '../components/LoadingState';
 import { ROLES } from '../constants/roles';

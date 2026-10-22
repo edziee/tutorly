@@ -22,6 +22,35 @@ export function toDateKey(date = new Date()) {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+export function getBookingTimeError({ dateKey, startTime, endTime, durationHours }, now = new Date()) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey ?? '')) {
+    return 'Choose a valid session date.';
+  }
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime()) || toDateKey(date) !== dateKey) {
+    return 'Choose a valid session date.';
+  }
+  const startMinutes = parseTimeToMinutes(startTime);
+  const endMinutes = parseTimeToMinutes(endTime);
+  if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+    return 'Choose a valid session start and end time.';
+  }
+  if (
+    !Number.isInteger(durationHours) ||
+    durationHours < 1 ||
+    durationHours > 3 ||
+    endMinutes - startMinutes !== durationHours * 60
+  ) {
+    return 'Session time must match a duration between one and three hours.';
+  }
+
+  const todayKey = toDateKey(now);
+  if (dateKey < todayKey || (dateKey === todayKey && startMinutes <= now.getHours() * 60 + now.getMinutes())) {
+    return 'Choose a session time in the future.';
+  }
+  return '';
+}
+
 // The first session the student still has coming up: a booking that is
 // 'upcoming' or still 'requested' and has not ended yet. Returns null if there
 // is none. `now` can be passed in for testing.
