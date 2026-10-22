@@ -23,15 +23,17 @@ The app serves four types of users, each with its own dashboard:
 
 ## Current status
 
-Last updated on Oct 11, 2026, after the files were organized for the team. The repo is at its first stage: the interface exists, but everything still runs on mock data.
+The app has Firebase-backed authentication and data flows for bookings, tutor profiles, chat, notifications and admin review. Configure Firebase before testing these features; the app no longer substitutes demo records when Firebase is unavailable.
 
 | Area | State |
 | --- | --- |
 | Splash screen and two-page onboarding | Built (the onboarding is marked to be edited later) |
-| Student app with five tabs: Tutors, Profile, Schedule, Tutor Profile, Messages | Built with mock data |
-| Tutors list with search and course and tier filters | Built with mock data |
-| Schedule with upcoming and past sessions, reschedule, add to calendar | Built with mock data, saved on the device only |
-| Messages screen | Built with mock data |
+| Student app with five tabs: Tutors, Profile, Schedule, Tutor Profile, Messages | Screens use Firebase-backed services; remaining feature gaps are listed below |
+| Tutors list with search and course and tier filters | Reads approved tutor profiles from Firestore |
+| Schedule with upcoming and past sessions, reschedule, add to calendar | Reads live bookings from Firestore |
+| Messages screen | Reads live conversations and approved tutors from Firestore |
+| Tutor schedule and session ledger | Reads live bookings from Firestore |
+| Admin review history | Reads reviewed tutor applications from Firestore |
 | Tutor application (grades, courses, proof details/link) | Built, proof details and an optional reviewable URL are stored instead of a Firebase file upload |
 | Shared theme and reusable components | Started in `src/theme` and `src/components` |
 | Login and sign-up (student, tutor, professional tutor, admin) | Not built. Placeholder screens, the role navigators and `AuthContext` are in place |
@@ -41,7 +43,7 @@ Last updated on Oct 11, 2026, after the files were organized for the team. The r
 | In-app notifications | Not wired up. The bell in the header shows a placeholder alert. `NotificationCard` is built but no screen uses it yet |
 | Geolocation and map | Not built. `expo-location` is installed and the distance helpers are in `src/utils/distance.js`. The map library is not chosen yet |
 
-The full list of mock data is in [`docs/MOCK_DATA_INVENTORY.md`](docs/MOCK_DATA_INVENTORY.md).
+Runtime demo datasets and fallback identities have been removed. The remaining test/seed fixtures and the cleanup scope are documented in [`docs/MOCK_DATA_INVENTORY.md`](docs/MOCK_DATA_INVENTORY.md).
 
 ## Tech stack
 
@@ -109,7 +111,7 @@ docs/
   ARCHITECTURE.md       How the code is organized and the rules for working in it
   PROJECT_PLAN.md       3-week plan with member areas and task tables
   FIRESTORE_SCHEMA.md   Draft data structure for Firebase
-  MOCK_DATA_INVENTORY.md  Where mock data is used and what replaces it
+  MOCK_DATA_INVENTORY.md  Runtime demo-data cleanup and preserved test fixtures
   SCREEN_DATA_CONTRACTS.md  What each new screen expects from its service functions
   members/              One task brief per member
 .github/                Pull request checklist

@@ -8,8 +8,7 @@
 // first answer, so a person who is already logged in does not see the login
 // screen flash by.
 //
-// signInDemo is a local preview shortcut. signOut handles both Firebase
-// sessions and demo sessions; signOutDemo remains as a compatibility alias.
+// All authenticated state comes from Firebase Authentication and user profiles.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { signOut, subscribeToAuthState } from '../services/authService';
@@ -19,15 +18,12 @@ const signedOut = {
   user: null, // the user's profile document, or null when logged out
   role: null, // one of ROLES in src/constants/roles.js, or null when logged out
   loading: false, // true while the app is still finding out who is logged in
-  isDemo: false,
 };
 
 const AuthContext = createContext({
   ...signedOut,
   signOut: async () => {},
   updateProfile: async () => {},
-  signInDemo: () => {},
-  signOutDemo: () => {},
 });
 
 export function AuthProvider({ children }) {
@@ -57,7 +53,7 @@ export function AuthProvider({ children }) {
           signOut().catch(() => {});
           return;
         }
-        setState({ user: profile, role: profile.role ?? null, loading: false, isDemo: false });
+        setState({ user: profile, role: profile.role ?? null, loading: false });
       } catch (error) {
         if (!isCurrent()) return;
         console.warn('Could not load the user profile:', error);
@@ -68,16 +64,15 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const isDemoSession = state.isDemo;
   const handleSignOut = useCallback(async () => {
     const signOutEventId = ++latestEvent.current;
-    if (!isDemoSession) await signOut();
+    await signOut();
     if (latestEvent.current === signOutEventId) setState(signedOut);
-  }, [isDemoSession]);
+  }, []);
 
   const handleUpdateProfile = useCallback(async (changes) => {
     const uid = state.user?.uid;
-    if (!uid || state.isDemo) throw new Error('A signed-in Firebase account is required.');
+    if (!uid) throw new Error('A signed-in Firebase account is required.');
     await updateUserProfile(uid, changes);
     const safeChanges = { ...changes };
     ['id', 'uid', 'role', 'email', 'createdAt', 'tutorType'].forEach((field) => delete safeChanges[field]);
@@ -85,24 +80,7 @@ export function AuthProvider({ children }) {
       ...current,
       user: { ...current.user, ...safeChanges },
     }));
-  }, [state.isDemo, state.user?.uid]);
-
-  const signInDemo = useCallback((role) => {
-    latestEvent.current += 1;
-    setState({
-      user: {
-        id: `demo-${role}`,
-        uid: `demo-${role}`,
-        name: role === 'admin' ? 'Demo Admin' : role === 'tutor' ? 'Demo Tutor' : 'John Doe',
-        email: role === 'admin' ? 'admin@tutorly.edu' : 'john.doe@university.edu',
-        role,
-        stats: {},
-      },
-      role,
-      loading: false,
-      isDemo: true,
-    });
-  }, []);
+  }, [state.user?.uid]);
 
   return (
     <AuthContext.Provider
@@ -110,8 +88,6 @@ export function AuthProvider({ children }) {
         ...state,
         signOut: handleSignOut,
         updateProfile: handleUpdateProfile,
-        signInDemo,
-        signOutDemo: handleSignOut,
       }}
     >
       {children}

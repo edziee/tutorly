@@ -86,21 +86,10 @@ export default function TutorCard({ tutor, handlePress }) {
       color: colors.text,
       marginTop: 4,
     },
-    rate: {
-      color: colors.primary,
-      marginTop: 4,
-      fontWeight: '600',
-    },
     hourlyRate: {
       fontWeight: 'bold',
       fontSize: 20,
       color: "#1A146B",
-    },
-
-    overTime: {
-      backgroundColor: "#E6E8EA",
-      borderRadius: 12,
-      padding: 5,
     },
 
     bookButton: {
@@ -159,9 +148,6 @@ export default function TutorCard({ tutor, handlePress }) {
         <View style={{ flexDirection: 'column' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
             <Text style={styles.hourlyRate}>{Number.isFinite(tutor.hourlyRate) ? `₱${tutor.hourlyRate}` : 'Fee not set'}</Text><Text> / session</Text>
-          </View>
-          <View style={styles.overTime}>
-            <Text style={{ fontSize: 11, color: "#1A146B" }}>+₱50/hr overtime option</Text>
           </View>
         </View>
 

@@ -5,6 +5,7 @@ import { getOrCreateConversation, markConversationRead, subscribeToChatTutors, s
 import { ROUTES } from '../../constants/routes';
 import { getUserId } from '../../utils/user';
 import { timeAgo } from '../../utils/format';
+import EmptyState from '../../components/EmptyState';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import { useMemo, useState } from 'react';
@@ -21,21 +22,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { mockTutors } from '../../data/mockTutors';
-import { mockConversations } from '../../data/mockConversations';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 const filters = ['All Messages', 'Active Tutors', 'Faculty / Profs'];
 const accent = colors.secondary;
-const portraits = {
-  'tutor-1': require('../../../assets/chat/marcus-chen.jpg'),
-  'tutor-2': require('../../../assets/chat/prof-henderson.jpg'),
-  'tutor-3': require('../../../assets/chat/elena-garcia.jpg'),
-  'tutor-4': require('../../../assets/chat/devon-vance.jpg'),
-  'tutor-5': require('../../../assets/chat/maya-lee.jpg'),
-  'tutor-6': require('../../../assets/chat/marcus-reynolds.jpg'),
-};
 
 function Avatar({ initials, color, image, size = 46, online = false }) {
   const [failed, setFailed] = useState(false);
@@ -70,7 +61,11 @@ function MessageCard({ message, onPress, onAction }) {
         onPress={onPress}
         style={styles.cardBody}
       >
-        <Avatar initials={message.initials} color={message.color} image={message.photoUrl ? { uri: message.photoUrl } : !isFirebaseConfigured ? portraits[message.tutorId] : undefined} online={message.unread} />
+        <Avatar
+          initials={message.initials}
+          color={message.color}
+          image={message.photoUrl ? { uri: message.photoUrl } : undefined}
+        />
         <View style={styles.messageContent}>
           <View style={styles.messageTopRow}>
             <Text numberOfLines={1} style={styles.personName}>{message.name}</Text>
@@ -112,41 +107,31 @@ export default function ChatScreen({ navigation }) {
     ? subscribeToChatTutors(onData, onError) : undefined, [uid, live, role]);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All Messages');
-  const [demoMessages, setMessages] = useState(() =>
-    mockConversations.map((message) => ({ ...message })),
-  );
 
-  const messages = live ? (conversations.data || []).map((chat) => ({
+  const messages = (conversations.data || []).map((chat) => ({
     ...chat, name: uid === chat.studentId ? chat.tutorName : chat.studentName,
     role: chat.tutorTier, roleColor: colors.mint, course: '', preview: chat.lastMessage || 'Say your first message!',
     time: timeAgo(chat.lastMessageAt), unread: chat.unreadBy?.includes(uid),
     category: chat.tutorTier === 'Professor' ? 'Faculty / Profs' : 'Active Tutors',
-  })) : demoMessages;
-  const onlineTutors = live ? (availableTutors.data || []) : mockTutors.filter((tutor) => tutor.online !== false).sort(
-    (a, b) => Number(b.id === 'tutor-6') - Number(a.id === 'tutor-6'),
-  );
+  }));
+  const onlineTutors = role === 'student' ? (availableTutors.data || []) : [];
 
   const visibleMessages = useMemo(() => {
     const query = search.trim().toLowerCase();
 
     return messages
       .map((message) => {
-        const tutor = (live ? [] : mockTutors).find(
-          (item) => item.id === message.tutorId,
-        );
-
         return {
           ...message,
-          name: message.name || tutor?.name || 'Tutor',
+          name: message.name || 'User',
           initials:
             message.initials ||
-            tutor?.initials ||
-            tutor?.name
+            message.name
               ?.split(' ')
               .map((part) => part[0])
               .join('')
               .slice(0, 2),
-          color: message.color || tutor?.color,
+          color: message.color || colors.secondary,
         };
       })
       .filter((message) => {
@@ -162,22 +147,39 @@ export default function ChatScreen({ navigation }) {
   }, [activeFilter, messages, search]);
 
   async function markAllRead() {
-    if (live) {
-      try { await Promise.all(messages.filter((item) => item.unread).map((item) => markConversationRead(item.id, uid))); }
-      catch (error) { Alert.alert('Could not mark messages read', error.message); }
-    } else setMessages((current) => current.map((message) => ({ ...message, unread: false })));
+    try {
+      await Promise.all(messages.filter((item) => item.unread).map((item) => markConversationRead(item.id, uid)));
+    } catch (error) {
+      Alert.alert('Could not mark messages read', error.message);
+    }
   }
 
   async function openConversation(target, existing = false) {
-    if (!live) { Alert.alert(target.name, 'Configure Firebase and sign in to send messages.'); return; }
     try {
       const conversationId = existing ? target.id : await getOrCreateConversation(uid, target.id);
       navigation.navigate(ROUTES.CONVERSATION, { conversationId });
     } catch (error) { Alert.alert('Could not open chat', error.message); }
   }
 
-  if (live && conversations.status === 'loading') return <LoadingState message="Loading conversations…" />;
-  if (live && conversations.status === 'error') return <ErrorState title="Could not load conversations" message={conversations.error.message} onRetry={conversations.retry} />;
+  if (!live) {
+    return (
+      <ErrorState
+        title="Firebase is not configured"
+        message="Configure Firebase before using messages and tutor discovery."
+      />
+    );
+  }
+  if (!uid) {
+    return (
+      <EmptyState
+        icon="chatbubbles-outline"
+        title="Sign in to view messages"
+        message="Your conversations will appear here."
+      />
+    );
+  }
+  if (conversations.status === 'loading') return <LoadingState message="Loading conversations…" />;
+  if (conversations.status === 'error') return <ErrorState title="Could not load conversations" message={conversations.error.message} onRetry={conversations.retry} />;
 
   return (
     <SafeAreaView edges={[]} style={styles.safeArea}>
@@ -193,8 +195,7 @@ export default function ChatScreen({ navigation }) {
             </Text>
           </View>
           <View style={styles.switchButton}>
-            <Text style={styles.switchText}>{live ? user?.name?.split(' ')[0] || 'You' : 'Marcus\nC.'}</Text>
-            <View style={styles.switchOnlineDot} />
+            <Text style={styles.switchText}>{user?.name?.split(' ')[0] || 'You'}</Text>
           </View>
         </View>
 
@@ -251,51 +252,67 @@ export default function ChatScreen({ navigation }) {
           })}
         </ScrollView>
 
-        {live && availableTutors.status === 'error' && <ErrorState compact title="Could not load tutors" message={availableTutors.error.message} onRetry={availableTutors.retry} />}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>{live ? 'AVAILABLE TUTORS' : 'AVAILABLE FOR ON-DEMAND HELP'}</Text>
-          <Text style={styles.onlineCount}>{onlineTutors.length} {live ? 'Tutors' : 'Online'}</Text>
-        </View>
+        {role === 'student' ? (
+          <>
+            {availableTutors.status === 'error' ? (
+              <ErrorState
+                compact
+                title="Could not load tutors"
+                message={availableTutors.error.message}
+                onRetry={availableTutors.retry}
+              />
+            ) : null}
+            {availableTutors.status === 'loading' ? (
+              <LoadingState compact message="Loading tutors..." />
+            ) : (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionLabel}>AVAILABLE TUTORS</Text>
+                  <Text style={styles.onlineCount}>{onlineTutors.length} Tutors</Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  contentContainerStyle={styles.onlineList}
+                  showsHorizontalScrollIndicator={false}
+                >
+                  {onlineTutors.map((tutor) => {
+                    const initials = tutor.name
+                      ?.split(' ')
+                      .map((part) => part[0])
+                      .join('')
+                      .slice(0, 2);
 
-        <ScrollView
-          horizontal
-          contentContainerStyle={styles.onlineList}
-          showsHorizontalScrollIndicator={false}
-        >
-          {onlineTutors.map((tutor) => {
-            const initials =
-              tutor.initials ||
-              tutor.name
-                ?.split(' ')
-                .map((part) => part[0])
-                .join('')
-                .slice(0, 2);
-
-            return (
-              <Pressable
-                key={tutor.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Message ${tutor.name}`}
-                onPress={() => openConversation(tutor)}
-                style={styles.onlineTutor}
-              >
-                <Avatar
-                  initials={initials}
-                  color={tutor.color}
-                  size={50}
-                  image={tutor.photoUrl ? { uri: tutor.photoUrl } : !live ? portraits[tutor.id] : undefined}
-                  online={tutor.online === true}
-                />
-                <Text numberOfLines={1} style={styles.onlineName}>
-                  {tutor.shortName || tutor.name}
-                </Text>
-                <Text numberOfLines={1} style={styles.subjectTag}>
-                  {tutor.subject?.split(':')[0] || tutor.tier}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                    return (
+                      <Pressable
+                        key={tutor.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Message ${tutor.name}`}
+                        onPress={() => openConversation(tutor)}
+                        style={styles.onlineTutor}
+                      >
+                        <Avatar
+                          initials={initials}
+                          size={50}
+                          image={tutor.photoUrl ? { uri: tutor.photoUrl } : undefined}
+                          online={tutor.online === true}
+                        />
+                        <Text numberOfLines={1} style={styles.onlineName}>
+                          {tutor.name}
+                        </Text>
+                        <Text numberOfLines={1} style={styles.subjectTag}>
+                          {tutor.subject?.split(':')[0] || tutor.tier}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {!onlineTutors.length ? (
+                    <Text style={styles.emptyText}>No approved tutor profiles are available yet.</Text>
+                  ) : null}
+                </ScrollView>
+              </>
+            )}
+          </>
+        ) : null}
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionLabel}>ACTIVE INQUIRIES & PREP</Text>
@@ -369,12 +386,6 @@ const styles = StyleSheet.create({
     lineHeight: 11,
     textAlign: 'center',
     fontWeight: '700',
-  },
-  switchOnlineDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: accent,
   },
   searchBox: {
     minHeight: 44,

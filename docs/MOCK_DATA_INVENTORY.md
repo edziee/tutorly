@@ -1,53 +1,30 @@
-# Mock data inventory
+# Runtime demo-data cleanup
 
-This covers the Week 1 task "List every file and screen in the repo that uses mock data, and which Firestore collection will replace it". It was made by reading the repo on Oct 10, 2026. By the end of Week 3 all of it must be replaced with real Firebase data (see [PROJECT_PLAN.md](PROJECT_PLAN.md)).
+Normal app screens should use their authenticated Firebase/service data and show a loading, empty, or error state when that data is unavailable. They must not fall back to fabricated records.
 
-The collection names below come from the plan (users with a role field, tutors, bookings, messages, notifications). Member 1 confirms the final structure in Week 1, so treat the right-hand column as a proposal.
+## Removed from runtime
 
-## Mock data files in `src/data/`
+| Runtime surface | Live source |
+| --- | --- |
+| Student schedule | `bookingService.subscribeToStudentBookings` |
+| Shared student/tutor chat and tutor discovery | `chatService.subscribeToConversations` and `chatService.subscribeToChatTutors` |
+| Tutor schedule and session ledger | `bookingService.subscribeToTutorBookings` |
+| Admin review history | `adminService.subscribeToReviewedApplications` |
+| Authentication preview identities | Firebase Authentication and `users/{uid}` profiles |
 
-| File | What it holds | Used by | Replaced by | Owner |
-| --- | --- | --- | --- | --- |
-| `mockTutors.jsx` | 7 tutors: name, tier, subject, rating, hourly rate, location, availability, online flag | `TutorsScreen`, `ChatScreen` | `tutors` | Member 2 (tutors list), Member 4 (chat) |
-| `mockSchedules.jsx` | Sample sessions with date, time, status, location, total, payment status | `ScheduleScreen` | `bookings` | Member 2 |
-| `mockConversations.jsx` | Chat conversations linked to tutors | `ChatScreen` | `messages` | Member 4 |
-| `mockNotifications.jsx` | Two sample notifications | Nothing yet | `notifications` | Member 4 |
-| `courseCategories.jsx` | Subject filter chips | `TutorsScreen` | Can stay as app configuration, or be built from the subjects in `tutors` | Member 2 |
-| `tierCategories.jsx` | Tier filter chips (All, Professors, Alumni, ...) | `TutorsScreen` | Same as above | Member 2 |
+The retired `src/data/mock*.jsx` modules and sample chat portraits were removed after their screen imports were migrated. The student's old local-only session cache is migrated only to retain notification IDs for real bookings, then cleared; the new local cache stores reminder IDs only, not session records.
 
-The two category files are filter options, not fake records. Decide in Week 1 whether they count as mock data for the Week 3 sweep, and write the decision here.
+## Preserved test and seed resources
 
-## Fake values written directly in screens
+The cleanup scope is runtime-only. Test/seed resources such as `tests/seed-chat-demo.mjs`, `tests/firebase-loader.mjs`, `tests/chat-notifications.test.mjs`, and `firebase.chat-test.json` remain available for testing. No Firebase documents were deleted or changed.
 
-Some sample values are typed into the screens instead of coming from `src/data/`. Check these in the final sweep:
+## App configuration, not demo records
 
-| Where | Value | Notes |
-| --- | --- | --- |
-| `src/screens/shared/ChatScreen.jsx` | Tutor name "Marcus" in a switcher | Should come from the logged-in user's tutor list |
-| `src/screens/tutor/TutorProfileScreen.jsx` | Rate "₱250.00" and "+ ₱50.00 / hr" overtime | Should come from the tutor's own rate |
-| `src/screens/student/StudentProfileScreen.jsx` | "Earn ₱200 - ₱300/hr" | Marketing text, may stay |
-| `src/components/TutorCard.jsx` | "+₱50/hr overtime option" | Should come from tutor data |
-| `src/screens/student/StudentProfileScreen.jsx` | Study space preference and automated reminder settings | Check whether these are saved anywhere |
+`src/data/courseCategories.jsx` and `src/data/tierCategories.jsx` contain UI filter options, not user or tutor records. They remain as application configuration.
 
-## Local storage that is not mock data
+## Testing guidance
 
-`src/screens/student/ScheduleScreen.jsx` saves the session list on the device with AsyncStorage. After bookings move to Firestore, this should become only a cache or be removed so the device and the database do not disagree.
-
-## Screens built without mock data
-
-These screens read their data only through the functions in `src/services`, so they add nothing to the sweep below. While the services are placeholders they show the error state with the "not implemented yet" message.
-
-- [x] Login, sign-up, student dashboard, notifications screen and the 4 admin screens (branch `member3/ui-screens`) contain no mock data
-
-`mockStudentProfile.jsx` and `mockMentorApplication.jsx` were replaced by Firestore-backed profile data in Week 2 and are no longer used. `mockNotifications.jsx` is still not used by anything; delete it in the Week 3 sweep.
-
-## Final sweep checklist (Week 3)
-
-- [ ] Search the repo for `mock`, `sample`, `dummy` and `fake` and delete every file or value that is left
-- [ ] Search for tutor and student names from the files above ("Marcus Chen", "John Doe", and so on)
-- [ ] Search for hardcoded prices and times in screens and components
-- [ ] Delete `src/data/mock*.jsx` and confirm the app still builds and every screen loads from Firestore
-- [ ] Log in with an account for each role (student, tutor, professional tutor, admin) and confirm no sample data shows
-- [ ] Test with an empty database to confirm the empty states look right
-
-Starter records saved in Firestore (for example test accounts) are real database data, not mock data.
+- Configure Firebase with the project environment values before testing live features.
+- Use real accounts for each role and create bookings, conversations, tutor applications, and review decisions in Firebase.
+- Confirm empty-state behavior with an account that has no records.
+- Keep test data isolated using the test configuration and scripts; do not substitute those fixtures into normal app screens.

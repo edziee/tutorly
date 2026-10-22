@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  ActivityIndicator,
   Image,
   Modal,
   Pressable,
   Platform,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,24 +15,27 @@ import * as Calendar from 'expo-calendar';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import EmptyState from '../../components/EmptyState';
 import ErrorState from '../../components/ErrorState';
+import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
 import { ROUTES } from '../../constants/routes';
 import { BOOKING_PAYMENT_STATUS, BOOKING_STATUS } from '../../constants/statuses';
 import { useAuth } from '../../context/AuthContext';
-import { mockSchedules } from '../../data/mockSchedules';
 import { useSubscription } from '../../hooks/useSubscription';
 import {
   rescheduleBooking,
   subscribeToStudentBookings,
   updateBookingStatus,
 } from '../../services/bookingService';
+import { getTutorById } from '../../services/tutorService';
 import { colors } from '../../theme/colors';
 import styles from '../../theme/scheduleScreenStyles';
 import { getErrorMessage } from '../../utils/errors';
 
 const initialDate = new Date();
-const storageKey = 'tutorly.schedule.sessions.v3';
+const legacySessionsStorageKey = 'tutorly.schedule.sessions.v3';
+const reminderStorageKey = 'tutorly.schedule.reminders.v1';
 const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const filters = [
   { key: 'all', label: 'All Sessions' },
@@ -65,14 +66,6 @@ function dateKey(date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function normalizeSessionStatuses(sessionList) {
-  const todayKey = dateKey(new Date());
-  return sessionList.map((session) => ({
-    ...session,
-    status: session.dateKey < todayKey ? 'completed' : 'upcoming',
-  }));
 }
 
 function startOfWeek(date) {
@@ -282,7 +275,9 @@ function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onRe
       {session.status === 'upcoming' ? <View style={styles.paymentRow}><Ionicons name="shield-checkmark-outline" size={14} color={colors.success} /><Text style={styles.paymentText}>{session.paymentStatus}</Text></View> : null}
       {session.rating ? <View style={styles.ratingBox}><Text style={styles.ratingStars}>★★★★★</Text><Text style={styles.ratingText}>{session.rating}</Text></View> : null}
       <View style={styles.sessionActions}>
-        <Pressable style={styles.secondaryAction} onPress={(event) => { event.stopPropagation(); onBookAgain(); }}><Ionicons name="refresh-outline" size={15} color={colors.primary} /><Text style={styles.secondaryActionText}>Book Again</Text></Pressable>
+        {session.tutorId ? (
+          <Pressable style={styles.secondaryAction} onPress={(event) => { event.stopPropagation(); onBookAgain(); }}><Ionicons name="refresh-outline" size={15} color={colors.primary} /><Text style={styles.secondaryActionText}>Book Again</Text></Pressable>
+        ) : null}
         <Pressable style={styles.secondaryAction} onPress={(event) => { event.stopPropagation(); onCalendar(); }}><Ionicons name="calendar-outline" size={15} color={colors.primary} /><Text style={styles.secondaryActionText}>Add to Calendar</Text></Pressable>
         {session.status === 'upcoming' ? (
           <>
@@ -305,11 +300,11 @@ function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onRe
               )
             ) : null}
             <Pressable style={styles.disabledAction} disabled><Ionicons name="map-outline" size={15} color={colors.mutedText} /><Text style={styles.disabledActionText}>View Map Route</Text></Pressable>
-            {(!session.bookingId || session.approvalStatus === BOOKING_STATUS.UPCOMING) ? (
+            {session.bookingId && session.approvalStatus === BOOKING_STATUS.UPCOMING ? (
               <Pressable style={styles.secondaryAction} onPress={(event) => { event.stopPropagation(); onReschedule(); }}><Ionicons name="swap-horizontal-outline" size={15} color={colors.primary} /><Text style={styles.secondaryActionText}>Reschedule</Text></Pressable>
             ) : null}
             <Pressable style={styles.cancelAction} onPress={(event) => { event.stopPropagation(); onCancel(); }}><Ionicons name="close-circle-outline" size={15} color={colors.error} /><Text style={styles.cancelActionText}>Cancel</Text></Pressable>
-            <Pressable style={styles.reminderAction} onPress={(event) => { event.stopPropagation(); onReminder(); }}><Ionicons name={session.reminderEnabled ? 'notifications' : 'notifications-outline'} size={15} color={colors.success} /><Text style={styles.reminderActionText}>{session.reminderEnabled ? 'Reminder On' : 'Set Reminder'}</Text></Pressable>
+            <Pressable disabled={!session.remindersLoaded} style={[styles.reminderAction, !session.remindersLoaded && { opacity: 0.5 }]} onPress={(event) => { event.stopPropagation(); onReminder(); }}><Ionicons name={session.reminderEnabled ? 'notifications' : 'notifications-outline'} size={15} color={colors.success} /><Text style={styles.reminderActionText}>{session.reminderEnabled ? 'Reminder On' : 'Set Reminder'}</Text></Pressable>
             <Pressable style={styles.primaryAction} disabled><Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.white} /><Text style={styles.primaryActionText}>Message {session.tutorName.split(' ')[0]}</Text></Pressable>
           </>
         ) : null}
@@ -342,8 +337,6 @@ export default function ScheduleScreen() {
     ),
     [user?.uid],
   );
-  const [sessions, setSessions] = useState(() => normalizeSessionStatuses(mockSchedules));
-  const [hydrated, setHydrated] = useState(false);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [month, setMonth] = useState(initialDate);
   const [view, setView] = useState('agenda');
@@ -354,29 +347,80 @@ export default function ScheduleScreen() {
   const [draftDate, setDraftDate] = useState(dateKey(initialDate));
   const [draftStartTime, setDraftStartTime] = useState('4:00 PM');
   const [draftEndTime, setDraftEndTime] = useState('7:00 PM');
-  const [draftNotes, setDraftNotes] = useState('');
+  const [reminderIds, setReminderIds] = useState({});
+  const [remindersLoaded, setRemindersLoaded] = useState(false);
   const remoteSessions = (bookingResults.data ?? [])
     .filter((booking) => [
       BOOKING_STATUS.REQUESTED,
       BOOKING_STATUS.UPCOMING,
       BOOKING_STATUS.COMPLETED,
     ].includes(booking.status))
-    .map(toScheduleBooking);
-  const allSessions = [
-    ...sessions.filter((session) => !session.bookingId),
-    ...remoteSessions,
-  ];
+    .map((booking) => ({
+      ...toScheduleBooking(booking),
+      reminderId: reminderIds[booking.id] || null,
+      reminderEnabled: Boolean(reminderIds[booking.id]),
+      remindersLoaded,
+    }));
+  const allSessions = remoteSessions;
 
   useEffect(() => {
-    AsyncStorage.getItem(storageKey).then((stored) => {
-      if (stored) setSessions(normalizeSessionStatuses(JSON.parse(stored)));
-      setHydrated(true);
-    }).catch(() => setHydrated(true));
+    let active = true;
+    const loadReminders = async () => {
+      let nextReminderIds = {};
+      try {
+        const storedReminders = await AsyncStorage.getItem(reminderStorageKey);
+        if (storedReminders) {
+          const parsed = JSON.parse(storedReminders);
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('Saved schedule reminders have an invalid format.');
+          }
+          nextReminderIds = Object.fromEntries(
+            Object.entries(parsed).filter(([, id]) => typeof id === 'string'),
+          );
+        }
+
+        const legacySessions = await AsyncStorage.getItem(legacySessionsStorageKey);
+        if (legacySessions) {
+          const parsed = JSON.parse(legacySessions);
+          if (!Array.isArray(parsed)) {
+            throw new Error('Saved schedule sessions have an invalid format.');
+          }
+          const staleReminderIds = [];
+          parsed.forEach((session) => {
+            if (session.bookingId && typeof session.reminderId === 'string') {
+              nextReminderIds[session.bookingId] = session.reminderId;
+            } else if (typeof session.reminderId === 'string') {
+              staleReminderIds.push(session.reminderId);
+            }
+          });
+          const Notifications = staleReminderIds.length ? getNotificationsModule() : null;
+          if (Notifications) {
+            await Promise.all(
+              staleReminderIds.map((id) => Notifications.cancelScheduledNotificationAsync(id)),
+            );
+          }
+          await AsyncStorage.setItem(reminderStorageKey, JSON.stringify(nextReminderIds));
+          await AsyncStorage.removeItem(legacySessionsStorageKey);
+        }
+      } catch (error) {
+        console.warn('Could not migrate schedule reminders:', error);
+      } finally {
+        if (active) {
+          setReminderIds(nextReminderIds);
+          setRemindersLoaded(true);
+        }
+      }
+    };
+    loadReminders();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
-    if (hydrated) AsyncStorage.setItem(storageKey, JSON.stringify(sessions));
-  }, [hydrated, sessions]);
+    if (!remindersLoaded) return;
+    AsyncStorage.setItem(reminderStorageKey, JSON.stringify(reminderIds)).catch((error) => {
+      console.warn('Could not save schedule reminders:', error);
+    });
+  }, [reminderIds, remindersLoaded]);
 
   const visibleSessions = allSessions.filter((session) => filter === 'all' || session.status === filter);
   const selectedKey = dateKey(selectedDate);
@@ -430,7 +474,6 @@ export default function ScheduleScreen() {
     setDraftDate(session.dateKey);
     setDraftStartTime(session.startTime);
     setDraftEndTime(session.endTime);
-    setDraftNotes(session.notes || '');
     setModalMode(mode);
   }
 
@@ -439,56 +482,39 @@ export default function ScheduleScreen() {
       Alert.alert('Incomplete booking', 'Choose a date and time before saving.');
       return;
     }
-    if (modalMode === 'reschedule') {
-      if (activeSession.bookingId) {
-        try {
-          await rescheduleBooking(activeSession.bookingId, {
-            dateKey: draftDate,
-            startTime: draftStartTime,
-            endTime: draftEndTime,
-          });
-          setModalMode(null);
-        } catch (error) {
-          Alert.alert('Unable to reschedule', error.message || 'Please try again.');
-        }
-        return;
-      }
-      setSessions((current) => current.map((session) => session.id === activeSession.id ? {
-        ...session,
-        dateKey: draftDate,
-        startTime: draftStartTime,
-        endTime: draftEndTime,
-        notes: draftNotes,
-      } : session));
-      Alert.alert('Session rescheduled', 'The updated session is now on your schedule.');
-    } else {
-      setSessions((current) => [...current, {
-        ...activeSession,
-        id: `session-${Date.now()}`,
-        dateKey: draftDate,
-        startTime: draftStartTime,
-        endTime: draftEndTime,
-        durationHours: 3,
-        status: 'upcoming',
-        notes: draftNotes,
-        reminderEnabled: false,
-      }]);
-      Alert.alert('Session booked', 'The new session has been added to your schedule.');
+    if (!activeSession?.bookingId) {
+      Alert.alert('Unable to reschedule', 'This session is not linked to a live booking.');
+      return;
     }
-    setModalMode(null);
+    try {
+      await rescheduleBooking(activeSession.bookingId, {
+        dateKey: draftDate,
+        startTime: draftStartTime,
+        endTime: draftEndTime,
+      });
+      setModalMode(null);
+    } catch (error) {
+      Alert.alert('Unable to reschedule', error.message || 'Please try again.');
+    }
+  }
+
+  async function bookAgain(session) {
+    try {
+      const tutor = await getTutorById(session.tutorId);
+      if (!tutor) throw new Error('This tutor profile is no longer available.');
+      navigation.navigate(ROUTES.BOOKING, { tutor });
+    } catch (error) {
+      Alert.alert('Could not start a new booking', getErrorMessage(error));
+    }
   }
 
   function cancelSession(session) {
     const cancel = async () => {
-      if (session.bookingId) {
-        try {
-          await updateBookingStatus(session.bookingId, BOOKING_STATUS.CANCELLED);
-        } catch (error) {
-          Alert.alert('Unable to cancel session', error.message || 'Please try again.');
-        }
-        return;
+      try {
+        await updateBookingStatus(session.bookingId, BOOKING_STATUS.CANCELLED);
+      } catch (error) {
+        Alert.alert('Unable to cancel session', error.message || 'Please try again.');
       }
-      setSessions((current) => current.filter((item) => item.id !== session.id));
     };
     if (Platform.OS === 'web') {
       cancel();
@@ -503,13 +529,16 @@ export default function ScheduleScreen() {
   async function toggleReminder(session) {
     const Notifications = getNotificationsModule();
     if (!Notifications) {
-      setSessions((current) => current.map((item) => item.id === session.id ? { ...item, reminderEnabled: !item.reminderEnabled, reminderId: null } : item));
-      Alert.alert('In-app reminder enabled', 'Expo Go cannot load native Android notification services. This reminder is saved locally; use a development build for a system notification.');
+      Alert.alert('Notifications unavailable', 'Session reminders require a development build on Android or iOS.');
       return;
     }
     if (session.reminderEnabled && session.reminderId) {
       await Notifications.cancelScheduledNotificationAsync(session.reminderId);
-      setSessions((current) => current.map((item) => item.id === session.id ? { ...item, reminderEnabled: false, reminderId: null } : item));
+      setReminderIds((current) => {
+        const next = { ...current };
+        delete next[session.id];
+        return next;
+      });
       Alert.alert('Reminder disabled', 'You will no longer receive a reminder for this session.');
       return;
     }
@@ -538,7 +567,7 @@ export default function ScheduleScreen() {
       },
       trigger: reminderDate,
     });
-    setSessions((current) => current.map((item) => item.id === session.id ? { ...item, reminderEnabled: true, reminderId } : item));
+    setReminderIds((current) => ({ ...current, [session.id]: reminderId }));
     Alert.alert('Reminder enabled', 'You will be reminded one hour before this session.');
   }
 
@@ -568,14 +597,23 @@ export default function ScheduleScreen() {
     Alert.alert('Added to calendar', 'This session was added to your device calendar.');
   }
 
-  if (!hydrated) {
+  if (!user?.uid) {
     return (
-      <ScreenContainer>
-        <View style={styles.loadingState}>
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading your schedule...</Text>
-        </View>
-      </ScreenContainer>
+      <EmptyState
+        icon="calendar-outline"
+        title="Sign in to view your schedule"
+        message="Your live booking requests and sessions will appear here."
+      />
+    );
+  }
+  if (bookingResults.status === 'loading') return <LoadingState message="Loading your schedule..." />;
+  if (bookingResults.status === 'error') {
+    return (
+      <ErrorState
+        title="Could not load live bookings"
+        message={getErrorMessage(bookingResults.error)}
+        onRetry={bookingResults.retry}
+      />
     );
   }
 
@@ -590,7 +628,7 @@ export default function ScheduleScreen() {
               <View style={styles.modalCard}>
                 <View style={styles.modalHeader}>
                   <View style={styles.modalTitleCopy}>
-                    <Text style={styles.modalTitle}>{modalMode === 'details' ? 'Session Details' : modalMode === 'reschedule' ? 'Reschedule Session' : 'Book Again'}</Text>
+                    <Text style={styles.modalTitle}>{modalMode === 'details' ? 'Session Details' : 'Reschedule Session'}</Text>
                     <Text style={styles.modalSubtitle}>{activeSession?.subject}</Text>
                   </View>
                   <Pressable onPress={() => setModalMode(null)} hitSlop={10}><Ionicons name="close" size={22} color={colors.text} /></Pressable>
@@ -625,9 +663,7 @@ export default function ScheduleScreen() {
                         return <Pressable key={window} onPress={() => { setDraftStartTime(start); setDraftEndTime(end); }} style={[styles.modalOption, selected && styles.modalOptionActive]}><Text style={[styles.modalOptionText, selected && styles.modalOptionTextActive]}>{window}</Text></Pressable>;
                       })}
                     </View>
-                    <Text style={styles.formLabel}>Notes for your tutor</Text>
-                    <TextInput value={draftNotes} onChangeText={setDraftNotes} placeholder="Add a topic or preparation note" placeholderTextColor={colors.placeholder} multiline style={styles.modalInput} />
-                    <Pressable style={styles.primaryAction} onPress={saveBooking}><Ionicons name="checkmark-circle-outline" size={16} color={colors.white} /><Text style={styles.primaryActionText}>{modalMode === 'reschedule' ? 'Save New Time' : 'Confirm Booking'}</Text></Pressable>
+                    <Pressable style={styles.primaryAction} onPress={saveBooking}><Ionicons name="checkmark-circle-outline" size={16} color={colors.white} /><Text style={styles.primaryActionText}>Save New Time</Text></Pressable>
                   </>
                 )}
                 <Pressable style={styles.modalCancelButton} onPress={() => setModalMode(null)}><Text style={styles.modalCancelText}>Close</Text></Pressable>
@@ -638,25 +674,17 @@ export default function ScheduleScreen() {
           </View>
           <Pressable style={styles.todayButton} onPress={() => selectDate(new Date())}><Text style={styles.todayButtonText}>Today</Text></Pressable>
         </View>
-        {bookingResults.status === 'error' ? (
-          <ErrorState
-            compact
-            title="Could not load live bookings"
-            message={getErrorMessage(bookingResults.error)}
-            onRetry={bookingResults.retry}
-          />
-        ) : null}
         <View style={styles.calendarCard}>
           <CalendarHeader view={view} setView={setView} month={month} onMovePeriod={moveCalendarPeriod} />
           {view === 'month' ? <MonthGrid month={month} selectedDate={selectedDate} onSelectDate={selectDate} sessions={allSessions} /> : <WeekStrip selectedDate={selectedDate} onSelectDate={selectDate} sessions={allSessions} />}
           <Text style={styles.selectedDateText}>{formatShortDate(selectedDate)} • {view === 'agenda' ? 'Agenda' : `${view.charAt(0).toUpperCase()}${view.slice(1)} view`}</Text>
         </View>
         <FilterBar filter={filter} onChange={changeFilter} sessions={allSessions} />
-        {view === 'week' && displayedSessions.length ? <WeekAgenda sessions={displayedSessions} onSelect={(session) => openScheduleModal(session, 'details')} onBookAgain={(session) => openScheduleModal(session, 'booking')} onCalendar={addToCalendar} onCancel={cancelSession} onReschedule={(session) => openScheduleModal(session, 'reschedule')} onReminder={toggleReminder} onPay={(session) => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} /> : null}
+        {view === 'week' && displayedSessions.length ? <WeekAgenda sessions={displayedSessions} onSelect={(session) => openScheduleModal(session, 'details')} onBookAgain={bookAgain} onCalendar={addToCalendar} onCancel={cancelSession} onReschedule={(session) => openScheduleModal(session, 'reschedule')} onReminder={toggleReminder} onPay={(session) => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} /> : null}
         {view !== 'week' && upcomingSessions.length ? (
           <View>
             <View style={styles.sectionHeading}><Ionicons name="calendar-outline" size={20} color={colors.success} /><Text style={styles.sectionHeadingText}>Upcoming Agenda</Text><Text style={styles.sessionCount}>{upcomingSessions.length} Sessions</Text></View>
-            {upcomingSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => openScheduleModal(session, 'booking')} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onPay={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} />)}
+            {upcomingSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => bookAgain(session)} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onPay={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} />)}
           </View>
         ) : null}
         {view !== 'week' && completedSessions.length ? (
@@ -664,7 +692,7 @@ export default function ScheduleScreen() {
             <Pressable style={styles.sectionHeading} onPress={() => setPastExpanded((current) => !current)}>
               <Ionicons name="archive-outline" size={20} color={colors.text} /><Text style={styles.sectionHeadingText}>Past Completed Sessions</Text><Text style={styles.sessionCount}>{completedSessions.length} total</Text><Ionicons name={pastExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.text} />
             </Pressable>
-            {pastExpanded ? completedSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => openScheduleModal(session, 'booking')} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onPay={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} />) : null}
+            {pastExpanded ? completedSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => bookAgain(session)} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onPay={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} />) : null}
           </View>
         ) : null}
         {!displayedSessions.length ? <View style={styles.emptyState}><Ionicons name="calendar-clear-outline" size={30} color={colors.mutedText} /><Text style={styles.emptyTitle}>No sessions here</Text><Text style={styles.emptyText}>{view === 'agenda' ? 'Try another filter or choose a different calendar view.' : 'There are no sessions in this selected date range.'}</Text><Pressable style={styles.browseButton} onPress={() => navigation.navigate('Tutors')}><Ionicons name="people-outline" size={16} color={colors.white} /><Text style={styles.browseButtonText}>Browse Tutors</Text></Pressable></View> : null}

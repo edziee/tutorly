@@ -26,7 +26,6 @@ import {
   updateBookingStatus,
 } from '../../services/bookingService';
 import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
-import { mockTutorSessions } from '../../data/mockTutorWorkspace';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { isHttpsUrl } from '../../utils/validation';
@@ -92,6 +91,15 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
       [BOOKING_STATUS.UPCOMING, BOOKING_STATUS.COMPLETED].includes(booking.status) &&
       booking.paymentStatus === BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION,
   );
+  const sessions = (bookingResults.data ?? [])
+    .filter((booking) =>
+      [BOOKING_STATUS.UPCOMING, BOOKING_STATUS.COMPLETED].includes(booking.status),
+    )
+    .sort((first, second) =>
+      `${first.dateKey} ${first.startTime}`.localeCompare(`${second.dateKey} ${second.startTime}`),
+    );
+  const upcomingSessions = sessions.filter((session) => session.status === BOOKING_STATUS.UPCOMING);
+  const completedSessions = sessions.filter((session) => session.status === BOOKING_STATUS.COMPLETED);
   const tutorName = application?.name || user?.name || 'Tutor';
   const tutorType = application?.tutorType
     ?? user?.tutorType
@@ -379,13 +387,42 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           <Text style={styles.emptyRequests}>Student payment reports will appear here for your review.</Text>
         ) : null}
 
-        <SectionTitle title="Session Ledger" subtitle="Upcoming (3)" action="Past (42)" />
-        {mockTutorSessions.map((session) => (
+        <SectionTitle
+          title="Session Ledger"
+          subtitle={`Upcoming (${upcomingSessions.length})`}
+          action={`Past (${completedSessions.length})`}
+        />
+        {sessions.map((session) => (
           <View key={session.id} style={styles.sessionCard}>
-            <View style={[styles.sessionAccent, { backgroundColor: session.accent }]} />
-            <View style={styles.sessionCopy}><View style={styles.sessionTop}><Text style={styles.sessionStatus}>{session.status}</Text><Text style={styles.sessionTime}>{session.date} · {session.time}</Text></View><Text style={styles.sessionName}>{session.studentName}</Text><Text style={styles.sessionMeta}>{session.subject} · {session.location}</Text><Text style={styles.sessionAction}><Ionicons name="chatbubble-outline" size={13} color={colors.primary} /> Message <Text style={styles.sessionActionMuted}>              Reschedule</Text></Text></View>
+            <View
+              style={[
+                styles.sessionAccent,
+                {
+                  backgroundColor: session.status === BOOKING_STATUS.COMPLETED
+                    ? colors.mutedText
+                    : colors.secondary,
+                },
+              ]}
+            />
+            <View style={styles.sessionCopy}>
+              <View style={styles.sessionTop}>
+                <Text style={styles.sessionStatus}>
+                  {session.status === BOOKING_STATUS.COMPLETED ? 'Completed' : 'Upcoming'}
+                </Text>
+                <Text style={styles.sessionTime}>
+                  {session.dateKey} · {session.startTime} - {session.endTime}
+                </Text>
+              </View>
+              <Text style={styles.sessionName}>{session.studentName || 'Student'}</Text>
+              <Text style={styles.sessionMeta}>
+                {[session.subject, session.location].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
           </View>
         ))}
+        {bookingResults.status === 'ready' && !sessions.length ? (
+          <Text style={styles.emptyRequests}>Accepted and completed sessions will appear here.</Text>
+        ) : null}
 
         {signOutError ? (
           <Text accessibilityRole="alert" style={styles.signOutError}>

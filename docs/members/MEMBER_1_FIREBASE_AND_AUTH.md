@@ -64,7 +64,7 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 - Sign-up and login for students and tutors: `authService.signUp` and `signIn`, plus `userService.createUserProfile`. A new account gets a `users/{uid}` document with its `role`.
 - Finish `AuthProvider`, then switch `App.js` to `AppNavigator` ("Switching on login" in [ARCHITECTURE](../ARCHITECTURE.md)) once a student can log in.
 - Hand Members 2 to 4 a test account for each role as soon as you have them.
-- The mock data list is drafted in [MOCK_DATA_INVENTORY](../MOCK_DATA_INVENTORY.md). Review it with the team and compile the final version.
+- Runtime demo-data cleanup and preserved test fixtures are tracked in [MOCK_DATA_INVENTORY](../MOCK_DATA_INVENTORY.md).
 
 **Week 2**
 - Professional tutor login and sign-up with verification documents, and the hidden admin login (`signInAdmin` signs the person out and throws if the role is not `admin`).
@@ -75,13 +75,13 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 
 **Week 3**
 - Security rules for Firestore. Each role only reaches its own data, only admins reach admin data, users cannot change their own `role`, and unimplemented chat/notification collections remain closed. Review `firebase-rules/firestore.rules`, test it in the Rules Playground or Emulator Suite, then publish. Before publishing, sign in as admin and use **Migrate approved tutors** on the verification screen so approved legacy profiles remain visible without exposing their proof fields.
-- Run the final mock-data sweep for the whole team (checklist at the end of [MOCK_DATA_INVENTORY](../MOCK_DATA_INVENTORY.md)).
+- Review the runtime demo-data cleanup status and test-fixture scope in [MOCK_DATA_INVENTORY](../MOCK_DATA_INVENTORY.md).
 
-## Mock data you remove
+## Data migration status
 
 `src/data/mockStudentProfile.jsx` and `src/data/mockMentorApplication.jsx` have been removed from the profile screens. Student details and tutor application data now load from Firestore. Do not replace external photo URLs with Firebase Storage uploads.
 
-The shared tutor dashboard profile summary also reads the tutor application from Firestore for Peer Tutors, Alumni and Professors, including category, credentials, courses, proof details, verification status and application availability. Its booking-request and session panels still contain mock data; booking/schedule data integration belongs to Member 2, and chat integration belongs to Member 4. Do not mark the broader dashboard task complete until those respective owners connect their data and the remaining Member 1-owned professional dashboard work is verified.
+The shared tutor dashboard profile summary reads the tutor application from Firestore for Peer Tutors, Alumni and Professors, including category, credentials, courses, proof details, verification status and application availability. Its booking-request and session panels read live bookings; chat uses the shared conversation service. Verify those role-specific views and the remaining professional dashboard work before marking the broader dashboard task complete.
 
 ## Watch out for
 

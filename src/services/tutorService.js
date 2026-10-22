@@ -1,10 +1,8 @@
 // Public tutor profiles (tutors/{uid}) and private applications
 // (tutorApplications/{uid}). See docs/FIRESTORE_SCHEMA.md.
 //
-// Two owners share this file, so keep your functions together and pull often:
-//   Member 2: getTutors, getTutorById   (replaces src/data/mockTutors.jsx)
-//   Member 1: getTutorApplication, saveTutorApplication
-//             (replaces src/data/mockMentorApplication.jsx)
+// Two owners share this file, so keep the public tutor and private application
+// functions together.
 import {
   collection,
   deleteField,

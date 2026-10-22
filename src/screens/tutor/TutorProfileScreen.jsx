@@ -656,16 +656,10 @@ export default function TutorProfileScreen() {
           </Section>
 
           <Section>
-            <SectionTitle title="Standard Campus Stipend" action={<Text style={styles.fixedBadge}>Fixed Base</Text>} />
-            <View style={styles.ratePanel}>
-              <Text style={styles.rateLabel}>Core Session Rate</Text>
-              <View style={styles.rateRow}>
-                <Text style={styles.rateValue}>₱250.00</Text>
-                <View style={styles.overtimeBadge}><Text style={styles.overtimeText}>+ ₱50.00 / hr{`\n`}Authorized overtime</Text></View>
-              </View>
-              <Text style={styles.rateDescription}>Covers standard session blocks up to 3 full hours</Text>
-            </View>
-            <View style={styles.bankNote}><Ionicons name="cash-outline" size={16} color={colors.secondary} /><Text style={styles.bankText}>Disbursed bi-weekly straight to your connected bank account.</Text></View>
+            <SectionTitle
+              title="Session Pricing"
+              subtitle="Set your session price and payment QR in Tutor Workspace after submitting your application."
+            />
           </Section>
 
           <Section>

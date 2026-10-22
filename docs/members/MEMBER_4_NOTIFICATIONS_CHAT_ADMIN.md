@@ -12,7 +12,7 @@ You make messages and alerts arrive in real time, and give the admin the tools t
 | `src/services/notificationService.js` | Placeholders | `createNotification`, `subscribeToNotifications`, `markNotificationRead`, `markAllNotificationsRead`, preferences |
 | `src/services/adminService.js` | Placeholders | `getUsers`, `subscribeToPendingVerifications`, `setVerificationStatus`, `getBookingsOverview` |
 | `src/constants/statuses.js` | Ready | `NOTIFICATION_TYPES` and `VERIFICATION_STATUS`. You own the notification list |
-| `src/screens/shared/ChatScreen.jsx` | Built on mock data | Switch it to `chatService`. It still has a typed-in tutor name ("Marcus") in its switcher |
+| `src/screens/shared/ChatScreen.jsx` | Firestore-backed | Uses `chatService` for conversations and approved tutor discovery |
 | `src/screens/shared/NotificationsScreen.jsx` | Placeholder | Member 3 builds the layout, you connect `notificationService` |
 | `src/components/NotificationCard.jsx` | Ready | One row of the list. It shows text, so turn the Firestore timestamp into text ("1 hour ago") in the screen |
 | `src/screens/admin/` | Placeholders | Member 3 builds the four admin screens, you connect them to `adminService` |
@@ -27,7 +27,7 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 **Week 2**
 - Real-time chat: use `onSnapshot` from `firebase/firestore` so new messages show without refreshing.
 - Notifications created when a booking is requested or accepted, when a session reminder is due, and when a new message arrives. Agree with Member 2 who calls `createNotification` after a booking change.
-- Admin: connect the admin dashboard to Firestore. Users list, approve or reject tutor and professional verification, and bookings overview. Remove the mock data in chat, notifications and admin.
+- Admin: connect the admin dashboard and review history to Firestore. Users list, approve or reject tutor and professional verification, and bookings overview.
 
 **Week 3**
 - Notification preferences and read/unread states.
@@ -45,7 +45,7 @@ They are different from the session reminders in `ScheduleScreen`, which are loc
 - **Indexes:** a query that filters on `recipientId` and sorts on `createdAt` needs a composite index. When Firestore reports it, the error contains a link that creates it.
 - **Stop listening:** every `subscribeTo...` function returns a function that stops the listener. Call it when the screen closes (return it from `useEffect`), or the app keeps reading in the background and uses up the free daily reads.
 - **Admin is not secure by being hidden:** the real protection is Member 1's security rules in Week 3. Tell Member 1 which collections the admin needs to read and write.
-- **Mock data you remove:** `src/data/mockConversations.jsx` (replaced by `conversations` and `messages`) and `src/data/mockNotifications.jsx` (replaced by `notifications`). `ChatScreen` also uses `mockTutors`, which Member 2 replaces, so agree who deletes that file.
+- Chat conversations and tutor discovery, notifications, and admin review history use their Firestore services. Runtime demo datasets have been removed; test/seed fixtures remain separate as noted in [MOCK_DATA_INVENTORY](../MOCK_DATA_INVENTORY.md).
 
 ## Done when
 

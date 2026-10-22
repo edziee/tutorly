@@ -1,6 +1,6 @@
 // Reads and writes the user document (users/{uid}): name, role, contact info,
 // campus, streak and so on. See docs/FIRESTORE_SCHEMA.md for the fields.
-// Owner: Member 1.   Replaces: src/data/mockStudentProfile.jsx
+// Owner: Member 1. Stores user profiles in Firestore.
 import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 
 import { requireFirebase } from '../config/firebase';

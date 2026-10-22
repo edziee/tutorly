@@ -44,21 +44,14 @@ const countByStatus = (bookings, status) =>
   bookings.filter((booking) => booking.status === status).length;
 
 export default function AdminDashboardScreen({ navigation }) {
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
-  const isDemoAdmin = user?.id === 'demo-admin';
-  const users = useAsync(() => (isDemoAdmin ? Promise.resolve([]) : getUsers()), [isDemoAdmin]);
-  const bookings = useAsync(
-    () => (isDemoAdmin ? Promise.resolve([]) : getBookingsOverview()),
-    [isDemoAdmin],
-  );
+  const users = useAsync(() => getUsers(), []);
+  const bookings = useAsync(() => getBookingsOverview(), []);
   const pending = useSubscription(
-    (onData) =>
-      isDemoAdmin
-        ? (onData([]), undefined)
-        : subscribeToPendingVerifications(onData),
-    [isDemoAdmin],
+    (onData, onError) => subscribeToPendingVerifications(onData, onError),
+    [],
   );
 
   const parts = [users, bookings, pending];

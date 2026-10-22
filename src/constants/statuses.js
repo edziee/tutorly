@@ -1,9 +1,8 @@
 // Fixed lists of values that several members use. Keeping them here makes sure
 // the screens, the services and the Firestore data all use the same words.
 
-// Tutor tiers. These are the same words the tutors list filter already uses
-// (see src/data/tierCategories.jsx). Some mock data still says "Faculty" or
-// "Faculty Tier"; use PROFESSOR everywhere in the real data.
+// Tutor tiers. Keep these values aligned with src/data/tierCategories.jsx and
+// the public tutor profiles stored in Firestore.
 export const TUTOR_TIERS = {
   PEER: 'Peer Tutor',
   ALUMNI: 'Alumni',

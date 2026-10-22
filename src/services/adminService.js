@@ -128,6 +128,70 @@ export async function getUsers(filters = {}) {
   }));
 }
 
+/** Listen to applications that have completed admin review. */
+export function subscribeToReviewedApplications(callback, onError) {
+  requireSignedInAdmin();
+  const { db } = requireFirebase();
+  const reviewedStatuses = [VERIFICATION_STATUS.APPROVED, VERIFICATION_STATUS.REJECTED];
+  let applications = null;
+  let legacyTutors = null;
+  let stopped = false;
+  let stopApplications = () => {};
+  let stopLegacyTutors = () => {};
+
+  const reviewedAt = (application) =>
+    application.verificationReviewedAt ?? application.updatedAt ?? null;
+  const timestampValue = (timestamp) =>
+    typeof timestamp?.toMillis === 'function' ? timestamp.toMillis() : 0;
+
+  const emit = () => {
+    if (applications === null || legacyTutors === null || stopped) return;
+    const reviewedById = new Map(legacyTutors.map((item) => [item.id, item]));
+    applications.forEach((item) => reviewedById.set(item.id, item));
+    callback(
+      [...reviewedById.values()].sort((first, second) =>
+        timestampValue(reviewedAt(second)) - timestampValue(reviewedAt(first)),
+      ),
+    );
+  };
+
+  const stop = () => {
+    stopped = true;
+    stopApplications();
+    stopLegacyTutors();
+  };
+
+  const handleError = (error) => {
+    if (stopped) return;
+    stop();
+    onError?.(error);
+  };
+
+  stopApplications = onSnapshot(
+    query(
+      collection(db, COLLECTIONS.TUTOR_APPLICATIONS),
+      where('verificationStatus', 'in', reviewedStatuses),
+    ),
+    (snapshot) => {
+      applications = snapshot.docs.map(toTutorApplication);
+      emit();
+    },
+    handleError,
+  );
+  stopLegacyTutors = onSnapshot(
+    query(
+      collection(db, COLLECTIONS.TUTORS),
+      where('verificationStatus', 'in', reviewedStatuses),
+    ),
+    (snapshot) => {
+      legacyTutors = snapshot.docs.map(toTutorApplication);
+      emit();
+    },
+    handleError,
+  );
+  return stop;
+}
+
 /**
  * Listen to new private applications and legacy pending tutor profiles.
  * Legacy profiles are included until they are migrated by resubmission/review.

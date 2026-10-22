@@ -8,8 +8,8 @@ You make the student side work with real data: finding a tutor, booking, the sch
 
 | File | State | What you do |
 | --- | --- | --- |
-| `src/screens/student/TutorsScreen.jsx` | Built on mock data | Search and filter logic. Switch its data to `tutorService.getTutors` |
-| `src/screens/student/ScheduleScreen.jsx` | Built on mock data | Switch to `bookingService.subscribeToStudentBookings`. Today it also saves sessions on the phone with AsyncStorage; once bookings are in Firestore that copy must go, or the phone and the database will disagree |
+| `src/screens/student/TutorsScreen.jsx` | Firestore-backed | Search and filter logic uses `tutorService.getTutors` |
+| `src/screens/student/ScheduleScreen.jsx` | Firestore-backed | Uses `bookingService.subscribeToStudentBookings`; local-only demo sessions and their cache have been removed |
 | `src/services/tutorService.js` | Placeholders | Yours: `getTutors`, `getTutorById` |
 | `src/services/bookingService.js` | Placeholders | `createBooking`, `subscribeToStudentBookings`, `subscribeToTutorBookings`, `updateBookingStatus`, `rescheduleBooking`, `markBookingPaid`, `checkInToBooking` |
 | `src/services/locationService.js` | Placeholders | `requestLocationPermission`, `getCurrentCoordinates`, `isAtCampus` (Week 3) |
@@ -24,7 +24,7 @@ You make the student side work with real data: finding a tutor, booking, the sch
 Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pull request as your code.
 
 **Week 1**
-- Tutors list logic with search and filters. The screen already filters mock tutors by search text, subject and tier. Keep that working while you get ready to swap the source.
+- Tutors list logic with search and filters. The screen filters approved tutor profiles by search text, subject and tier.
 - Agree on the booking fields with Member 3 and Member 1 (see `bookings` in [FIRESTORE_SCHEMA](../FIRESTORE_SCHEMA.md)), so the booking screens and your data fit.
 
 **Week 2** (needs Member 1's Firebase setup)
@@ -50,15 +50,15 @@ Ask your instructor whether the demo must run in Expo Go. If it must, the map co
 
 Docs: [expo-maps](https://docs.expo.dev/versions/v57.0.0/sdk/maps/), [expo-location](https://docs.expo.dev/versions/v57.0.0/sdk/location/).
 
-## Mock data you remove
+## Runtime data sources
 
-| File | Replaced by |
+| Screen data | Source |
 | --- | --- |
-| `src/data/mockTutors.jsx` | `tutors` (Member 4's chat also uses it, so agree before deleting) |
-| `src/data/mockSchedules.jsx` | `bookings` |
-| `src/data/courseCategories.jsx`, `tierCategories.jsx` | Filter options. They are not fake records, so they may stay. Decide in Week 1 and write it in [MOCK_DATA_INVENTORY](../MOCK_DATA_INVENTORY.md) |
+| Tutors and booking profiles | `tutors` collection through `tutorService` |
+| Student schedule | `bookings` collection through `bookingService` |
+| `src/data/courseCategories.jsx`, `tierCategories.jsx` | UI filter options, not user or tutor records |
 
-Also replace the typed-in prices in `TutorCard.jsx` ("+₱50/hr overtime option") with data from the tutor, as listed in the inventory.
+Do not add mock fallbacks to these runtime screens. See [MOCK_DATA_INVENTORY](../MOCK_DATA_INVENTORY.md) for the cleanup scope and preserved test fixtures.
 
 ## Watch out for
 
