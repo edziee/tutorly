@@ -120,7 +120,7 @@ The filter tabs on the Messages screen (`All Messages`, `Active Tutors`, `Facult
 | `recipientId` | string | Who sees it |
 | `type` | string | `NOTIFICATION_TYPES` in `statuses.js` |
 | `title`, `message` | string | |
-| `data` | map | Where to go on tap, for example `{ bookingId }` or `{ conversationId }` |
+| `data` | map | Where to go on tap, for example `{ bookingId }` or `{ conversationId, messageId }` for chat alerts |
 | `read` | boolean | |
 | `createdAt` | timestamp | |
 
@@ -157,3 +157,16 @@ Before publishing role-based rules, migrate existing tutor documents. Reviewing 
 4. **Tier names:** some mock data says `Faculty` or `Faculty Tier`. The real data uses `Professor` only.
 5. **Drive sharing policy:** confirm the admin reviewer's Google account and whether tutors must share only with that account or whether "Anyone with the link" is acceptable for the demo.
 6. **Booking payment states:** Member 2 must confirm the exact `paymentStatus` values for the simulated payment flow; do not persist display labels such as "Escrow protected" unless the team agrees they are the canonical values.
+
+## Chat notification delivery
+
+`sendMessage` commits the message and conversation preview together, then creates
+one deterministic `new_message` notification using `data.conversationId` and
+`data.messageId`. Retrying the same message ID does not duplicate the message or
+reset an already-read alert. A notification failure is returned separately
+from the successful message save. Opening the chat marks its alerts read.
+
+Only recipients can list their alerts or change `read` to true. The sender can
+get their own generated message alert by ID for retry deduplication. Chat
+notification creation must reference a real message sent by the caller to the
+other conversation participant. Client alerts remain best effort on Spark.

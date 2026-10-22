@@ -29,7 +29,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --test \"src/**/*.test.mjs\""
+    "test": "node --test \"src/**/*.test.mjs\"",
+    "test:chat": "node --loader ./tests/firebase-loader.mjs --test tests/chat-notifications.test.mjs"
   },
   "private": true
 }

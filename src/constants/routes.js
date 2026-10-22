@@ -23,6 +23,7 @@ export const ROUTES = {
 
   // Shared by every role
   NOTIFICATIONS: 'Notifications',
+  CONVERSATION: 'Conversation',
 
   // Professional tutor
   PROFESSIONAL_DASHBOARD: 'ProfessionalDashboard',

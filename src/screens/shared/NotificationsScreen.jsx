@@ -10,12 +10,8 @@
 // `createdAt` can be a Firestore timestamp. The screen turns it into "5 minutes
 // ago" with timeAgo(), and gives NotificationCard plain text.
 //
-// Tapping a notification marks it read (markNotificationRead). The "Mark all as
-// read" button calls markAllNotificationsRead. Going to the booking or chat a
-// notification is about is not done yet: it needs those screens first, and
-// `data` ({ bookingId } or { conversationId }) is where that will come from.
-// This screen works for every role, so register it in each role's navigator.
-import { useCallback } from 'react';
+// Tapping a message alert marks it read and opens its conversation. The feed
+// is shared with the header bell through NotificationContext.
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
 import AppButton from '../../components/AppButton';
@@ -25,11 +21,11 @@ import LoadingState from '../../components/LoadingState';
 import NotificationCard from '../../components/NotificationCard';
 import ScreenContainer from '../../components/ScreenContainer';
 import { useAuth } from '../../context/AuthContext';
-import { useSubscription } from '../../hooks/useSubscription';
+import { useNotifications } from '../../context/NotificationContext';
+import { ROUTES } from '../../constants/routes';
 import {
   markAllNotificationsRead,
   markNotificationRead,
-  subscribeToNotifications,
 } from '../../services/notificationService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -37,22 +33,23 @@ import { getErrorMessage } from '../../utils/errors';
 import { timeAgo } from '../../utils/format';
 import { getUserId } from '../../utils/user';
 
-export default function NotificationsScreen() {
+export default function NotificationsScreen({ navigation }) {
   const { user } = useAuth();
   const userId = getUserId(user);
 
-  const { status, data, error, retry } = useSubscription(
-    (onData) => (userId ? subscribeToNotifications(userId, onData) : undefined),
-    [userId],
-  );
+  const { status, notifications, error, retry } = useNotifications();
 
   const showSaveError = (failure) =>
     Alert.alert('Could not update', getErrorMessage(failure, 'Please try again.'));
 
-  const handlePress = useCallback((notification) => {
-    if (notification.read) return;
-    markNotificationRead(notification.id).catch(showSaveError);
-  }, []);
+  const handlePress = async (notification) => {
+    try {
+      if (!notification.read) await markNotificationRead(notification.id);
+      if (notification.type === 'new_message' && notification.data?.conversationId) {
+        navigation.navigate(ROUTES.CONVERSATION, { conversationId: notification.data.conversationId });
+      }
+    } catch (failure) { showSaveError(failure); }
+  };
 
   const handleMarkAll = () => {
     markAllNotificationsRead(userId).catch(showSaveError);
@@ -78,7 +75,6 @@ export default function NotificationsScreen() {
     );
   }
 
-  const notifications = Array.isArray(data) ? data : [];
   if (notifications.length === 0) {
     return (
       <EmptyState

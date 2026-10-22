@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
+import { NotificationProvider } from './src/context/NotificationContext';
 import { AuthProvider } from './src/context/AuthContext';
 import OnboardingScreen from './src/screens/onboarding/OnboardingScreen';
 import SplashScreen from './src/screens/onboarding/SplashScreen';
@@ -47,7 +48,9 @@ export default function App() {
       ) : (
         <NavigationContainer>
           <AuthProvider>
-            <AppNavigator />
+            <NotificationProvider>
+              <AppNavigator />
+            </NotificationProvider>
           </AuthProvider>
         </NavigationContainer>
       )}

@@ -1,59 +1,91 @@
-// In-app notifications (notifications/{id}): alerts shown inside the app, such
-// as a booking request or a new message. They are Firestore documents the app
-// listens to in real time, so no push notification service is needed.
-// Owner: Member 4.   Replaces: src/data/mockNotifications.jsx
-//
-// Not the same thing as the session reminders in ScheduleScreen, which are
-// local notifications scheduled with expo-notifications on the device.
-// Types are in src/constants/statuses.js (NOTIFICATION_TYPES).
+// Firestore in-app alerts. These do not send operating-system push notifications.
+import {
+  collection, doc, documentId, getDocs, limit, onSnapshot, orderBy,
+  query, runTransaction, serverTimestamp, startAfter, updateDoc, where, writeBatch,
+} from 'firebase/firestore';
+import { requireFirebase } from '../config/firebase';
 import { notImplemented } from './notImplemented';
+import { NOTIFICATION_TYPES } from '../constants/statuses';
 
-/**
- * Create a notification for one user.
- * @param {{ recipientId: string, type: string, title: string, message: string, data?: object }} notification
- * @returns {Promise<string>} the new notification id
- */
-export async function createNotification(notification) {
-  throw notImplemented('notificationService.createNotification', 'Member 4');
+function signedIn() {
+  const firebase = requireFirebase();
+  if (!firebase.auth.currentUser) throw new Error('Sign in to see notifications.');
+  return { ...firebase, uid: firebase.auth.currentUser.uid };
 }
 
-/**
- * Live list of a user's notifications for the bell and the notifications
- * screen, newest first. The callback receives the list; the bell can count the
- * ones where read is false.
- * @param {string} userId
- * @param {(notifications: object[]) => void} callback
- * @returns {() => void} function that stops listening
- */
-export function subscribeToNotifications(userId, callback) {
-  throw notImplemented('notificationService.subscribeToNotifications', 'Member 4');
+export async function createNotification({ recipientId, type, title, message, data = {} }) {
+  const { db } = signedIn();
+  if (!recipientId || !Object.values(NOTIFICATION_TYPES).includes(type) ||
+      typeof title !== 'string' || !title.trim() || typeof message !== 'string' || !message.trim()) {
+    throw new Error('The notification is missing required details.');
+  }
+  // One message has one stable notification, including after retries. An
+  // existing alert is left intact so retries never reset the recipient's read state.
+  const id = type === 'new_message' && data.conversationId && data.messageId
+    ? encodeURIComponent(JSON.stringify([data.conversationId, data.messageId])) : null;
+  const ref = id ? doc(db, 'notifications', id) : doc(collection(db, 'notifications'));
+  await runTransaction(db, async (transaction) => {
+    const existing = await transaction.get(ref);
+    if (existing.exists()) {
+      const saved = existing.data();
+      if (saved.recipientId !== recipientId || saved.type !== type || saved.message !== message.trim() ||
+          saved.data?.conversationId !== data.conversationId || saved.data?.messageId !== data.messageId) {
+        throw new Error('This notification ID belongs to a different event.');
+      }
+      return;
+    }
+    transaction.set(ref, {
+      recipientId, type, title: title.trim(), message: message.trim(), data,
+      read: false, createdAt: serverTimestamp(),
+    });
+  });
+  return ref.id;
 }
 
-/** @param {string} notificationId @returns {Promise<void>} */
+export function subscribeToNotifications(userId, callback, onError = console.error) {
+  const { db, uid } = signedIn();
+  if (uid !== userId) throw new Error('You can only load your own notifications.');
+  return onSnapshot(query(collection(db, 'notifications'), where('recipientId', '==', uid),
+    orderBy('createdAt', 'desc')),
+  (snapshot) => callback(snapshot.docs.map((item) => ({ ...item.data(), id: item.id }))), onError);
+}
+
 export async function markNotificationRead(notificationId) {
-  throw notImplemented('notificationService.markNotificationRead', 'Member 4');
+  const { db } = signedIn();
+  await updateDoc(doc(db, 'notifications', notificationId), { read: true });
 }
 
-/** @param {string} userId @returns {Promise<void>} */
 export async function markAllNotificationsRead(userId) {
-  throw notImplemented('notificationService.markAllNotificationsRead', 'Member 4');
+  return markMatchingNotificationsRead(userId);
 }
 
-/**
- * Week 3. Which kinds of alerts the user wants (for example bookings, messages,
- * reminders). Saved on the user document.
- * @param {string} userId
- * @returns {Promise<object>}
- */
+export async function markConversationNotificationsRead(conversationId, userId) {
+  return markMatchingNotificationsRead(userId, conversationId);
+}
+
+async function markMatchingNotificationsRead(userId, conversationId) {
+  const { db, uid } = signedIn();
+  if (uid !== userId) throw new Error('You can only update your own notifications.');
+  // Paginate in document order so each write batch stays below 500 writes.
+  let cursor;
+  do {
+    const constraints = [where('recipientId', '==', uid), orderBy(documentId()), limit(400)];
+    if (cursor) constraints.push(startAfter(cursor));
+    const snapshot = await getDocs(query(collection(db, 'notifications'), ...constraints));
+    const batch = writeBatch(db);
+    const unread = snapshot.docs.filter((item) => !item.data().read &&
+      (!conversationId || item.data().data?.conversationId === conversationId));
+    unread.forEach((item) => batch.update(item.ref, { read: true }));
+    if (unread.length) await batch.commit();
+    cursor = snapshot.size === 400 ? snapshot.docs.at(-1) : null;
+  } while (cursor);
+}
+
+// Preferences remain the separate Week 3 task.
 export async function getNotificationPreferences(userId) {
   throw notImplemented('notificationService.getNotificationPreferences', 'Member 4');
 }
 
-/**
- * @param {string} userId
- * @param {object} preferences
- * @returns {Promise<void>}
- */
 export async function updateNotificationPreferences(userId, preferences) {
   throw notImplemented('notificationService.updateNotificationPreferences', 'Member 4');
 }

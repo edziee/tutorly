@@ -10,6 +10,7 @@ import { ROUTES } from '../constants/routes';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import StudentDashboardScreen from '../screens/student/StudentDashboardScreen';
 import { TutorsScreen } from '../screens/student/TutorsScreen';
+import ConversationScreen from '../screens/shared/ConversationScreen';
 import ChatScreen from '../screens/shared/ChatScreen';
 import ScheduleScreen from '../screens/student/ScheduleScreen';
 import StudentProfileScreen from '../screens/student/StudentProfileScreen';
@@ -69,10 +70,11 @@ function StudentTabs() {
             onNotificationsPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}
           />
         ),
+        tabBarLabelPosition: 'below-icon',
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
         tabBarStyle: {
-          height: 70,
+          height: 64,
           paddingTop: 8,
           paddingBottom: 8,
           backgroundColor: colors.surface,
@@ -80,6 +82,9 @@ function StudentTabs() {
         },
         tabBarLabelStyle: {
           fontSize: 10,
+          marginTop: 2,
+          lineHeight: 14,
+          flexShrink: 0,
           fontWeight: '600',
         },
         tabBarIcon: ({ focused, color, size }) => {
@@ -148,12 +153,12 @@ export default function StudentNavigator() {
         component={StudentTabs}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name={ROUTES.CONVERSATION} component={ConversationScreen} options={{ title: 'Conversation' }} />
       <Stack.Screen
         name={ROUTES.NOTIFICATIONS}
         component={NotificationsScreen}
         options={{
           title: 'Notifications',
-          header: () => <AppHeader title="Notifications" initials={studentInitials} />,
         }}
       />
       <Stack.Screen

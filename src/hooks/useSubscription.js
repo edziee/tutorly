@@ -1,25 +1,11 @@
-// Listens to live data from a service and gives the screen a simple state.
-//
-//   const { status, data, error, retry } = useSubscription(
-//     (onData) => notificationService.subscribeToNotifications(userId, onData),
-//     [userId],
-//   );
-//
-// status is 'loading' until the first data arrives, then 'ready', or 'error' if
-// starting the listener threw (for example Firebase is not configured, or the
-// service function is still a placeholder). `retry()` starts the listener again.
-// The listener is stopped when the screen closes or `deps` change, so the app
-// does not keep reading from Firestore in the background.
-//
-// `subscribe` receives the callback and must return the function that stops
-// listening, which is what every subscribeTo... function in src/services does.
-// Return nothing (undefined) to skip listening, for example when there is no
-// logged-in user yet; the status then stays 'loading'. Subscriptions may pass
-// an optional second callback to report asynchronous listener errors.
 import { useEffect, useRef, useState } from 'react';
 
 export function useSubscription(subscribe, deps = []) {
-  const [state, setState] = useState({ status: 'loading', data: null, error: null });
+  const [state, setState] = useState({
+    status: 'loading',
+    data: null,
+    error: null,
+  });
   const [attempt, setAttempt] = useState(0);
   const subscribeRef = useRef(subscribe);
   subscribeRef.current = subscribe;
@@ -29,16 +15,21 @@ export function useSubscription(subscribe, deps = []) {
 
     let stop;
     let active = true;
+
+    const onError = (error) => {
+      if (active) {
+        setState({ status: 'error', data: null, error });
+      }
+    };
+
     try {
       stop = subscribeRef.current((data) => {
-        if (!active) return;
-        setState({ status: 'ready', data, error: null });
-      }, (error) => {
-        if (!active) return;
-        setState({ status: 'error', data: null, error });
-      });
+        if (active) {
+          setState({ status: 'ready', data, error: null });
+        }
+      }, onError);
     } catch (error) {
-      setState({ status: 'error', data: null, error });
+      onError(error);
     }
 
     return () => {
@@ -48,5 +39,8 @@ export function useSubscription(subscribe, deps = []) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, attempt]);
 
-  return { ...state, retry: () => setAttempt((count) => count + 1) };
+  return {
+    ...state,
+    retry: () => setAttempt((count) => count + 1),
+  };
 }
