@@ -1,6 +1,16 @@
+import { isFirebaseConfigured } from '../../config/firebase';
+import { useAuth } from '../../context/AuthContext';
+import { useSubscription } from '../../hooks/useSubscription';
+import { getOrCreateConversation, markConversationRead, subscribeToChatTutors, subscribeToConversations } from '../../services/chatService';
+import { ROUTES } from '../../constants/routes';
+import { getUserId } from '../../utils/user';
+import { timeAgo } from '../../utils/format';
+import ErrorState from '../../components/ErrorState';
+import LoadingState from '../../components/LoadingState';
 import { useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,8 +28,17 @@ import { spacing } from '../../theme/spacing';
 
 const filters = ['All Messages', 'Active Tutors', 'Faculty / Profs'];
 const accent = colors.secondary;
+const portraits = {
+  'tutor-1': require('../../../assets/chat/marcus-chen.jpg'),
+  'tutor-2': require('../../../assets/chat/prof-henderson.jpg'),
+  'tutor-3': require('../../../assets/chat/elena-garcia.jpg'),
+  'tutor-4': require('../../../assets/chat/devon-vance.jpg'),
+  'tutor-5': require('../../../assets/chat/maya-lee.jpg'),
+  'tutor-6': require('../../../assets/chat/marcus-reynolds.jpg'),
+};
 
-function Avatar({ initials, color, size = 42, online = false }) {
+function Avatar({ initials, color, image, size = 46, online = false }) {
+  const [failed, setFailed] = useState(false);
   return (
     <View
       style={[
@@ -32,84 +51,87 @@ function Avatar({ initials, color, size = 42, online = false }) {
         },
       ]}
     >
-      <Text style={[styles.avatarText, { fontSize: size * 0.3 }]}>
-        {initials || '?'}
-      </Text>
+      {image && !failed ? (
+        <Image source={image} style={{ width: size, height: size, borderRadius: size / 2 }} onError={() => setFailed(true)} />
+      ) : (
+        <Text style={[styles.avatarText, { fontSize: size * 0.3 }]}>{initials || '?'}</Text>
+      )}
       {online && <View style={styles.onlineDot} />}
     </View>
   );
 }
 
-function MessageCard({ message, onPress }) {
+function MessageCard({ message, onPress, onAction }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Open conversation with ${message.name}`}
-      onPress={onPress}
-      style={styles.messageCard}
-    >
-      <Avatar initials={message.initials} color={message.color} />
-
-      <View style={styles.messageContent}>
-        <View style={styles.messageTopRow}>
-          <Text numberOfLines={1} style={styles.personName}>
-            {message.name}
-          </Text>
-          {message.unread && <View style={styles.unreadDot} />}
-          <Text style={styles.time}>{message.time}</Text>
-        </View>
-
-        <View style={styles.metaRow}>
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.roleTag,
-              { backgroundColor: message.roleColor || colors.background },
-            ]}
-          >
-            {message.role}
-          </Text>
-          <Text numberOfLines={1} style={styles.course}>
-            {message.course}
-          </Text>
-        </View>
-
-        <Text numberOfLines={1} style={styles.preview}>
-          {message.preview}
-        </Text>
-
-        {message.session ? (
-          <View style={styles.sessionRow}>
-            <Ionicons
-              name="calendar-outline"
-              size={14}
-              color={colors.mutedText}
-            />
-            <Text numberOfLines={1} style={styles.sessionText}>
-              {message.session}
-            </Text>
+    <View style={styles.messageCard}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open conversation with ${message.name}`}
+        onPress={onPress}
+        style={styles.cardBody}
+      >
+        <Avatar initials={message.initials} color={message.color} image={message.photoUrl ? { uri: message.photoUrl } : !isFirebaseConfigured ? portraits[message.tutorId] : undefined} online={message.unread} />
+        <View style={styles.messageContent}>
+          <View style={styles.messageTopRow}>
+            <Text numberOfLines={1} style={styles.personName}>{message.name}</Text>
+            {message.category === 'Faculty / Profs' && <Ionicons name="school-outline" size={13} color={colors.text} />}
+            <Text style={styles.time}>{message.time}</Text>
+            {message.unread && <View style={styles.unreadBadge}><Text style={styles.unreadBadgeText}>1</Text></View>}
+            <Ionicons name="chevron-down" size={11} color={colors.mutedText} />
           </View>
-        ) : null}
-      </View>
-    </Pressable>
+          <View style={styles.metaRow}>
+            <Text style={[styles.roleTag, { backgroundColor: message.roleColor }]}>{message.role}</Text>
+            <Text numberOfLines={1} style={styles.course}>{message.course}</Text>
+          </View>
+          <Text numberOfLines={1} style={styles.preview}>{message.preview}</Text>
+          {message.sessionPreview && <Text numberOfLines={1} style={styles.sessionText}>{message.sessionPreview}</Text>}
+        </View>
+      </Pressable>
+      {message.action && (
+        <View style={styles.cardFooter}>
+          <View style={styles.footerDescription}>
+            <Ionicons name={message.action === 'Open Chat' ? 'videocam-outline' : message.action === 'Download' ? 'attach-outline' : 'calendar-outline'} size={12} color={message.action === 'Open Chat' ? accent : colors.mutedText} />
+            <Text numberOfLines={1} style={[styles.footerText, message.action === 'Open Chat' && styles.videoText]}>{message.session}</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${message.action}: ${message.name}`} onPress={onAction} style={[styles.footerAction, message.action === 'Open Chat' && styles.openChatButton]}>
+            <Text style={[styles.footerActionText, message.action === 'Open Chat' && styles.openChatText]}>{message.action}{message.action === 'Open Chat' ? ' →' : ''}</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
   );
 }
 
-export default function ChatScreen() {
+export default function ChatScreen({ navigation }) {
+  const { user, role } = useAuth();
+  const uid = getUserId(user);
+  const live = isFirebaseConfigured;
+  const conversations = useSubscription((onData, onError) => live && uid
+    ? subscribeToConversations(uid, onData, onError) : undefined, [uid, live]);
+  const availableTutors = useSubscription((onData, onError) => live && uid && role === 'student'
+    ? subscribeToChatTutors(onData, onError) : undefined, [uid, live, role]);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All Messages');
-  const [messages, setMessages] = useState(() =>
+  const [demoMessages, setMessages] = useState(() =>
     mockConversations.map((message) => ({ ...message })),
   );
 
-  const onlineTutors = mockTutors.filter((tutor) => tutor.online !== false);
+  const messages = live ? (conversations.data || []).map((chat) => ({
+    ...chat, name: uid === chat.studentId ? chat.tutorName : chat.studentName,
+    role: chat.tutorTier, roleColor: colors.mint, course: '', preview: chat.lastMessage || 'Say your first message!',
+    time: timeAgo(chat.lastMessageAt), unread: chat.unreadBy?.includes(uid),
+    category: chat.tutorTier === 'Professor' ? 'Faculty / Profs' : 'Active Tutors',
+  })) : demoMessages;
+  const onlineTutors = live ? (availableTutors.data || []) : mockTutors.filter((tutor) => tutor.online !== false).sort(
+    (a, b) => Number(b.id === 'tutor-6') - Number(a.id === 'tutor-6'),
+  );
 
   const visibleMessages = useMemo(() => {
     const query = search.trim().toLowerCase();
 
     return messages
       .map((message) => {
-        const tutor = mockTutors.find(
+        const tutor = (live ? [] : mockTutors).find(
           (item) => item.id === message.tutorId,
         );
 
@@ -139,15 +161,23 @@ export default function ChatScreen() {
       });
   }, [activeFilter, messages, search]);
 
-  function markAllRead() {
-    setMessages((current) =>
-      current.map((message) => ({ ...message, unread: false })),
-    );
+  async function markAllRead() {
+    if (live) {
+      try { await Promise.all(messages.filter((item) => item.unread).map((item) => markConversationRead(item.id, uid))); }
+      catch (error) { Alert.alert('Could not mark messages read', error.message); }
+    } else setMessages((current) => current.map((message) => ({ ...message, unread: false })));
   }
 
-  function openConversation(name) {
-    Alert.alert(name, 'Conversation screen will be connected here.');
+  async function openConversation(target, existing = false) {
+    if (!live) { Alert.alert(target.name, 'Configure Firebase and sign in to send messages.'); return; }
+    try {
+      const conversationId = existing ? target.id : await getOrCreateConversation(uid, target.id);
+      navigation.navigate(ROUTES.CONVERSATION, { conversationId });
+    } catch (error) { Alert.alert('Could not open chat', error.message); }
   }
+
+  if (live && conversations.status === 'loading') return <LoadingState message="Loading conversations…" />;
+  if (live && conversations.status === 'error') return <ErrorState title="Could not load conversations" message={conversations.error.message} onRetry={conversations.retry} />;
 
   return (
     <SafeAreaView edges={[]} style={styles.safeArea}>
@@ -159,11 +189,11 @@ export default function ChatScreen() {
         <View style={styles.inboxSwitcher}>
           <View style={[styles.switchButton, styles.switchSelected]}>
             <Text style={styles.switchSelectedText}>
-              Inbox ({messages.length})
+              Inbox{'\n'}({messages.length})
             </Text>
           </View>
           <View style={styles.switchButton}>
-            <Text style={styles.switchText}>Marcus</Text>
+            <Text style={styles.switchText}>{live ? user?.name?.split(' ')[0] || 'You' : 'Marcus\nC.'}</Text>
             <View style={styles.switchOnlineDot} />
           </View>
         </View>
@@ -197,6 +227,8 @@ export default function ChatScreen() {
             return (
               <Pressable
                 key={filter}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
                 onPress={() => setActiveFilter(filter)}
                 style={[
                   styles.filterChip,
@@ -219,9 +251,10 @@ export default function ChatScreen() {
           })}
         </ScrollView>
 
+        {live && availableTutors.status === 'error' && <ErrorState compact title="Could not load tutors" message={availableTutors.error.message} onRetry={availableTutors.retry} />}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>AVAILABLE FOR ON-DEMAND HELP</Text>
-          <Text style={styles.onlineCount}>{onlineTutors.length} Online</Text>
+          <Text style={styles.sectionLabel}>{live ? 'AVAILABLE TUTORS' : 'AVAILABLE FOR ON-DEMAND HELP'}</Text>
+          <Text style={styles.onlineCount}>{onlineTutors.length} {live ? 'Tutors' : 'Online'}</Text>
         </View>
 
         <ScrollView
@@ -241,20 +274,23 @@ export default function ChatScreen() {
             return (
               <Pressable
                 key={tutor.id}
-                onPress={() => openConversation(tutor.name)}
+                accessibilityRole="button"
+                accessibilityLabel={`Message ${tutor.name}`}
+                onPress={() => openConversation(tutor)}
                 style={styles.onlineTutor}
               >
                 <Avatar
                   initials={initials}
                   color={tutor.color}
-                  size={44}
-                  online
+                  size={50}
+                  image={tutor.photoUrl ? { uri: tutor.photoUrl } : !live ? portraits[tutor.id] : undefined}
+                  online={tutor.online === true}
                 />
                 <Text numberOfLines={1} style={styles.onlineName}>
                   {tutor.shortName || tutor.name}
                 </Text>
                 <Text numberOfLines={1} style={styles.subjectTag}>
-                  {tutor.subject}
+                  {tutor.subject?.split(':')[0] || tutor.tier}
                 </Text>
               </Pressable>
             );
@@ -263,7 +299,7 @@ export default function ChatScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionLabel}>ACTIVE INQUIRIES & PREP</Text>
-          <Pressable onPress={markAllRead}>
+          <Pressable accessibilityRole="button" onPress={markAllRead}>
             <Text style={styles.markRead}>Mark all read</Text>
           </Pressable>
         </View>
@@ -272,7 +308,14 @@ export default function ChatScreen() {
           <MessageCard
             key={message.id}
             message={message}
-            onPress={() => openConversation(message.name)}
+            onPress={() => openConversation(message, true)}
+            onAction={() => {
+              if (message.action === 'Open Chat') {
+                openConversation(message, true);
+              } else {
+                Alert.alert(message.action, `${message.action === 'Download' ? 'Attachments' : 'Rescheduling'} will be available when this conversation is connected.`);
+              }
+            }}
           />
         ))}
 
@@ -290,22 +333,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   inboxSwitcher: {
     alignSelf: 'flex-end',
     flexDirection: 'row',
     padding: 4,
-    borderRadius: 20,
+    borderRadius: 24,
     backgroundColor: '#E9EAEE',
     marginBottom: spacing.md,
   },
   switchButton: {
-    minHeight: 29,
+    minHeight: 34,
+    minWidth: 64,
     paddingHorizontal: spacing.md,
-    borderRadius: 16,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -317,22 +361,25 @@ const styles = StyleSheet.create({
   switchText: {
     color: colors.text,
     fontSize: 11,
+    textAlign: 'center',
   },
   switchSelectedText: {
     color: colors.white,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    lineHeight: 11,
+    textAlign: 'center',
+    fontWeight: '700',
   },
   switchOnlineDot: {
-    width: 6,
-    height: 6,
+    width: 5,
+    height: 5,
     borderRadius: 3,
     backgroundColor: accent,
   },
   searchBox: {
-    minHeight: 42,
+    minHeight: 44,
     paddingHorizontal: spacing.md,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
@@ -342,22 +389,22 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     color: colors.text,
-    fontSize: 13,
+    fontSize: 12,
     paddingVertical: spacing.sm,
   },
   searchHint: {
     color: colors.mutedText,
     fontSize: 10,
-    marginLeft: 31,
-    marginTop: 2,
-    marginBottom: spacing.sm,
+    marginLeft: 30,
+    marginTop: -7,
+    marginBottom: spacing.md,
   },
   filterList: {
     gap: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
   },
   filterChip: {
-    minHeight: 27,
+    minHeight: 26,
     paddingHorizontal: spacing.md,
     borderRadius: 16,
     backgroundColor: colors.surface,
@@ -386,13 +433,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   sectionLabel: {
     color: colors.text,
     fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 0.25,
+    letterSpacing: 0.4,
+    flexShrink: 1,
   },
   onlineCount: {
     color: accent,
@@ -401,10 +449,11 @@ const styles = StyleSheet.create({
   },
   onlineList: {
     gap: spacing.md,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.xl,
+    paddingTop: 2,
   },
   onlineTutor: {
-    width: 58,
+    width: 62,
     alignItems: 'center',
   },
   avatar: {
@@ -427,21 +476,21 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
   },
   onlineName: {
-    maxWidth: 58,
+    maxWidth: 62,
     color: colors.text,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '600',
     marginTop: spacing.xs,
   },
   subjectTag: {
-    maxWidth: 58,
+    maxWidth: 62,
     overflow: 'hidden',
-    color: colors.text,
-    backgroundColor: colors.background,
+    color: colors.successText,
+    backgroundColor: colors.mint,
     borderRadius: 8,
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
-    fontSize: 8,
+    fontSize: 9,
     marginTop: 3,
   },
   markRead: {
@@ -450,11 +499,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   messageCard: {
-    minHeight: 86,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-    borderRadius: 11,
+    marginBottom: spacing.md,
+    borderRadius: 12,
     backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  cardBody: {
+    minHeight: 94,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
@@ -472,14 +524,21 @@ const styles = StyleSheet.create({
   personName: {
     flexShrink: 1,
     color: colors.text,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
-  unreadDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+  unreadBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '600',
   },
   time: {
     color: colors.mutedText,
@@ -489,14 +548,13 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
     marginTop: 3,
   },
   roleTag: {
     overflow: 'hidden',
-    maxWidth: 78,
     color: colors.text,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: 8,
     fontSize: 9,
@@ -508,19 +566,57 @@ const styles = StyleSheet.create({
   },
   preview: {
     color: colors.mutedText,
-    fontSize: 10,
-    marginTop: spacing.xs,
-  },
-  sessionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+    fontSize: 11,
     marginTop: spacing.xs,
   },
   sessionText: {
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: spacing.xs,
+  },
+  cardFooter: {
+    minHeight: 30,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: '#FAFBFC',
+  },
+  footerDescription: {
     flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  footerText: {
+    flexShrink: 1,
     color: colors.mutedText,
     fontSize: 9,
+  },
+  videoText: {
+    color: colors.successText,
+    fontWeight: '600',
+  },
+  footerAction: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 12,
+  },
+  footerActionText: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  openChatButton: {
+    backgroundColor: colors.primary,
+  },
+  openChatText: {
+    color: colors.white,
   },
   emptyText: {
     color: colors.mutedText,

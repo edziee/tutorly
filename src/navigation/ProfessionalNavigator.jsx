@@ -3,7 +3,8 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { ROUTES } from '../constants/routes';
-import NotificationBell from '../components/NotificationBell';
+import ConversationScreen from '../screens/shared/ConversationScreen';
+import ChatScreen from '../screens/shared/ChatScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import ProfessionalDashboardScreen from '../screens/professional/ProfessionalDashboardScreen';
 import AppHeader from '../components/AppHeader';
@@ -18,12 +19,11 @@ export default function ProfessionalNavigator() {
         component={ProfessionalDashboardScreen}
         options={({ navigation }) => ({
           title: 'Dashboard',
-          header: () => <AppHeader title="Dashboard" initials="PT" />,
-          headerRight: () => (
-            <NotificationBell onPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)} />
-          ),
+          header: () => <AppHeader title="Dashboard" initials="PT" onNotificationsPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)} />,
         })}
       />
+      <Stack.Screen name={ROUTES.CHAT} component={ChatScreen} options={{ title: 'Messages' }} />
+      <Stack.Screen name={ROUTES.CONVERSATION} component={ConversationScreen} options={{ title: 'Conversation' }} />
       <Stack.Screen
         name={ROUTES.NOTIFICATIONS}
         component={NotificationsScreen}

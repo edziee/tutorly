@@ -121,7 +121,7 @@ Week 1 sets up Firebase and the shared data structure first, because everything 
 | Design in Figma: professional tutor login and hidden admin login | Member 3 | Done |
 | Design in Figma: professional tutor dashboard and admin dashboard | Member 3 | Done |
 | Tutors list logic with search and filters (temporary data is fine for now) | Member 2 | In progress (search and filters exist on mock data) |
-| Firestore data and logic for chat and notifications | Member 4 | Not started |
+| Firestore data and logic for chat and notifications | Member 4 | In progress (message alerts and read states implemented; tested with local Firebase emulators; teammate auth integration and team Firebase deployment pending) |
 
 ## Week 2 (Oct 16 to 22): Firebase features
 
@@ -137,12 +137,12 @@ Week 2 connects each area to real Firebase data and builds the two new logins an
 | Connect the professional tutor dashboard to Firestore and replace mock data in the login, profile and professional dashboard screens | Member 1 | In progress — the shared tutor dashboard profile/application summary reads from Firestore for Peer Tutors, Alumni and Professors, including category, proof details and availability. Booking requests and session panels still show mock data; booking/schedule integration belongs to Member 2 and chat integration belongs to Member 4 |
 | Booking flow and schedule saved to Firestore | Member 2 | Not started (schedule screen exists on mock data and device storage) |
 | Connect the student dashboard and tutors list to Firestore and replace mock data in them, in booking and in the schedule | Member 2 | Not started |
-| Build the booking, schedule, payment and chat screens | Member 3 | In progress (schedule and chat screens exist; booking and payment not built) |
+| Build the booking, schedule, payment and chat screens | Member 3 | In progress (chat inbox updated to the supplied visual reference; schedule exists; booking and payment not built) |
 | Build the professional tutor login and dashboard, the hidden admin login and the admin dashboard | Member 3 | In progress (admin dashboard, users, verifications and bookings screens built on branch `member3/ui-screens`; professional login and dashboard and the admin login are not built) |
 | Build the tutors map view and session check-in screens, and the notification bell and toast | Member 3 | In progress (notifications screen and the bell in every role's header are built; map view, check-in and the toast are not) |
 | Add loading, empty and error states to every screen | Member 3 | In progress (done for the screens built in this branch: login, sign-up, dashboard, notifications and the 4 admin screens; the older screens still need them) |
-| Real-time chat using Firestore | Member 4 | Not started |
-| In-app notifications triggered by booking events (requested, accepted, reminder) and new messages | Member 4 | Not started |
+| Real-time chat using Firestore | Member 4 | In progress (live inbox and conversation screen implemented; tested locally; teammate auth integration and team Firebase deployment pending) |
+| In-app notifications triggered by booking events (requested, accepted, reminder) and new messages | Member 4 | In progress (chat message alerts implemented; booking/reminder events pending) |
 | Connect the admin dashboard to Firestore (users list, approve or reject tutor and professional verification, bookings overview) | Member 4 | Not started |
 | Replace mock data in chat, notifications and the admin dashboard | Member 4 | Not started |
 

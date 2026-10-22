@@ -1,7 +1,8 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import NotificationBell from './NotificationBell';
 import StudentAvatar from './StudentAvatar';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
@@ -30,21 +31,7 @@ export function AppHeaderActions({
 }) {
   return (
     <View style={styles.actions}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Notifications"
-        hitSlop={8}
-        onPress={
-          onNotificationsPress ??
-          (() => Alert.alert('Notifications', 'No new notifications.'))
-        }
-      >
-        <Ionicons
-          name="notifications-outline"
-          size={21}
-          color={colors.text}
-        />
-      </Pressable>
+      <NotificationBell onPress={onNotificationsPress} />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={profileAccessibilityLabel}
