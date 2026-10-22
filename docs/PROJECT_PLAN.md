@@ -2,7 +2,7 @@
 
 Oct 10, 2026
 
-> This is the markdown copy of the Claude Doc "Tutorly 3-Week Plan", kept in the repo so the team can update task statuses in the same place as the code. The progress section, the status of tasks the repo already covers, and the open questions were updated on Oct 10, 2026 after reading the GitHub repo. Swap the member names in for "Member 1 to 4".
+> This is the markdown copy of the Claude Doc "Tutorly 3-Week Plan", kept in the repo so the team can update task statuses in the same place as the code. Progress and task statuses were updated on Oct 23, 2026 based on the implementation and validation completed so far. Swap the member names in for "Member 1 to 4".
 
 ## Overview for the team
 
@@ -19,13 +19,13 @@ The app serves four types of users. The last two are new in this plan, and each 
 - **Professional tutors (professors and alumni):** a new login option and a new professional tutor dashboard.
 - **Admin:** a hidden login that normal users never see, and a new admin dashboard.
 
-The GitHub repo currently contains mock data. All of it must be replaced with real Firebase data by the end of Week 3, and every member is responsible for the mock data in their own area. The full list is in [MOCK_DATA_INVENTORY.md](MOCK_DATA_INVENTORY.md).
+Runtime demo records and fallback identities have been removed from the connected app screens. Those screens now use Firebase/service data and show loading, empty, or error states. Test and seed fixtures are intentionally preserved; no Firebase documents were changed. See [MOCK_DATA_INVENTORY.md](MOCK_DATA_INVENTORY.md) for cleanup scope and remaining verification.
 
 Each of you owns one area, listed below. In Week 1 we build the foundation, in Week 2 we connect real Firebase data and the required features, and in Week 3 we join everything, test it and submit. When you finish a task, change its status in the tables below so everyone can see progress.
 
 ## Progress so far
 
-The Figma prototype is done (16 screens). The code in the repo (`edziee/tutorly`, one commit so far) is a React Native app built with Expo that covers part of the student side using mock data.
+The Figma prototype is done (16 screens). The repo contains a React Native app built with Expo, with several Firebase-backed features implemented alongside screens and workflows that remain incomplete.
 
 **Done: UI prototype in Figma**
 
@@ -41,20 +41,21 @@ The Figma prototype is done (16 screens). The code in the repo (`edziee/tutorly`
 - Tutor profile
 - Already designed in the prototype: a toast notification, notification preferences, a live session geolocation check-in tool, and a campus proximity setting
 
-**Already coded in the repo (all on mock data)**
+**Already coded in the repo**
 
 - Splash screen and two-page onboarding (the onboarding is marked to be edited later)
 - Student navigation with five tabs: Tutors, Profile, Schedule, Tutor Profile, Messages
 - Tutors list with search, course filter and tier filter
-- Schedule with upcoming and past sessions, reschedule, add to calendar, and session reminders saved on the device
-- Messages screen
+- Schedule with upcoming and past sessions, reschedule, add to calendar, and session reminders; schedule records now come from live bookings
+- Messages screen with live conversations and tutor discovery
 - Student profile with personal information, streak, leaderboard and honors
 - Tutor application with courses, grades and proof file selection
+- Firebase-backed student/tutor profiles, tutor booking subscriptions, tutor session ledger, and admin review history
 - Shared theme (colors, spacing, typography) and reusable components, still to be completed to match Figma
 
-**Not coded yet:** login and sign-up for any role, booking flow, payment, tutors map view, geolocation, in-app notifications (the header bell only shows a placeholder), Firebase, the professional tutor dashboard and the admin dashboard.
+**Still incomplete:** end-to-end booking creation, payment, tutors map view and campus check-in, complete notification triggers/preferences, role-specific access and security-rule rollout, full UI polish, and end-to-end testing across all four roles. Some dashboard and admin workflows still need completion.
 
-**Not yet designed:** the professional tutor login, the hidden admin login, and the professional tutor and admin dashboards. They are added as Figma tasks in Week 1. The repo's mock data is tracked as tasks in all three weeks.
+The professional tutor and hidden admin login/dashboard designs are marked complete in Week 1 below. Remaining mock-data work is limited to verifying runtime surfaces; test/seed fixtures are intentionally retained.
 
 ## Distribution of parts
 
@@ -114,7 +115,7 @@ Week 1 sets up Firebase and the shared data structure first, because everything 
 | Figma prototype, all 16 screens | Everyone | Done |
 | Create Firebase project, connect it to the app, share config with the team | Member 1 | Not started |
 | Design Firestore structure (users with a role field, tutors, bookings, messages, notifications) | Member 1 (with all) | In progress — schema proposal documented in [FIRESTORE_SCHEMA.md](FIRESTORE_SCHEMA.md); team review and open decisions remain |
-| List every file and screen in the repo that uses mock data, and which Firestore collection will replace it | Everyone (Member 1 compiles) | Draft ready in [MOCK_DATA_INVENTORY.md](MOCK_DATA_INVENTORY.md), team to review |
+| List every file and screen in the repo that uses mock data, and which Firestore collection will replace it | Everyone (Member 1 compiles) | Done — inventory and runtime cleanup scope are documented in [MOCK_DATA_INVENTORY.md](MOCK_DATA_INVENTORY.md); test/seed fixtures are intentionally preserved |
 | Sign-up and login logic for students and tutors | Member 1 | Not started |
 | Set up the shared UI theme and reusable components to match Figma | Member 3 | In progress (theme, form, card, badge, filter and state components are in; `ScreenHeader` and `SessionCard` are still empty) |
 | Build the UI for login and sign-up, the student dashboard and the tutors list | Member 3 | Done on branch `member3/ui-screens` (login, sign-up and dashboard built and waiting for review; tutors list already existed). Google login and "Forgot password" are left out until Member 1 has service functions for them. The dashboard is registered but no button opens it yet |
@@ -134,17 +135,17 @@ Week 2 connects each area to real Firebase data and builds the two new logins an
 | Build the professional tutor login logic (professors and alumni) with its verification documents | Member 1 | Done — professors and alumni use the shared tutor sign-up/login; sign-up type is saved and determines the application evidence requirements |
 | Build the hidden admin login (no public sign-up; admin accounts created by the team in Firebase) | Member 1 | Done — admin accounts are created in Firebase, and admin sign-in verifies the Firestore role; Firestore security rules are a separate Week 3 task |
 | Role-based access: each role (student, tutor, professional tutor, admin) opens its own dashboard | Member 1 | Not started |
-| Connect the professional tutor dashboard to Firestore and replace mock data in the login, profile and professional dashboard screens | Member 1 | In progress — the shared tutor dashboard profile/application summary reads from Firestore for Peer Tutors, Alumni and Professors, including category, proof details and availability. Booking requests and session panels still show mock data; booking/schedule integration belongs to Member 2 and chat integration belongs to Member 4 |
-| Booking flow and schedule saved to Firestore | Member 2 | Not started (schedule screen exists on mock data and device storage) |
-| Connect the student dashboard and tutors list to Firestore and replace mock data in them, in booking and in the schedule | Member 2 | Not started |
+| Connect the professional tutor dashboard to Firestore and replace mock data in the login, profile and professional dashboard screens | Member 1 | In progress — tutor profile/application data reads from Firestore, and the tutor schedule/session ledger uses live bookings. Full booking-request workflows and end-to-end role verification remain |
+| Booking flow and schedule saved to Firestore | Member 2 | In progress — the student schedule subscribes to live bookings; end-to-end booking creation is not complete |
+| Connect the student dashboard and tutors list to Firestore and replace mock data in them, in booking and in the schedule | Member 2 | In progress — the schedule now uses live bookings; student dashboard and complete booking-flow data integration remain to be finished/verified |
 | Build the booking, schedule, payment and chat screens | Member 3 | In progress (chat inbox updated to the supplied visual reference; schedule exists; booking and payment not built) |
 | Build the professional tutor login and dashboard, the hidden admin login and the admin dashboard | Member 3 | In progress (admin dashboard, users, verifications and bookings screens built on branch `member3/ui-screens`; professional login and dashboard and the admin login are not built) |
 | Build the tutors map view and session check-in screens, and the notification bell and toast | Member 3 | In progress (notifications screen and the bell in every role's header are built; map view, check-in and the toast are not) |
 | Add loading, empty and error states to every screen | Member 3 | In progress (done for the screens built in this branch: login, sign-up, dashboard, notifications and the 4 admin screens; the older screens still need them) |
 | Real-time chat using Firestore | Member 4 | In progress (live inbox and conversation screen implemented; tested locally; teammate auth integration and team Firebase deployment pending) |
 | In-app notifications triggered by booking events (requested, accepted, reminder) and new messages | Member 4 | In progress (chat message alerts implemented; booking/reminder events pending) |
-| Connect the admin dashboard to Firestore (users list, approve or reject tutor and professional verification, bookings overview) | Member 4 | Not started |
-| Replace mock data in chat, notifications and the admin dashboard | Member 4 | Not started |
+| Connect the admin dashboard to Firestore (users list, approve or reject tutor and professional verification, bookings overview) | Member 4 | In progress — reviewed application history now comes from Firestore; users list, bookings overview, and complete approval workflow still need verification |
+| Replace mock data in chat, notifications and the admin dashboard | Member 4 | Done for runtime demo data — chat, tutor workspace/schedule, admin review history and authentication no longer use fabricated records; the notification mock dataset was removed. Test/seed fixtures remain intentionally, and notification triggers are tracked separately above |
 
 ## Week 3 (Oct 23 to Oct 28): Integration, polish and submission
 
@@ -157,12 +158,12 @@ Week 3 adds payment and geolocation, locks down Firebase for each role, finishes
 | Session check-in using campus proximity (location check) | Member 2 | Not started |
 | Fully customize and polish the UI: spacing, animations, responsive layout, consistency across all four user types | Member 3 | Not started |
 | Compare the finished app to the Figma design and fix mismatches | Member 3 (with everyone) | Not started |
-| Notification preferences and read/unread states | Member 4 | Not started |
+| Notification preferences and read/unread states | Member 4 | In progress — chat read states are implemented; notification preference controls and end-to-end verification remain |
 | Notify tutors in the app when an admin approves or rejects their verification | Member 4 | Not started |
 | Firestore security rules so each role only reaches its own data (admin data only for admins) | Member 1 | Drafted and checked in the Firestore Emulator; not yet reviewed or published |
-| Final mock-data sweep: search the whole repo for mock or sample data files and fake values, delete them, and confirm every screen loads real Firestore data | Everyone (Member 1 coordinates) | Not started |
-| Full app testing with accounts for all four roles (student, tutor, professional tutor, admin) and bug fixes | Everyone | Not started |
-| Documentation, demo script and submission | Member 4 (coordinates) | Not started |
+| Final mock-data sweep: search the whole repo for mock or sample data files and fake values, delete them, and confirm every screen loads real Firestore data | Everyone (Member 1 coordinates) | In progress — runtime demo datasets/fallback identities were removed from connected screens and source searches found no active imports of retired mock modules. Test/seed fixtures are preserved by design; remaining screens and all four-role live-data behavior still need verification |
+| Full app testing with accounts for all four roles (student, tutor, professional tutor, admin) and bug fixes | Everyone | In progress — unit tests pass (54/54) and Expo web export succeeds; full four-role end-to-end testing is outstanding. Chat integration could not complete because Firebase Auth returned `auth/network-request-failed` |
+| Documentation, demo script and submission | Member 4 (coordinates) | In progress — project and mock-data documentation updated; demo script and submission remain |
 
 ## Notes and open questions
 
