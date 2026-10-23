@@ -547,12 +547,12 @@ export default function ScheduleScreen() {
       Alert.alert('Device calendar', 'Calendar export is available on Android and iOS.');
       return;
     }
-    const {permission} = await Calendar.requestCalendarPermissions();
+    const permission = await Calendar.requestCalendarPermissions();
     if (permission.status !== 'granted') {
       Alert.alert('Calendar permission needed', 'Allow calendar access to add this session.');
       return;
     }
-    const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
+    const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
     const writableCalendar = calendars.find((calendar) => calendar.allowsModifications);
     if (!writableCalendar) {
       Alert.alert('No calendar available', 'Create a device calendar before exporting this session.');

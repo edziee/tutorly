@@ -599,14 +599,7 @@ export default function ScheduleScreen() {
                   </View>
                   {modalMode === 'details' && activeSession ? (
                     <>
-                      <View style={styles.detailHero}><View style={styles.tutorAvatar}><Text style={styles.tutorAvatarText}>{activeSession.studentName.charAt(0)}</Text></View><View style={styles.modalTitleCopy}><Text style={styles.detailTutor}>{activeSession.studentName}</Text><Text style={styles.detailRole}>{activeSession.role}</Text></View></View>
-                      <View style={styles.detailRow}><Ionicons name="calendar-outline" size={17} color={colors.success} /><Text style={styles.detailText}>{formatSessionDate(activeSession.dateKey)}</Text></View>
-                      <View style={styles.detailRow}><Ionicons name="time-outline" size={17} color={colors.success} /><Text style={styles.detailText}>{activeSession.startTime} - {activeSession.endTime} ({formatDuration(activeSession)})</Text></View>
-                      <View style={styles.detailRow}><Ionicons name="location-outline" size={17} color={colors.success} /><Text style={styles.detailText}>{activeSession.location}</Text></View>
-                      <View style={styles.detailNote}><Text style={styles.detailNoteLabel}>Session notes</Text><Text style={styles.detailText}>{activeSession.notes || 'No notes added yet.'}</Text></View>
-                      {(!activeSession.bookingId || activeSession.approvalStatus === BOOKING_STATUS.UPCOMING) ? (
-                        <Pressable style={styles.primaryAction} onPress={() => openScheduleModal(activeSession, 'reschedule')}><Ionicons name="swap-horizontal-outline" size={16} color={colors.white} /><Text style={styles.primaryActionText}>Reschedule Session</Text></Pressable>
-                      ) : null}
+                      <Text>yep</Text>
                     </>
                   ) : (
                     <>
