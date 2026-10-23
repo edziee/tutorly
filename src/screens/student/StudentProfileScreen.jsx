@@ -67,7 +67,7 @@ export default function StudentProfileScreen() {
   const scholarProgress = Math.min(100, Math.max(0, Number(stats.scholarProgress) || 0));
   const leaderboard = Array.isArray(stats.leaderboard) ? stats.leaderboard : [];
   const subjectHonors = Array.isArray(stats.subjectHonors) ? stats.subjectHonors : [];
-  const showProfileMessage = (message) => Alert.alert('Student Profile', message);
+  const showProfileMessage = (message) => Alert.alert('Profile', message);
   const handleSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
@@ -84,9 +84,9 @@ export default function StudentProfileScreen() {
       handleSignOut();
       return;
     }
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+    Alert.alert('Sign out?', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: handleSignOut },
+      { text: 'Sign out', style: 'destructive', onPress: handleSignOut },
     ]);
   };
   const openProfileEditor = () => {
@@ -103,7 +103,7 @@ export default function StudentProfileScreen() {
     };
 
     if (!updatedProfile.name) {
-      Alert.alert('Missing information', 'Enter your name before saving.');
+      Alert.alert('Name needed', 'Enter your name to save your profile.');
       return;
     }
 
@@ -111,12 +111,12 @@ export default function StudentProfileScreen() {
       updatedProfile.age &&
       (!Number.isInteger(Number(updatedProfile.age)) || Number(updatedProfile.age) < 1)
     ) {
-      Alert.alert('Invalid age', 'Enter your age as a positive whole number, or leave it blank.');
+      Alert.alert('Check your age', 'Enter a whole number above 0, or leave it blank.');
       return;
     }
 
     if (updatedProfile.photoUrl && !isHttpsUrl(updatedProfile.photoUrl)) {
-      Alert.alert('Invalid photo URL', 'Enter a valid HTTPS image URL, or leave it blank.');
+      Alert.alert('Check the photo link', 'Enter a valid secure image link, or leave it blank.');
       return;
     }
 
@@ -126,7 +126,7 @@ export default function StudentProfileScreen() {
       setProfile({ ...updatedProfile, email: user?.email ?? '' });
       setEditVisible(false);
     } catch (error) {
-      Alert.alert('Unable to save profile', getErrorMessage(error, 'Please try again.'));
+      Alert.alert('Couldn’t save your profile', getErrorMessage(error, 'Please try again.'));
     } finally {
       setSavingProfile(false);
     }
@@ -134,7 +134,7 @@ export default function StudentProfileScreen() {
 
   if (loading) return <LoadingState message="Loading your profile..." />;
   if (!user?.uid) {
-    return <ErrorState title="Profile unavailable" message="Sign in again to view your profile." />;
+    return     <ErrorState title="Profile unavailable" message="Sign in again to see your profile." />;
   }
 
   return (
@@ -203,7 +203,7 @@ export default function StudentProfileScreen() {
                 <Text style={styles.streakTitle}>{streakDays}-Day Streak</Text>
                 {streakDays > 0 ? <Text style={styles.activeTag}>Active</Text> : null}
               </View>
-              <Text style={styles.mutedText}>Next Milestone: {nextStreakMilestone} Days</Text>
+              <Text style={styles.mutedText}>Next milestone: {nextStreakMilestone} days</Text>
             </View>
           </View>
 
@@ -226,7 +226,7 @@ export default function StudentProfileScreen() {
           </View>
 
           <View style={styles.progressLabels}>
-            <Text style={styles.progressTitle}>Level {scholarLevel} Scholar Shield</Text>
+            <Text style={styles.progressTitle}>Level {scholarLevel} learner</Text>
             <Text style={styles.progressPercent}>{scholarProgress}% Complete</Text>
           </View>
           <View style={styles.progressTrack}>
@@ -277,11 +277,11 @@ export default function StudentProfileScreen() {
               </View>
             ))}
             {leaderboard.length === 0 ? (
-              <Text style={styles.emptyProfileData}>Leaderboard information is not available yet.</Text>
+              <Text style={styles.emptyProfileData}>Your study rank isn’t available yet.</Text>
             ) : null}
           </View>
 
-          <Text style={styles.subsectionLabel}>UNLOCKED SUBJECT HONORS</Text>
+          <Text style={styles.subsectionLabel}>Subject badges</Text>
           <View style={styles.honorsRow}>
             {subjectHonors.map((honor) => (
               <View key={honor.id} style={styles.honorTile}>
@@ -301,7 +301,7 @@ export default function StudentProfileScreen() {
             <View style={styles.headingIconMint}>
               <Ionicons name="navigate" size={19} color="#006F69" />
             </View>
-            <Text style={styles.preferenceTitle}>Study Space Preference</Text>
+            <Text style={styles.preferenceTitle}>Preferred study location</Text>
             <Text style={styles.defaultLabel}>Default{ '\n' }Location</Text>
           </View>
 
@@ -316,17 +316,17 @@ export default function StudentProfileScreen() {
             <PreferenceOption
               selected={meetingPreference === 'online'}
               icon="link-outline"
-              title="Tutor Custom Meeting Link"
-              description="(Zoom, Google Meet, or Teams link provided by tutor in chat/booking)"
+              title="Use your tutor’s meeting link"
+              description="Your tutor may share a Zoom, Google Meet, or Teams link."
               onPress={() => setMeetingPreference('online')}
             />
           </View>
 
-          <Text style={styles.reminderHeading}>AUTOMATED SESSION REMINDERS</Text>
+          <Text style={styles.reminderHeading}>Session reminders</Text>
           <View style={styles.reminderRow}>
             <View style={styles.reminderCopy}>
-              <Text style={styles.reminderTitle}>Streak Recovery Notification</Text>
-              <Text style={styles.reminderDescription}>Urgent reminder at 8:00 PM if streak is at risk</Text>
+              <Text style={styles.reminderTitle}>Study streak reminder</Text>
+              <Text style={styles.reminderDescription}>Reminder at 8:00 PM if your streak is at risk</Text>
             </View>
             <Switch
               value={streakRemindersEnabled}
@@ -343,9 +343,9 @@ export default function StudentProfileScreen() {
             <Text style={styles.earnText}>Teach with Tutorly</Text>
           </View>
           <Ionicons name="school-outline" size={23} color={colors.secondary} style={styles.schoolIcon} />
-          <Text style={styles.ctaTitle}>Qualified to Peer Tutor?</Text>
+          <Text style={styles.ctaTitle}>Interested in tutoring?</Text>
           <AppButton
-            title="Check Eligibility  →"
+            title="See if you qualify"
             variant="secondary"
             onPress={() => showProfileMessage('Peer tutor eligibility details are coming soon.')}
           />
@@ -367,7 +367,7 @@ export default function StudentProfileScreen() {
           <View style={styles.logoutIcon}>
             <Ionicons name="log-out-outline" size={20} color={colors.error} />
           </View>
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>Sign out</Text>
           <Ionicons name="chevron-forward" size={19} color={colors.error} />
         </Pressable>
         </ScrollView>
@@ -381,7 +381,7 @@ export default function StudentProfileScreen() {
           <View style={styles.modalBackdrop}>
             <View style={styles.editModal}>
               <View style={styles.modalHeading}>
-                <Text style={styles.modalTitle}>Edit Personal Information</Text>
+                <Text style={styles.modalTitle}>Edit your profile</Text>
                 <Pressable
                   accessibilityLabel="Close profile editor"
                   onPress={() => setEditVisible(false)}

@@ -29,7 +29,7 @@ const tabs = {
     inactiveIcon: 'calendar-outline',
   },
   TutorChat: {
-    title: 'Chat',
+    title: 'Messages',
     icon: 'chatbubble',
     inactiveIcon: 'chatbubble-outline',
   },
@@ -100,7 +100,7 @@ export default function TutorNavigator() {
       <Stack.Screen
         name="TutorApplication"
         component={TutorProfileScreen}
-        options={{ headerShown: true, title: 'Tutor Application' }}
+        options={{ headerShown: true, title: 'Tutor application' }}
       />
       <Stack.Screen
         name={ROUTES.NOTIFICATIONS}
@@ -110,7 +110,7 @@ export default function TutorNavigator() {
       <Stack.Screen
         name={ROUTES.CONVERSATION}
         component={ConversationScreen}
-        options={{ headerShown: true, title: 'Conversation' }}
+        options={{ headerShown: true, title: 'Messages' }}
       />
     </Stack.Navigator>
   );

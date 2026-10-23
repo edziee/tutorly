@@ -1,113 +1,32 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors } from '../theme/colors';
-import { spacing } from '../theme/spacing';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+
+import { colors } from '../theme/colors';
+import { radius, spacing } from '../theme/spacing';
+
+const tierStyles = {
+  Professor: { backgroundColor: colors.primary, color: colors.white, iconColor: colors.white },
+  Alumni: { backgroundColor: colors.success, color: colors.white, iconColor: colors.white },
+  'Peer Tutor': { backgroundColor: colors.inputBackground, color: colors.text, iconColor: colors.text },
+};
 
 export default function TutorCard({ tutor, handlePress }) {
   const tier = tutor.tier || 'Tutor';
-  const styles = StyleSheet.create({
-    card: {
-      flexDirection: 'column',
-      padding: spacing.lg,
-      marginBottom: spacing.md,
-      borderRadius: 12,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: "gray",
-    },
-
-    topDetails: {
-      flexDirection: 'row',
-      marginBottom: 15,
-    },
-
-    bottomDetails: {
-      flexDirection: 'row',
-      marginBottom: 15,
-    },
-
-    tier: {
-      backgroundColor: tier === "Professor" ? "#312E81" :
-        tier === "Alumni" ? "#006A61" :
-          tier === "Peer Tutor" ? "#E6E8EA" : "white",
-      borderRadius: 12,
-      padding: 7,
-      flexDirection: "row",
-      width: "55%",
-      alignItems: 'center',
-    },
-
-    tierText: {
-      color: tier === "Professor" ? "white" :
-        tier === "Alumni" ? "white" :
-          tier === "Peer Tutor" ? "black" : "white",
-      fontWeight: "bold",
-      fontSize: 12,
-      marginLeft: 5,
-    },
-
-    avatar: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: colors.secondary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.md,
-    },
-    avatarText: {
-      color: colors.white,
-      fontSize: 22,
-      fontWeight: '700',
-    },
-    avatarImage: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-    },
-    details: {
-      flex: 1,
-    },
-    name: {
-      color: colors.text,
-      fontSize: 19,
-      fontWeight: 'bold',
-      marginBottom: 3,
-    },
-    mutedText: {
-      color: colors.mutedText,
-      marginTop: 4,
-      fontSize: 16,
-    },
-    rating: {
-      color: colors.text,
-      marginTop: 4,
-    },
-    hourlyRate: {
-      fontWeight: 'bold',
-      fontSize: 20,
-      color: "#1A146B",
-    },
-
-    bookButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: "blue",
-      paddingVertical: 7,
-      paddingHorizontal: 15,
-
-      borderRadius: 12,
-      alignSelf: 'flex-end',
-      marginLeft: 'auto',
-    }
-  });
+  const tierStyle = tierStyles[tier] ?? {
+    backgroundColor: colors.inputBackground,
+    color: colors.text,
+    iconColor: colors.text,
+  };
 
   return (
-    <Pressable style={styles.card}
-      onPress={handlePress}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`View ${tutor.name || 'tutor'} and book a session`}
+      onPress={handlePress}
+      style={({ pressed }) => [styles.card, pressed && styles.pressedCard]}
+    >
       <View style={styles.topDetails}>
         <View style={styles.avatar}>
           {tutor.photoUrl ? (
@@ -124,43 +43,181 @@ export default function TutorCard({ tutor, handlePress }) {
           )}
         </View>
         <View style={styles.details}>
-          <Text style={styles.name}>{tutor.name}</Text>
-          <View style={styles.tier}>
-            {tier === "Professor" ? (<FontAwesome5 name="scroll" size={12} color="white" />) :
-              tier === "Alumni" ? (<FontAwesome5 name="medal" size={12} color="white" />) :
-                tier === "Peer Tutor" ? (<Ionicons name="person" size={12} color="black" />) : null}
-            <Text style={styles.tierText}>Verified {tier}</Text>
+          <Text style={styles.name}>{tutor.name || 'Tutor'}</Text>
+          <View style={[styles.tier, { backgroundColor: tierStyle.backgroundColor }]}>
+            {tier === 'Professor' ? (
+              <FontAwesome5 name="scroll" size={12} color={tierStyle.iconColor} />
+            ) : tier === 'Alumni' ? (
+              <FontAwesome5 name="medal" size={12} color={tierStyle.iconColor} />
+            ) : tier === 'Peer Tutor' ? (
+              <Ionicons name="person" size={12} color={tierStyle.iconColor} />
+            ) : null}
+            <Text style={[styles.tierText, { color: tierStyle.color }]}>Verified {tier}</Text>
           </View>
-          <Text style={styles.mutedText}>{tutor.credentials}</Text>
-          <Text style={styles.rating}>
+          {tutor.credentials ? (
+            <Text style={styles.credentials}>{tutor.credentials}</Text>
+          ) : null}
+          <View style={styles.rating}>
             {Number.isFinite(tutor.rating) ? (
               <>
-                <AntDesign name="star" size={15} color="gold" />
-                <Text style={{ color: 'gold' }}> {tutor.rating} stars</Text>
+                <AntDesign name="star" size={14} color={colors.warning} />
+                <Text style={styles.ratingValue}>{tutor.rating} stars</Text>
               </>
-            ) : <Text style={{ color: colors.mutedText }}>New tutor</Text>}
-            <Text style={{ color: colors.mutedText, fontSize: 12 }}> ({tutor.reviewCount ?? 0} reviews)</Text>
-          </Text>
+            ) : (
+              <Text style={styles.newTutor}>New tutor</Text>
+            )}
+            <Text style={styles.reviewCount}>({tutor.reviewCount ?? 0} reviews)</Text>
+          </View>
         </View>
       </View>
 
       <View style={styles.bottomDetails}>
-        <View style={{ flexDirection: 'column' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
-            <Text style={styles.hourlyRate}>{Number.isFinite(tutor.hourlyRate) ? `₱${tutor.hourlyRate}` : 'Fee not set'}</Text><Text> / session</Text>
-          </View>
-        </View>
-
+        <Text style={styles.price} numberOfLines={2}>
+          {Number.isFinite(tutor.hourlyRate) ? `₱${tutor.hourlyRate}` : 'Price not set'}
+          <Text style={styles.priceUnit}> / session</Text>
+        </Text>
         <View style={styles.bookButton}>
-          <Text style={{textAlign: 'center', marginRight: 10, color: 'white', fontWeight: 'bold'}}>
-            Book{"\n"}
-            Session
-          </Text>
-          <FontAwesome name="calendar-plus-o" size={25} color="white" />
+          <Text style={styles.bookButtonText}>Book</Text>
+          <Ionicons name="calendar-outline" size={18} color={colors.white} />
         </View>
       </View>
 
-      <Text style={{color: colors.mutedText, fontSize: 12}}>Teaches {tutor.subject}</Text>
+      <Text style={styles.subject}>
+        Teaches {tutor.subject || 'various subjects'}
+      </Text>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+  },
+  pressedCard: {
+    opacity: 0.92,
+  },
+  topDetails: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  avatar: {
+    alignItems: 'center',
+    backgroundColor: colors.secondary,
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  avatarText: {
+    color: colors.white,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  avatarImage: {
+    borderRadius: 24,
+    height: 48,
+    width: 48,
+  },
+  details: {
+    flex: 1,
+    minWidth: 0,
+  },
+  name: {
+    color: colors.heading,
+    flexShrink: 1,
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  tier: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    maxWidth: '100%',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  tierText: {
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  credentials: {
+    color: colors.mutedText,
+    flexShrink: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: spacing.xs,
+  },
+  rating: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  ratingValue: {
+    color: colors.warning,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  newTutor: {
+    color: colors.mutedText,
+    fontSize: 12,
+  },
+  reviewCount: {
+    color: colors.mutedText,
+    fontSize: 11,
+  },
+  bottomDetails: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  price: {
+    color: colors.primary,
+    flex: 1,
+    flexShrink: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    minWidth: 0,
+  },
+  priceUnit: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  bookButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    flexShrink: 0,
+    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+  },
+  bookButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  subject: {
+    color: colors.mutedText,
+    flexShrink: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: spacing.sm,
+  },
+});

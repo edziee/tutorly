@@ -46,8 +46,8 @@ import { getAuthErrorMessage } from '../../utils/errors';
 import { MIN_PASSWORD_LENGTH, validateEmail, validatePassword, validateRequired } from '../../utils/validation';
 
 const modeOptions = [
-  { value: 'signIn', label: 'Sign In' },
-  { value: 'signUp', label: 'Sign Up / Register' },
+  { value: 'signIn', label: 'Sign in' },
+  { value: 'signUp', label: 'Create account' },
 ];
 
 const tutorKindOptions = [
@@ -59,17 +59,17 @@ const tutorKindOptions = [
 const disclosures = [
   {
     icon: 'navigate-outline',
-    title: 'Precise Geolocation:',
-    text: ' only for on-campus proximity checks and session check-ins.',
+    title: 'Precise location',
+    text: ' used for campus checks and session check-ins.',
   },
   {
     icon: 'globe-outline',
-    title: 'IP Address & Network Logging:',
-    text: ' to keep sessions secure and prevent unauthorized access.',
+    title: 'IP address',
+    text: ' recorded to help protect your account and the network.',
   },
   {
     icon: 'school-outline',
-    title: 'Academic Records & Personal Details:',
+    title: 'Academic records and personal details',
     text: ' used to confirm tutor qualifications.',
   },
 ];
@@ -104,8 +104,8 @@ export default function SignUpScreen({ navigation, route }) {
       campusId: campusIdRequired ? validateRequired(campusId, 'your campus ID number') : '',
       email: validateEmail(email),
       password: validatePassword(password),
-      terms: acceptedTerms ? '' : 'You need to agree to continue.',
-      permissions: acceptedPermissions ? '' : 'You need to give this permission to continue.',
+      terms: acceptedTerms ? '' : 'Agree to the Terms and Charter to continue.',
+      permissions: acceptedPermissions ? '' : 'Allow these permissions to create your account.',
     };
     setErrors(nextErrors);
     setFormError('');
@@ -141,7 +141,7 @@ export default function SignUpScreen({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <AuthHeader subtitle="Create an account to learn or teach on campus." />
+          <AuthHeader subtitle="Join Tutorly to learn or teach on campus." />
 
           <SegmentedControl
             options={modeOptions}
@@ -151,20 +151,20 @@ export default function SignUpScreen({ navigation, route }) {
             }}
           />
 
-          <Text style={styles.sectionLabel}>CHOOSE YOUR ROLE</Text>
+          <Text style={styles.sectionLabel}>I want to...</Text>
           <View style={styles.roleRow}>
             <RoleCard
               title="Student"
-              description="Find top peer tutors with institutional grade records."
-              badge="Seek Help"
+              description="Find a tutor and get help with your studies."
+              badge="Learn"
               icon="school"
               selected={isStudent}
               onPress={() => setPortal(ROLES.STUDENT)}
             />
             <RoleCard
               title="Tutor"
-              description="Peer tutors, professors & alumni"
-              badge="Earn & Teach"
+              description="Share your knowledge with other students."
+              badge="Teach"
               icon="ribbon"
               selected={!isStudent}
               onPress={() => setPortal(ROLES.TUTOR)}
@@ -182,7 +182,7 @@ export default function SignUpScreen({ navigation, route }) {
 
           <Card style={styles.formCard}>
             <AppInput
-              label="University Email"
+              label="University email"
               value={email}
               handleChangeText={setEmail}
               placeholder="qjdoe@tip.edu.ph"
@@ -195,7 +195,7 @@ export default function SignUpScreen({ navigation, route }) {
               returnKeyType="next"
             />
             <AppInput
-              label="Portal Password"
+              label="Password"
               value={password}
               handleChangeText={setPassword}
               placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
@@ -223,10 +223,10 @@ export default function SignUpScreen({ navigation, route }) {
               }
             />
             <AppInput
-              label="Full Legal Name"
+              label="Full name"
               value={name}
               handleChangeText={setName}
-              placeholder="As on campus ID"
+              placeholder="Name on your campus ID"
               error={errors.name}
               leftIcon="person-outline"
               autoCapitalize="words"
@@ -252,7 +252,7 @@ export default function SignUpScreen({ navigation, route }) {
             <View style={styles.consentBox}>
               <View style={styles.consentHeader}>
                 <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
-                <Text style={styles.consentTitle}>Academic Permissions & Privacy Consent</Text>
+                <Text style={styles.consentTitle}>Privacy and permissions</Text>
               </View>
               {disclosures.map((item) => (
                 <View key={item.title} style={styles.disclosure}>
@@ -280,10 +280,10 @@ export default function SignUpScreen({ navigation, route }) {
                   error={errors.permissions}
                 >
                   <Text style={styles.checkboxText}>
-                    I grant permission for Tutorly to access my precise{' '}
-                    <Text style={styles.link}>Location</Text> (campus study verification), record{' '}
-                    <Text style={styles.link}>IP Address</Text> (intranet security), and process my{' '}
-                    <Text style={styles.link}>Academic Records</Text>.
+                    I allow Tutorly to use my <Text style={styles.link}>precise location</Text> for campus
+                    check-ins, record my <Text style={styles.link}>IP address</Text> for security,
+                    and review my <Text style={styles.link}>academic records</Text> to verify tutor
+                    qualifications.
                   </Text>
                 </Checkbox>
               </View>
@@ -297,7 +297,7 @@ export default function SignUpScreen({ navigation, route }) {
             ) : null}
 
             <AppButton
-              title={`Complete ${ROLE_LABELS[role]} Registration`}
+              title={`Create ${ROLE_LABELS[role]} account`}
               onPress={handleSubmit}
               loading={submitting}
             />

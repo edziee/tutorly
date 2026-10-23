@@ -36,7 +36,7 @@ export default function AppNavigator() {
       return (
         <ErrorState
           title="Account not set up"
-          message="This account has no role yet. Please log out and sign up again, or contact the team."
+          message="Your account is missing a role. Sign out and sign up again, or contact support."
         />
       );
   }

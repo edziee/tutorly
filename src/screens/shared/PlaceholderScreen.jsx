@@ -7,7 +7,7 @@ export default function PlaceholderScreen({ title }) {
   return (
     <SafeAreaView edges={[]} style={styles.container}>
       <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>Coming soon.</Text>
+      <Text style={styles.subtitle}>We’re working on this. Check back soon.</Text>
     </SafeAreaView>
   );
 }

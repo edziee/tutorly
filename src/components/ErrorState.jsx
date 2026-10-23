@@ -8,8 +8,8 @@ import { spacing } from '../theme/spacing';
 // Shown when loading or saving data failed. Pass onRetry to show a
 // "Try again" button that runs the request again.
 export default function ErrorState({
-  title = 'Something went wrong',
-  message = 'Please check your connection and try again.',
+  title = 'We couldn’t load this',
+  message = 'Please try again in a moment.',
   onRetry,
   compact = false,
 }) {

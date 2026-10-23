@@ -14,9 +14,9 @@ test('known auth codes give a readable message', () => {
   assert.match(getAuthErrorMessage({ code: 'auth/email-already-in-use' }), /already exists/);
   assert.match(getAuthErrorMessage({ code: 'auth/network-request-failed' }), /internet/);
   assert.match(getAuthErrorMessage({ code: 'auth/too-many-requests' }), /Too many/);
-  assert.match(getAuthErrorMessage({ code: 'auth/profile-missing' }), /not set up yet/);
-  assert.match(getAuthErrorMessage({ code: 'auth/not-admin' }), /not authorized for admin access/);
-  assert.match(getAuthErrorMessage({ code: 'auth/role-mismatch' }), /different portal/);
+  assert.match(getAuthErrorMessage({ code: 'auth/profile-missing' }), /couldn’t find your account details/);
+  assert.match(getAuthErrorMessage({ code: 'auth/not-admin' }), /can’t access the admin area/);
+  assert.match(getAuthErrorMessage({ code: 'auth/role-mismatch' }), /another role/);
 });
 
 test('unknown errors never show raw developer text to a student', () => {
@@ -35,7 +35,7 @@ test('our own team messages are shown as written', () => {
 });
 
 test('getErrorMessage maps common Firestore codes and falls back to the given text', () => {
-  assert.match(getErrorMessage({ code: 'permission-denied' }), /permission/);
+  assert.match(getErrorMessage({ code: 'permission-denied' }), /access/);
   assert.match(getErrorMessage({ code: 'unavailable' }), /internet/);
   assert.equal(getErrorMessage(new Error('boom'), 'Could not load users.'), 'Could not load users.');
   assert.equal(getErrorMessage(null), 'Something went wrong. Please try again.');

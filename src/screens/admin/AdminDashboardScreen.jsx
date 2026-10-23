@@ -60,7 +60,7 @@ export default function AdminDashboardScreen({ navigation }) {
   if (failed) {
     return (
       <ErrorState
-        title="Could not load the dashboard"
+        title="Dashboard isn’t available"
         message={getErrorMessage(failed.error)}
         onRetry={() => parts.forEach((part) => part.status === 'error' && part.retry())}
       />
@@ -117,27 +117,27 @@ export default function AdminDashboardScreen({ navigation }) {
           <RoleLine label="Admins" count={countByRole(userList, ROLES.ADMIN)} />
         </Card>
 
-        <Text style={styles.heading}>Shortcuts</Text>
+        <Text style={styles.heading}>Quick links</Text>
         <Shortcut
           icon="shield-checkmark-outline"
           title="Review verifications"
           detail={
             pendingList.length === 0
-              ? 'Nobody is waiting for review'
-              : `${pendingList.length} waiting for review`
+              ? 'All caught up'
+              : `${pendingList.length} applications to review`
           }
           onPress={() => goTo(ROUTES.ADMIN_VERIFICATIONS)}
         />
         <Shortcut
           icon="people-outline"
           title="Manage users"
-          detail="See every account, filter by role"
+          detail="Browse and filter accounts"
           onPress={() => goTo(ROUTES.ADMIN_USERS)}
         />
         <Shortcut
           icon="calendar-outline"
           title="View bookings"
-          detail="Every booking and its status"
+          detail="See all bookings and their status"
           onPress={() => goTo(ROUTES.ADMIN_BOOKINGS)}
         />
         {signOutError ? (
@@ -146,7 +146,7 @@ export default function AdminDashboardScreen({ navigation }) {
           </Text>
         ) : null}
         <AppButton
-          title="Log out"
+          title="Sign out"
           variant="danger"
           onPress={handleSignOut}
           loading={signingOut}

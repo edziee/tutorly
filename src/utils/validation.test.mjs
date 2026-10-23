@@ -77,11 +77,11 @@ test('peer course proof requires an eligible grade and its own Drive link', () =
   assert.equal(getTutorCourseValidationError('peer', course), '');
   assert.match(
     getTutorCourseValidationError('peer', { ...course, grade: '1.75' }),
-    /grade from 1\.00 to 1\.50/,
+    /grade between 1\.00 and 1\.50/,
   );
   assert.match(
     getTutorCourseValidationError('peer', { ...course, proofUrl: '' }),
-    /sharing link/,
+    /Google Drive or Google Docs link/,
   );
 });
 
@@ -101,7 +101,7 @@ test('professional course grades are optional and proof is application-level', (
   assert.equal(getTutorApplicationEvidenceError(application), '');
   assert.match(
     getTutorApplicationEvidenceError({ ...application, applicationProofUrl: '' }),
-    /Google Drive or Docs link/,
+    /Google Drive or Google Docs link/,
   );
   assert.match(
     getTutorApplicationEvidenceError({ ...application, courses: [] }),

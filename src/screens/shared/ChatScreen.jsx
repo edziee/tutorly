@@ -150,7 +150,7 @@ export default function ChatScreen({ navigation }) {
     try {
       await Promise.all(messages.filter((item) => item.unread).map((item) => markConversationRead(item.id, uid)));
     } catch (error) {
-      Alert.alert('Could not mark messages read', error.message);
+      Alert.alert('Couldn’t mark messages as read', error.message);
     }
   }
 
@@ -158,14 +158,14 @@ export default function ChatScreen({ navigation }) {
     try {
       const conversationId = existing ? target.id : await getOrCreateConversation(uid, target.id);
       navigation.navigate(ROUTES.CONVERSATION, { conversationId });
-    } catch (error) { Alert.alert('Could not open chat', error.message); }
+    } catch (error) { Alert.alert('Couldn’t open chat', error.message); }
   }
 
   if (!live) {
     return (
       <ErrorState
-        title="Firebase is not configured"
-        message="Configure Firebase before using messages and tutor discovery."
+        title="Chat isn’t available yet"
+        message="Please try again later."
       />
     );
   }
@@ -173,13 +173,13 @@ export default function ChatScreen({ navigation }) {
     return (
       <EmptyState
         icon="chatbubbles-outline"
-        title="Sign in to view messages"
+        title="Sign in to see your messages"
         message="Your conversations will appear here."
       />
     );
   }
-  if (conversations.status === 'loading') return <LoadingState message="Loading conversations…" />;
-  if (conversations.status === 'error') return <ErrorState title="Could not load conversations" message={conversations.error.message} onRetry={conversations.retry} />;
+  if (conversations.status === 'loading') return <LoadingState message="Loading conversations..." />;
+  if (conversations.status === 'error') return <ErrorState title="Messages aren’t available" message={conversations.error.message} onRetry={conversations.retry} />;
 
   return (
     <SafeAreaView edges={[]} style={styles.safeArea}>
@@ -204,7 +204,7 @@ export default function ChatScreen({ navigation }) {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search tutors, messages, course codes"
+            placeholder="Search tutors or messages"
             placeholderTextColor={colors.mutedText}
             returnKeyType="search"
             style={styles.searchInput}
@@ -257,7 +257,7 @@ export default function ChatScreen({ navigation }) {
             {availableTutors.status === 'error' ? (
               <ErrorState
                 compact
-                title="Could not load tutors"
+                title="Tutors aren’t available"
                 message={availableTutors.error.message}
                 onRetry={availableTutors.retry}
               />
@@ -267,7 +267,7 @@ export default function ChatScreen({ navigation }) {
             ) : (
               <>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionLabel}>AVAILABLE TUTORS</Text>
+                  <Text style={styles.sectionLabel}>Tutors</Text>
                   <Text style={styles.onlineCount}>{onlineTutors.length} Tutors</Text>
                 </View>
                 <ScrollView
@@ -306,7 +306,7 @@ export default function ChatScreen({ navigation }) {
                     );
                   })}
                   {!onlineTutors.length ? (
-                    <Text style={styles.emptyText}>No approved tutor profiles are available yet.</Text>
+                    <Text style={styles.emptyText}>No tutors are available yet.</Text>
                   ) : null}
                 </ScrollView>
               </>
@@ -315,7 +315,7 @@ export default function ChatScreen({ navigation }) {
         ) : null}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>ACTIVE INQUIRIES & PREP</Text>
+          <Text style={styles.sectionLabel}>Open conversations</Text>
           <Pressable accessibilityRole="button" onPress={markAllRead}>
             <Text style={styles.markRead}>Mark all read</Text>
           </Pressable>
@@ -330,14 +330,14 @@ export default function ChatScreen({ navigation }) {
               if (message.action === 'Open Chat') {
                 openConversation(message, true);
               } else {
-                Alert.alert(message.action, `${message.action === 'Download' ? 'Attachments' : 'Rescheduling'} will be available when this conversation is connected.`);
+                Alert.alert(message.action, 'This option isn’t available in this chat yet.');
               }
             }}
           />
         ))}
 
         {visibleMessages.length === 0 && (
-          <Text style={styles.emptyText}>No matching messages.</Text>
+          <Text style={styles.emptyText}>No messages match your search.</Text>
         )}
       </ScrollView>
     </SafeAreaView>

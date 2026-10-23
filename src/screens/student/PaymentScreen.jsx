@@ -62,8 +62,8 @@ export default function PaymentScreen({ navigation, route }) {
     return (
       <ScreenContainer>
         <ErrorState
-          title="Booking not selected"
-          message="Choose an accepted session from your schedule to view the tutor’s payment QR."
+          title="Choose a session"
+          message="Select an accepted session from your schedule to see the tutor’s payment QR."
           onRetry={() => navigation.navigate(ROUTES.SCHEDULE)}
         />
       </ScreenContainer>
@@ -77,7 +77,7 @@ export default function PaymentScreen({ navigation, route }) {
     return (
       <ScreenContainer>
         <ErrorState
-          title="Could not load payment details"
+          title="Payment details aren’t available"
           message={getErrorMessage(bookingState.error)}
           onRetry={bookingState.retry}
         />
@@ -90,8 +90,8 @@ export default function PaymentScreen({ navigation, route }) {
     return (
       <ScreenContainer>
         <ErrorState
-          title="Booking not found"
-          message="Return to your schedule and choose an existing session."
+          title="Session not found"
+          message="Go to your schedule and choose a current session."
           onRetry={() => navigation.navigate(ROUTES.SCHEDULE)}
         />
       </ScreenContainer>
@@ -118,7 +118,7 @@ export default function PaymentScreen({ navigation, route }) {
       await reportBookingPayment(booking.id, user.uid);
       setReported(true);
     } catch (error) {
-      setActionError(getErrorMessage(error, 'Could not report your payment. Please try again.'));
+      setActionError(getErrorMessage(error, 'Couldn’t report your payment. Please try again.'));
     } finally {
       setReporting(false);
     }
@@ -137,8 +137,8 @@ export default function PaymentScreen({ navigation, route }) {
             <Ionicons name="arrow-back" size={21} color={colors.text} />
           </Pressable>
           <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>Tutor QR Payment</Text>
-            <Text style={styles.headerSubtitle}>Tutor QR checkout</Text>
+            <Text style={styles.headerTitle}>Pay your tutor</Text>
+            <Text style={styles.headerSubtitle}>QR payment</Text>
           </View>
           <Ionicons name="shield-checkmark-outline" size={23} color={colors.primary} />
         </View>
@@ -149,9 +149,9 @@ export default function PaymentScreen({ navigation, route }) {
               <Ionicons name="qr-code-outline" size={20} color={colors.primary} />
             </View>
             <View style={styles.policyCopy}>
-              <Text style={styles.policyTitle}>Pay your tutor directly by QR</Text>
+              <Text style={styles.policyTitle}>Pay your tutor by QR</Text>
               <Text style={styles.policyText}>
-                Tutorly does not collect payment. Check the amount and recipient in your wallet before confirming.
+                Tutorly doesn’t collect payments. Check the amount and recipient in your e-wallet before you send.
               </Text>
             </View>
           </View>
@@ -194,13 +194,13 @@ export default function PaymentScreen({ navigation, route }) {
               </View>
             </View>
             <Text style={styles.sessionNote}>
-              Includes a session of up to 3 hours. Any extra time should be agreed with the tutor before the session.
+              Includes up to 3 hours. Agree on any extra time with your tutor before the session.
             </Text>
           </View>
 
           <View style={styles.paymentCard}>
             <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle}>Tutor payment QR</Text>
+              <Text style={styles.sectionTitle}>Tutor’s payment QR</Text>
               <View style={styles.dynamicTag}>
                 <Text style={styles.dynamicTagText}>Tutor provided</Text>
               </View>
@@ -216,7 +216,7 @@ export default function PaymentScreen({ navigation, route }) {
             ) : !isAccepted ? (
               <View style={styles.missingQr}>
                 <Ionicons name="hourglass-outline" size={28} color={colors.mutedText} />
-                <Text style={styles.missingQrTitle}>Payment is not available yet</Text>
+                <Text style={styles.missingQrTitle}>Payment isn’t available yet</Text>
                 <Text style={styles.missingQrText}>
                   {booking.status === BOOKING_STATUS.REQUESTED
                     ? 'Wait for the tutor to accept this session before paying.'
@@ -226,21 +226,21 @@ export default function PaymentScreen({ navigation, route }) {
             ) : (
               <View style={styles.missingQr}>
                 <Ionicons name="alert-circle-outline" size={28} color={colors.warningText} />
-                <Text style={styles.missingQrTitle}>Payment QR unavailable</Text>
+                <Text style={styles.missingQrTitle}>Payment QR isn’t available</Text>
                 <Text style={styles.missingQrText}>
-                  Ask {booking.tutorName || 'your tutor'} to add a valid public HTTPS QR image before paying.
+                  Ask {booking.tutorName || 'your tutor'} to add a secure payment QR before you pay.
                 </Text>
               </View>
             )}
             {isAccepted ? (
               <Text style={styles.scanInstructions}>
-                Open your e-wallet, scan the tutor’s QR, and verify the recipient and amount before sending.
+                Open your e-wallet, scan the QR, and check the recipient and amount before sending.
               </Text>
             ) : null}
           </View>
 
           <View style={styles.priceCard}>
-            <Text style={styles.sectionTitle}>Price Summary</Text>
+            <Text style={styles.sectionTitle}>Price summary</Text>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Session fee</Text>
               <Text style={styles.priceValue}>{money(amount)}</Text>
@@ -251,7 +251,7 @@ export default function PaymentScreen({ navigation, route }) {
             </View>
             <View style={styles.divider} />
             <View style={styles.priceRow}>
-              <Text style={styles.totalLabel}>Amount to pay tutor</Text>
+              <Text style={styles.totalLabel}>Total to pay your tutor</Text>
               <Text style={styles.totalValue}>{money(amount)}</Text>
             </View>
           </View>
@@ -259,7 +259,7 @@ export default function PaymentScreen({ navigation, route }) {
           <View style={styles.protectionCard}>
             <Ionicons name="shield-checkmark" size={17} color={colors.success} />
             <Text style={styles.protectionText}>
-              After you report a transfer, payment stays pending verification until the tutor confirms it.
+              Your payment stays pending until your tutor confirms it.
             </Text>
           </View>
           {actionError ? <Text accessibilityRole="alert" style={styles.errorText}>{actionError}</Text> : null}
@@ -269,31 +269,31 @@ export default function PaymentScreen({ navigation, route }) {
           {isSettled ? (
             <View style={styles.reportedBanner}>
               <Ionicons name="checkmark-circle-outline" size={18} color={colors.successText} />
-              <Text style={styles.reportedText}>Tutor confirmed payment</Text>
+              <Text style={styles.reportedText}>Your tutor confirmed payment</Text>
             </View>
           ) : alreadyReported ? (
             <View style={styles.reportedBanner}>
               <Ionicons name="time-outline" size={18} color={colors.successText} />
-              <Text style={styles.reportedText}>Payment reported · Awaiting tutor verification</Text>
+              <Text style={styles.reportedText}>Payment reported · Waiting for tutor confirmation</Text>
             </View>
           ) : !isAccepted ? (
             <View style={styles.reportedBanner}>
               <Ionicons name="hourglass-outline" size={18} color={colors.mutedText} />
               <Text style={styles.reportedText}>
                 {booking.status === BOOKING_STATUS.REQUESTED
-                  ? 'Payment becomes available after tutor acceptance.'
+                  ? 'You can pay after your tutor accepts.'
                   : 'This booking is no longer active. No payment is due.'}
               </Text>
             </View>
           ) : (
             <AppButton
-              title="I paid — notify tutor"
+              title="I’ve paid — notify tutor"
               onPress={handleReportPayment}
               loading={reporting}
               disabled={!canReport}
             />
           )}
-          <Text style={styles.footerNote}>This only reports a transfer. It does not verify or settle payment.</Text>
+          <Text style={styles.footerNote}>This reports your transfer. Your tutor must still confirm payment.</Text>
         </View>
       </View>
     </ScreenContainer>

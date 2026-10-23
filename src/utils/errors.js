@@ -7,18 +7,18 @@
 // before its service is finished sees what is missing.
 
 const AUTH_MESSAGES = {
-  'auth/invalid-credential': 'Wrong email or password.',
-  'auth/wrong-password': 'Wrong email or password.',
-  'auth/user-not-found': 'Wrong email or password.',
-  'auth/invalid-email': 'That email address does not look right.',
+  'auth/invalid-credential': 'Email or password is incorrect.',
+  'auth/wrong-password': 'Email or password is incorrect.',
+  'auth/user-not-found': 'Email or password is incorrect.',
+  'auth/invalid-email': 'Enter a valid email address.',
   'auth/email-already-in-use': 'An account with this email already exists. Try signing in.',
-  'auth/weak-password': 'That password is too weak. Use at least 8 characters.',
-  'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
-  'auth/network-request-failed': 'No internet connection. Check your connection and try again.',
-  'auth/user-disabled': 'This account has been disabled. Contact the team.',
-  'auth/profile-missing': 'This account is not set up yet. Sign up again or contact the team.',
-  'auth/not-admin': 'This account is not authorized for admin access.',
-  'auth/role-mismatch': 'This account is registered for a different portal. Select the correct portal and try again.',
+  'auth/weak-password': 'Use at least 8 characters for your password.',
+  'auth/too-many-requests': 'Too many tries. Wait a few minutes, then try again.',
+  'auth/network-request-failed': 'Check your internet connection and try again.',
+  'auth/user-disabled': 'This account is unavailable. Contact support.',
+  'auth/profile-missing': 'We couldn’t find your account details. Try signing up again or contact support.',
+  'auth/not-admin': 'This account can’t access the admin area.',
+  'auth/role-mismatch': 'This account is registered for another role. Choose the right role and try again.',
   'auth/invalid-portal': 'Choose Student or Tutor to sign in.',
 };
 
@@ -38,7 +38,7 @@ export function getAuthErrorMessage(error) {
 // For errors when loading or saving data.
 export function getErrorMessage(error, fallback = GENERIC) {
   if (isTeamMessage(error?.message)) return error.message;
-  if (error?.code === 'permission-denied') return 'You do not have permission to see this.';
-  if (error?.code === 'unavailable') return 'No internet connection. Check your connection and try again.';
+  if (error?.code === 'permission-denied') return 'You don’t have access to this.';
+  if (error?.code === 'unavailable') return 'Check your internet connection and try again.';
   return fallback;
 }

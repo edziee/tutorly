@@ -64,7 +64,7 @@ export default function StudentDashboardScreen({ navigation }) {
           <Text accessibilityRole="header" style={styles.greeting}>
             {firstName ? `Hi, ${firstName}` : 'Welcome back'}
           </Text>
-          <Text style={styles.greetingSubtitle}>Here is how your studying is going.</Text>
+          <Text style={styles.greetingSubtitle}>Here’s your study progress.</Text>
         </View>
 
         <Card style={styles.cardGap}>
@@ -79,14 +79,14 @@ export default function StudentDashboardScreen({ navigation }) {
             <View style={styles.streakText}>
               <View style={styles.streakTitleRow}>
                 <Text style={styles.cardTitle}>
-                  {streakDays > 0 ? `${streakDays}-Day Streak` : 'Start Your Streak'}
+                  {streakDays > 0 ? `${streakDays}-day streak` : 'Start a study streak'}
                 </Text>
                 {streakDays > 0 ? <StatusBadge label="Active" tone="warning" /> : null}
               </View>
               <Text style={styles.cardCaption}>
                 {streakDays > 0
-                  ? `Next Milestone: ${streakDays + 1} Days`
-                  : 'First Milestone: 1 Day'}
+                  ? `Next milestone: ${streakDays + 1} days`
+                  : 'First milestone: 1 day'}
               </Text>
             </View>
           </View>
@@ -115,9 +115,9 @@ export default function StudentDashboardScreen({ navigation }) {
           <View>
             <View style={styles.levelRow}>
               <Text style={styles.levelText}>
-                {level > 1 ? `Level ${level} Scholar Shield` : 'Level 1 Beginner'}
+                {level > 1 ? `Level ${level} learner` : 'Level 1 learner'}
               </Text>
-              <Text style={styles.levelPercent}>{progress}% Complete</Text>
+              <Text style={styles.levelPercent}>{progress}% complete</Text>
             </View>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progress}%` }]} />
@@ -142,7 +142,7 @@ export default function StudentDashboardScreen({ navigation }) {
             icon="star-outline"
             label="Rating"
             value={rating > 0 ? rating.toFixed(2) : '0'}
-            caption="Mutual Peer"
+            caption="Peer rating"
           />
         </View>
 
@@ -156,13 +156,13 @@ export default function StudentDashboardScreen({ navigation }) {
         </Card>
 
         <View style={[styles.tutorBanner, styles.cardGap]}>
-          <Text style={styles.bannerTitle}>Qualified to Peer Tutor?</Text>
+          <Text style={styles.bannerTitle}>Interested in tutoring?</Text>
           <Text style={styles.bannerText}>
             Share what you know and help other students on campus.
           </Text>
           <View style={styles.bannerAction}>
             <AppButton
-              title="Check Eligibility"
+              title="See if you qualify"
               variant="secondary"
               onPress={() => navigation.navigate(ROUTES.TUTOR_PROFILE)}
             />
@@ -183,7 +183,7 @@ function NextSession({ bookings, onFindTutor, onOpenSchedule }) {
     return (
       <ErrorState
         compact
-        title="Could not load your sessions"
+        title="Sessions aren’t available"
         message={getErrorMessage(bookings.error)}
         onRetry={bookings.retry}
       />
@@ -197,7 +197,7 @@ function NextSession({ bookings, onFindTutor, onOpenSchedule }) {
         compact
         icon="calendar-outline"
         title="No sessions coming up"
-        message="Find a tutor and book your next session."
+        message="Find a tutor to plan your next session."
         actionLabel="Find a tutor"
         onAction={onFindTutor}
       />

@@ -54,12 +54,12 @@ export default function AdminLoginScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <AuthHeader subtitle="Restricted access for Tutorly reviewers." />
+          <AuthHeader subtitle="For Tutorly reviewers." />
           <Card style={styles.card}>
             <Text style={styles.title}>Admin sign in</Text>
-            <Text style={styles.helper}>Review tutor applications and history.</Text>
+            <Text style={styles.helper}>Review tutor applications.</Text>
             <AppInput
-              label="Admin email"
+              label="Email"
               value={email}
               handleChangeText={setEmail}
               placeholder="admin@tutorly.edu"
@@ -85,7 +85,7 @@ export default function AdminLoginScreen({ navigation }) {
               </Text>
             ) : null}
             <AppButton title="Sign in" onPress={submit} loading={submitting} />
-            <Text onPress={() => navigation.goBack()} style={styles.back}>Back to sign in</Text>
+            <Text onPress={() => navigation.goBack()} style={styles.back}>Back</Text>
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>

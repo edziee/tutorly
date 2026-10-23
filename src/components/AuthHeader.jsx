@@ -26,11 +26,11 @@ export default function AuthHeader({ subtitle, onLogoLongPress }) {
 
       <View style={styles.pill}>
         <Ionicons name="shield-checkmark" size={13} color={colors.successText} />
-        <Text style={styles.pillText}>Limited to Technological Institute of the Philippines</Text>
+        <Text style={styles.pillText}>For the TIP community</Text>
       </View>
 
       <Text accessibilityRole="header" style={styles.title}>
-        Campus Tutoring Hub
+        Campus tutoring, made easy
       </Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
     </View>

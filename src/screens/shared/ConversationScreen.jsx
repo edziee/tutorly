@@ -57,16 +57,16 @@ export default function ConversationScreen({ route, navigation }) {
       const result = await sendMessage(conversationId, { ...pending.current, senderId: uid });
       pending.current = null;
       setText('');
-      if (result.notificationError) setError('Message sent, but its notification could not be delivered.');
-    } catch (failure) { setError(failure.message || 'Could not send your message.'); }
+      if (result.notificationError) setError('Message sent, but no notification was delivered.');
+    } catch (failure) { setError(failure.message || 'Couldn’t send your message.'); }
     finally { sendingRef.current = false; setSending(false); }
   };
 
-  if (!conversationId) return <ErrorState message="No conversation was selected." />;
+  if (!conversationId) return <ErrorState message="Choose a conversation to continue." />;
   if (conversation.status === 'error' || messages.status === 'error') {
-    return <ErrorState title="Could not open chat" message={(conversation.error || messages.error)?.message} onRetry={() => { conversation.retry(); messages.retry(); }} />;
+    return <ErrorState title="Can’t open chat" message={(conversation.error || messages.error)?.message} onRetry={() => { conversation.retry(); messages.retry(); }} />;
   }
-  if (conversation.status === 'loading' || messages.status === 'loading') return <LoadingState message="Loading conversation…" />;
+  if (conversation.status === 'loading' || messages.status === 'loading') return <LoadingState message="Loading conversation..." />;
 
   return (
     <SafeAreaView edges={['bottom']} style={styles.screen}>
@@ -75,7 +75,7 @@ export default function ConversationScreen({ route, navigation }) {
           ref={list} data={messages.data || []} keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messages}
           onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
-          ListEmptyComponent={<Text style={styles.empty}>Start the conversation. Say hello!</Text>}
+          ListEmptyComponent={<Text style={styles.empty}>No messages yet. Say hello!</Text>}
           renderItem={({ item }) => (
             <View style={[styles.bubble, item.senderId === uid && styles.ownBubble]}>
               <Text style={[styles.message, item.senderId === uid && styles.ownText]}>{item.text}</Text>
@@ -85,7 +85,7 @@ export default function ConversationScreen({ route, navigation }) {
         />
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         <View style={styles.composer}>
-          <TextInput accessibilityLabel="Message" placeholder="Write a message…" value={text} onChangeText={setText} editable={!sending} maxLength={4000} multiline style={styles.input} />
+          <TextInput accessibilityLabel="Message" placeholder="Write a message..." value={text} onChangeText={setText} editable={!sending} maxLength={4000} multiline style={styles.input} />
           <Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={sending || !text.trim()} onPress={submit} style={[styles.send, (sending || !text.trim()) && styles.disabled]}>
             <Ionicons name="send" size={20} color={colors.white} />
           </Pressable>

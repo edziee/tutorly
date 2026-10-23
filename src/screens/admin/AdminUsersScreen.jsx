@@ -66,7 +66,7 @@ export default function AdminUsersScreen() {
       <AppInput
         value={search}
         handleChangeText={setSearch}
-        placeholder="Search by name or email"
+        placeholder="Search names or emails"
         leftIcon="search-outline"
         autoCapitalize="none"
         autoCorrect={false}
@@ -83,7 +83,7 @@ export default function AdminUsersScreen() {
     body = (
       <ErrorState
         compact
-        title="Could not load users"
+        title="Users aren’t available"
         message={getErrorMessage(error)}
         onRetry={retry}
       />
@@ -96,8 +96,8 @@ export default function AdminUsersScreen() {
         title="No users found"
         message={
           search.trim()
-            ? 'No user matches your search.'
-            : 'There are no users with this role yet.'
+            ? 'Try another name or email.'
+            : 'No users in this role yet.'
         }
       />
     );

@@ -10,18 +10,16 @@ const pages = [
     icon: 'people-outline',
     accent: colors.lavender,
     smallIcon: 'sparkles',
-    title: 'Find your perfect tutor',
-    description:
-      'Explore trusted tutors across the subjects you care about and find the right fit for your goals.',
-    badge: 'LEARN YOUR WAY',
+    title: 'Find a tutor who fits',
+    description: 'Browse tutors by subject and find the right support for you.',
+    badge: 'LEARN AT YOUR PACE',
   },
   {
     icon: 'calendar-outline',
     accent: colors.mint,
     smallIcon: 'chatbubble-ellipses-outline',
-    title: 'Make every lesson count',
-    description:
-      'Book sessions, keep your schedule in one place, and stay connected with your tutor as you grow.',
+    title: 'Keep learning together',
+    description: 'Book sessions, manage your schedule, and stay in touch with your tutor.',
     badge: 'GROW TOGETHER',
   },
 ];

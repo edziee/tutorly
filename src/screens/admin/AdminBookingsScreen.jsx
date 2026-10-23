@@ -47,7 +47,7 @@ export default function AdminBookingsScreen() {
     body = (
       <ErrorState
         compact
-        title="Could not load bookings"
+        title="Bookings aren’t available"
         message={getErrorMessage(error)}
         onRetry={retry}
       />
@@ -57,11 +57,11 @@ export default function AdminBookingsScreen() {
       <EmptyState
         compact
         icon="calendar-outline"
-        title="No bookings found"
+        title="No bookings yet"
         message={
           filter === 'all'
-            ? 'Bookings will show up here once students start booking.'
-            : 'No booking has this status.'
+            ? 'Student bookings will appear here.'
+            : 'No bookings match this status.'
         }
       />
     );

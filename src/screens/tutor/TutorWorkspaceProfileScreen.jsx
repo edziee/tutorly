@@ -145,7 +145,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   if (loadStatus === 'error') {
     return (
       <ErrorState
-        title="Could not load your tutor profile"
+        title="Tutor profile isn’t available"
         message={getErrorMessage(loadError)}
         onRetry={loadApplication}
       />
@@ -173,10 +173,10 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         paymentQrUrl: paymentQrUrl.trim(),
         hourlyRate: Number(hourlyRate),
       });
-      Alert.alert('Payment details saved', 'Students can use your session price and QR after you accept their request.');
+      Alert.alert('Booking details saved', 'Students can see your price and QR after you accept a request.');
       await loadApplication();
     } catch (error) {
-      setBookingDetailsError(getErrorMessage(error, 'Could not save your booking details.'));
+      setBookingDetailsError(getErrorMessage(error, 'Couldn’t save your booking details.'));
     } finally {
       setSavingBookingDetails(false);
     }
@@ -189,7 +189,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     try {
       await updateBookingStatus(bookingId, status);
     } catch (error) {
-      setBookingActionError(getErrorMessage(error, 'Could not update this booking.'));
+      setBookingActionError(getErrorMessage(error, 'Couldn’t update this booking.'));
     } finally {
       setWorkingBookingId('');
     }
@@ -202,7 +202,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     try {
       await confirmBookingPayment(bookingId);
     } catch (error) {
-      setBookingActionError(getErrorMessage(error, 'Could not verify this payment.'));
+      setBookingActionError(getErrorMessage(error, 'Couldn’t verify this payment.'));
     } finally {
       setWorkingBookingId('');
     }
@@ -213,7 +213,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.activeBanner}>
           <View style={styles.activeDot} />
-          <Text style={styles.activeText}>Tutor Workspace</Text>
+          <Text style={styles.activeText}>Tutor workspace</Text>
         </View>
 
         <View style={styles.profileCard}>
@@ -230,7 +230,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
                 <Badge>{tutorCategory}</Badge>
               </View>
               <Text style={styles.education}>
-                {application?.credentials || 'Add your academic credentials in the tutor application.'}
+                {application?.credentials || 'Add your credentials in your tutor application.'}
               </Text>
             </View>
           </View>
@@ -263,7 +263,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
               </View>
             ))}
             {courses.length === 0 ? (
-              <Text style={styles.courseText}>No courses submitted yet.</Text>
+              <Text style={styles.courseText}>No courses added yet.</Text>
             ) : null}
           </View>
           {tutorType === TUTOR_TYPES.PROFESSIONAL && application?.applicationProofName ? (
@@ -281,15 +281,15 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
             onPress={() => navigation.navigate('TutorApplication')}
           >
             <Ionicons name="create-outline" size={15} color={colors.primary} />
-            <Text style={styles.addCourseText}>Manage tutor application and course proof</Text>
+            <Text style={styles.addCourseText}>Edit application and course details</Text>
           </Pressable>
         </View>
 
-        <SectionTitle title="Schedule & Availability" subtitle="Your application availability" action="Edit Grid" />
+        <SectionTitle title="Schedule and availability" subtitle="When students can book you" action="Edit times" />
         <View style={styles.availabilityCard}>
           <View style={styles.instantRow}>
             <View style={styles.instantIcon}><Ionicons name="flash" size={16} color={colors.secondary} /></View>
-            <View style={styles.instantCopy}><Text style={styles.instantTitle}>Accept Instant Help</Text><Text style={styles.instantSubtitle}>Allows 15-min drop-in ping</Text></View>
+            <View style={styles.instantCopy}><Text style={styles.instantTitle}>Quick help sessions</Text><Text style={styles.instantSubtitle}>Let students request 15-minute drop-ins.</Text></View>
             <Switch value={instantHelp} onValueChange={setInstantHelp} trackColor={{ false: colors.border, true: colors.secondary }} thumbColor={colors.white} />
           </View>
           <Text style={styles.availabilityMeta}>
@@ -301,7 +301,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         </View>
 
         <View style={styles.paymentSetupCard}>
-          <SectionTitle title="Booking & QR Payment" subtitle="Set the session price and hosted QR image students will use after you accept." />
+          <SectionTitle title="Price and payment QR" subtitle="Add the price and QR students use after you accept a request." />
           <AppInput
             label="Session price (up to 3 hours)"
             value={hourlyRate}
@@ -310,7 +310,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
             keyboardType="decimal-pad"
           />
           <AppInput
-            label="Public HTTPS QR image URL"
+            label="Secure payment QR image link"
             value={paymentQrUrl}
             handleChangeText={setPaymentQrUrl}
             placeholder="https://example.com/your-payment-qr.png"
@@ -324,7 +324,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
             <Text accessibilityRole="alert" style={styles.formError}>{bookingDetailsError}</Text>
           ) : null}
           <AppButton
-            title="Save booking details"
+            title="Save details"
             variant="outline"
             onPress={saveBookingDetails}
             loading={savingBookingDetails}
@@ -332,7 +332,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         </View>
 
         <SectionTitle
-          title="Booking Requests"
+          title="Session requests"
           subtitle={bookingResults.status === 'ready' ? `${pendingRequests.length} pending` : 'Live requests'}
           action="Requires action"
         />
@@ -341,7 +341,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         ) : bookingResults.status === 'error' ? (
           <ErrorState
             compact
-            title="Could not load booking requests"
+            title="Session requests aren’t available"
             message={getErrorMessage(bookingResults.error)}
             onRetry={bookingResults.retry}
           />
@@ -357,26 +357,26 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
             </View>
           ))
         ) : (
-          <Text style={styles.emptyRequests}>New session requests will appear here.</Text>
+          <Text style={styles.emptyRequests}>New requests will appear here.</Text>
         )}
         {bookingActionError ? (
           <Text accessibilityRole="alert" style={styles.formError}>{bookingActionError}</Text>
         ) : null}
 
         <SectionTitle
-          title="Payment Verification"
-          subtitle={`${paymentsToVerify.length} transfer${paymentsToVerify.length === 1 ? '' : 's'} reported`}
-          action="Review before confirming"
+          title="Confirm payments"
+          subtitle={`${paymentsToVerify.length} transfer${paymentsToVerify.length === 1 ? '' : 's'} to review`}
+          action="Check before confirming"
         />
         {paymentsToVerify.map((booking) => (
           <View key={booking.id} style={styles.paymentVerificationCard}>
             <View style={styles.requestCopy}>
               <Text style={styles.requestName}>{booking.studentName || 'Student'}</Text>
               <Text style={styles.requestMeta}>{booking.subject} · ₱{Number(booking.totalAmount || 0).toFixed(2)}</Text>
-              <Text style={styles.requestNote}>Confirm only after you have verified the transfer in your payment app.</Text>
+              <Text style={styles.requestNote}>Confirm only after checking the transfer in your payment app.</Text>
             </View>
             <AppButton
-              title="Confirm received"
+              title="Confirm payment"
               variant="secondary"
               onPress={() => verifyPayment(booking.id)}
               loading={workingBookingId === booking.id}
@@ -384,11 +384,11 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           </View>
         ))}
         {bookingResults.status === 'ready' && !paymentsToVerify.length ? (
-          <Text style={styles.emptyRequests}>Student payment reports will appear here for your review.</Text>
+          <Text style={styles.emptyRequests}>Payment reports will appear here.</Text>
         ) : null}
 
         <SectionTitle
-          title="Session Ledger"
+          title="Sessions"
           subtitle={`Upcoming (${upcomingSessions.length})`}
           action={`Past (${completedSessions.length})`}
         />
@@ -421,7 +421,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           </View>
         ))}
         {bookingResults.status === 'ready' && !sessions.length ? (
-          <Text style={styles.emptyRequests}>Accepted and completed sessions will appear here.</Text>
+          <Text style={styles.emptyRequests}>Your upcoming and completed sessions will appear here.</Text>
         ) : null}
 
         {signOutError ? (
@@ -430,7 +430,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           </Text>
         ) : null}
         <AppButton
-          title="Log Out"
+          title="Sign out"
           variant="danger"
           onPress={handleSignOut}
           loading={signingOut}

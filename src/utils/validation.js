@@ -11,7 +11,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function validateEmail(value) {
   const email = (value ?? '').trim();
   if (!email) return 'Enter your email.';
-  if (!EMAIL_PATTERN.test(email)) return 'Enter a valid email, like name@tip.edu.ph.';
+  if (!EMAIL_PATTERN.test(email)) return 'Enter a valid email address.';
   return '';
 }
 
@@ -42,20 +42,20 @@ export function isEligibleTutorGrade(value) {
 
 export function getTutorCourseValidationError(tutorType, course) {
   if (!Object.values(TUTOR_TYPES).includes(tutorType)) {
-    return 'Choose a valid tutor category before adding courses.';
+    return 'Choose a tutor type before adding courses.';
   }
   if (!(course?.code ?? '').trim() || !(course?.title ?? '').trim()) {
     return 'Enter the course code and title.';
   }
   if (tutorType === TUTOR_TYPES.PEER) {
     if (!isEligibleTutorGrade(course.grade)) {
-      return 'Peer tutors need a final grade from 1.00 to 1.50 for each course.';
+      return 'Peer tutors need a final grade between 1.00 and 1.50 for each course.';
     }
     if (!(course.proofName ?? '').trim()) {
-      return 'Enter the title or type of proof for this course.';
+      return 'Add a name for this course’s proof document.';
     }
     if (!isGoogleDriveUrl(course.proofUrl)) {
-      return 'Add an HTTPS sharing link from drive.google.com or docs.google.com for this course.';
+      return 'Add a secure Google Drive or Google Docs link for this course.';
     }
   }
   return '';
@@ -63,14 +63,14 @@ export function getTutorCourseValidationError(tutorType, course) {
 
 export function getTutorApplicationEvidenceError(application) {
   if (!Object.values(TUTOR_TYPES).includes(application?.tutorType)) {
-    return 'Choose a valid tutor category before submitting.';
+    return 'Choose a tutor type before submitting.';
   }
   if (
     (application.tutorType === TUTOR_TYPES.PEER && application.tier !== TUTOR_TIERS.PEER) ||
     (application.tutorType === TUTOR_TYPES.PROFESSIONAL &&
       ![TUTOR_TIERS.ALUMNI, TUTOR_TIERS.PROFESSOR].includes(application.tier))
   ) {
-    return 'Select a tutor profile category that matches your sign-up type.';
+    return 'Choose a profile type that matches your sign-up.';
   }
   const courses = application.courses;
   if (!Array.isArray(courses) || courses.length === 0) {
@@ -78,7 +78,7 @@ export function getTutorApplicationEvidenceError(application) {
   }
   const ids = courses.map((course) => course.id);
   if (ids.some((id) => !id) || new Set(ids).size !== ids.length) {
-    return 'Each course must have a unique ID. Remove and add the affected course again.';
+    return 'Remove this course and add it again.';
   }
   for (const course of courses) {
     const courseError = getTutorCourseValidationError(application.tutorType, course);
@@ -86,10 +86,10 @@ export function getTutorApplicationEvidenceError(application) {
   }
   if (application.tutorType === TUTOR_TYPES.PROFESSIONAL) {
     if (!(application.applicationProofName ?? '').trim()) {
-      return 'Describe the proof you are submitting for your application.';
+      return 'Describe the proof for your application.';
     }
     if (!isGoogleDriveUrl(application.applicationProofUrl)) {
-      return 'Add an HTTPS Google Drive or Docs link for your application proof.';
+      return 'Add a secure Google Drive or Google Docs link for your proof.';
     }
   }
   return '';

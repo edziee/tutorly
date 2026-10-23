@@ -64,7 +64,7 @@ export default function AdminReviewHistoryScreen() {
   if (status === 'error') {
     return (
       <ErrorState
-        title="Could not load review history"
+        title="Review history isn’t available"
         message={getErrorMessage(error)}
         onRetry={retry}
       />
@@ -82,14 +82,14 @@ export default function AdminReviewHistoryScreen() {
         ListHeaderComponent={
           <View>
             <Text style={styles.heading}>Review history</Text>
-            <Text style={styles.helper}>Approved and rejected tutor applications.</Text>
+            <Text style={styles.helper}>Tutor applications you’ve reviewed.</Text>
           </View>
         }
         ListEmptyComponent={
           <EmptyState
             icon="time-outline"
             title="No reviews yet"
-            message="Completed tutor application reviews will appear here."
+            message="Applications you review will appear here."
           />
         }
         renderItem={({ item }) => <ReviewCard application={item} />}

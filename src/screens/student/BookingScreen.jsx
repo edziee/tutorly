@@ -151,8 +151,8 @@ export default function BookingScreen({ navigation, route }) {
       <ScreenContainer>
         <EmptyState
           icon="calendar-outline"
-          title="Choose a tutor first"
-          message="Return to the tutor list and choose Book Session."
+          title="Choose a tutor"
+          message="Select a tutor to book a session."
           actionLabel="Browse tutors"
           onAction={() => navigation.navigate(ROUTES.TUTORS)}
         />
@@ -201,7 +201,7 @@ export default function BookingScreen({ navigation, route }) {
       return;
     }
     if (!hasPrice) {
-      setSubmitError('This tutor has not set a session price yet. Please choose another tutor.');
+      setSubmitError('This tutor hasn’t set a price yet. Choose another tutor.');
       return;
     }
 
@@ -228,7 +228,7 @@ export default function BookingScreen({ navigation, route }) {
       });
       navigation.navigate(ROUTES.SCHEDULE);
     } catch (error) {
-      setSubmitError(getErrorMessage(error, 'Could not request this session. Please try again.'));
+      setSubmitError(getErrorMessage(error, 'Couldn’t request this session. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -250,7 +250,7 @@ export default function BookingScreen({ navigation, route }) {
             <Ionicons name="arrow-back" size={21} color={colors.text} />
           </Pressable>
           <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>Book Session</Text>
+            <Text style={styles.headerTitle}>Book a session</Text>
             <Text numberOfLines={1} style={styles.headerSubtitle}>{tutor.subject}</Text>
           </View>
           <View style={styles.headerAvatar}>
@@ -301,7 +301,7 @@ export default function BookingScreen({ navigation, route }) {
             </View>
             <View style={styles.ratePanel}>
               <View>
-                <Text style={styles.rateHeading}>Campus Session Rate</Text>
+                <Text style={styles.rateHeading}>Session rate</Text>
                 <Text style={styles.rateSubheading}>Up to 3 hours per session</Text>
               </View>
               <Text style={styles.rateAmount}>{displayPrice}</Text>
@@ -309,7 +309,7 @@ export default function BookingScreen({ navigation, route }) {
           </View>
 
           <View style={styles.card}>
-            <SectionHeading title="Coursework & Accreditations" trailing={String(courseList.length)} />
+            <SectionHeading title="Courses and grades" trailing={String(courseList.length)} />
             {courseList.length ? courseList.map((course) => (
               <View key={course.id || `${course.code}-${course.title}`} style={styles.courseRow}>
                 <View style={styles.courseIcon}><Ionicons name="school-outline" size={15} color={colors.primary} /></View>
@@ -319,12 +319,12 @@ export default function BookingScreen({ navigation, route }) {
                 </View>
               </View>
             )) : (
-              <Text style={styles.helperText}>No verified course details are available yet.</Text>
+              <Text style={styles.helperText}>No course details yet.</Text>
             )}
           </View>
 
           <View style={styles.card}>
-            <SectionHeading title="Session Modes" />
+            <SectionHeading title="Session format" />
             {tutorFormats.length ? (
               <View style={styles.modeList}>
                 {tutorFormats.map((format) => {
@@ -360,12 +360,12 @@ export default function BookingScreen({ navigation, route }) {
                 })}
               </View>
             ) : (
-              <Text style={styles.helperText}>This tutor has not listed a session format yet.</Text>
+              <Text style={styles.helperText}>This tutor hasn’t added a session format yet.</Text>
             )}
           </View>
 
           <View style={styles.card}>
-            <SectionHeading title="Select Date & Time" trailing="Campus local time" />
+            <SectionHeading title="Choose a date and time" trailing="Local time" />
             {dates.length ? (
               <>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateList}>
@@ -399,7 +399,7 @@ export default function BookingScreen({ navigation, route }) {
                     })}
                   </View>
                 ) : (
-                  <Text style={styles.helperText}>No openings are listed for this date.</Text>
+                  <Text style={styles.helperText}>No times available on this date.</Text>
                 )}
                 {activeSlot ? (
                   <View style={styles.durationRow}>
@@ -421,7 +421,7 @@ export default function BookingScreen({ navigation, route }) {
                 ) : null}
               </>
             ) : (
-              <Text style={styles.helperText}>The tutor has not added any available days yet.</Text>
+              <Text style={styles.helperText}>This tutor hasn’t added available days yet.</Text>
             )}
           </View>
 
@@ -436,11 +436,11 @@ export default function BookingScreen({ navigation, route }) {
               <Text style={styles.totalLabel}>Total due to tutor</Text>
               <Text style={styles.totalValue}>{displayPrice}</Text>
             </View>
-            <Text style={styles.helperText}>Pay the tutor directly by QR only after they accept your request.</Text>
+            <Text style={styles.helperText}>Pay your tutor by QR after they accept your request.</Text>
           </View>
 
           <View style={styles.card}>
-            <SectionHeading title="Student Reviews" trailing={tutor.reviewCount ? `${tutor.rating ?? ''} / 5.0` : undefined} />
+            <SectionHeading title="Reviews" trailing={tutor.reviewCount ? `${tutor.rating ?? ''} / 5.0` : undefined} />
             {reviews.length ? reviews.slice(0, 2).map((review, index) => (
               <View key={review.id || `${review.studentName}-${index}`} style={styles.reviewRow}>
                 <View style={styles.reviewAvatar}><Text style={styles.reviewInitial}>{review.studentName?.charAt(0) || 'S'}</Text></View>
@@ -451,17 +451,17 @@ export default function BookingScreen({ navigation, route }) {
                 <Text style={styles.reviewStars}>★★★★★</Text>
               </View>
             )) : (
-              <Text style={styles.helperText}>Reviews will appear here after students complete sessions.</Text>
+              <Text style={styles.helperText}>Reviews will appear after completed sessions.</Text>
             )}
           </View>
 
           <View style={styles.notesCard}>
-            <Text style={styles.notesTitle}>Notes for your tutor (optional)</Text>
+            <Text style={styles.notesTitle}>Note for your tutor (optional)</Text>
             <TextInput
               accessibilityLabel="Notes for your tutor"
               value={notes}
               onChangeText={setNotes}
-              placeholder="Share a topic or preparation note"
+              placeholder="Add a topic or note to prepare"
               placeholderTextColor={colors.placeholder}
               multiline
               maxLength={500}

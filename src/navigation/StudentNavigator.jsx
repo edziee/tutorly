@@ -28,7 +28,7 @@ const tabConfig = {
   Schedule: { icon: 'calendar', inactiveIcon: 'calendar-outline', title: 'Schedule' },
   TutorProfile: { icon: 'school', inactiveIcon: 'school-outline', title: 'Tutor Profile' },
   Chat: { icon: 'chatbubble', inactiveIcon: 'chatbubble-outline', title: 'Messages' },
-  [ROUTES.BOOKING]: { icon: 'calendar', inactiveIcon: 'calendar-outline', title: 'Book Session' },
+  [ROUTES.BOOKING]: { icon: 'calendar', inactiveIcon: 'calendar-outline', title: 'Book a session' },
   [ROUTES.PAYMENT]: { icon: 'card', inactiveIcon: 'card-outline', title: 'Payment' },
 };
 
@@ -153,7 +153,7 @@ export default function StudentNavigator() {
         component={StudentTabs}
         options={{ headerShown: false }}
       />
-      <Stack.Screen name={ROUTES.CONVERSATION} component={ConversationScreen} options={{ title: 'Conversation' }} />
+      <Stack.Screen name={ROUTES.CONVERSATION} component={ConversationScreen} options={{ title: 'Messages' }} />
       <Stack.Screen
         name={ROUTES.NOTIFICATIONS}
         component={NotificationsScreen}

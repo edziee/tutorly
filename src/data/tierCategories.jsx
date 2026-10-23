@@ -2,7 +2,7 @@ export const tierCategories = [
     {
         id: 1,
         keyword: "",
-        label: "All Tiers",
+        label: "All tutor types",
         isSelected: true,
     },
 
@@ -16,7 +16,7 @@ export const tierCategories = [
     {
         id: 3,
         keyword: "Alumni",
-        label: "Alumnis",
+        label: "Alumni",
         isSelected: false,
     },
 

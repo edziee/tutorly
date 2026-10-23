@@ -60,13 +60,13 @@ export default function AdminVerificationsScreen() {
       const count = await migrateLegacyApprovedTutors();
       setMigrationMessage(
         count === 0
-          ? 'All approved tutor profiles are already migrated.'
-          : `Migrated ${count} approved tutor profile${count === 1 ? '' : 's'}.`,
+          ? 'All approved tutors are up to date.'
+          : `Updated ${count} approved tutor profile${count === 1 ? '' : 's'}.`,
       );
     } catch (error) {
       Alert.alert(
-        'Migration incomplete',
-        getErrorMessage(error, 'Could not migrate approved tutor profiles.'),
+        'Couldn’t finish the update',
+        getErrorMessage(error, 'Please try again.'),
       );
     } finally {
       setMigrating(false);
@@ -75,7 +75,7 @@ export default function AdminVerificationsScreen() {
 
   const review = async (tutorId, newStatus, reason) => {
     if (!reviewerId) {
-      Alert.alert('Not logged in', 'Log in as an admin to review tutors.');
+      Alert.alert('Sign in required', 'Sign in as an admin to review tutors.');
       return false;
     }
     setBusyId(tutorId);
@@ -83,7 +83,7 @@ export default function AdminVerificationsScreen() {
       await setVerificationStatus(tutorId, newStatus, { reviewerId, reason });
       return true;
     } catch (failure) {
-      Alert.alert('Could not save', getErrorMessage(failure, 'Please try again.'));
+      Alert.alert('Couldn’t save changes', getErrorMessage(failure, 'Please try again.'));
       return false;
     } finally {
       setBusyId(null);
@@ -94,7 +94,7 @@ export default function AdminVerificationsScreen() {
   if (status === 'error') {
     return (
       <ErrorState
-        title="Could not load verifications"
+        title="Verifications aren’t available"
         message={getErrorMessage(error)}
         onRetry={retry}
       />
@@ -106,12 +106,12 @@ export default function AdminVerificationsScreen() {
   return (
     <ScreenContainer>
       <View style={styles.migration}>
-        <Text style={styles.migrationTitle}>Existing approved tutors</Text>
+        <Text style={styles.migrationTitle}>Approved tutors</Text>
         <Text style={styles.migrationDescription}>
-          Move legacy verification evidence into private application records before publishing secure Firestore rules.
+          Move older tutor approvals to the current record format.
         </Text>
         <AppButton
-          title="Migrate approved tutors"
+          title="Update approved tutor records"
           variant="outline"
           loading={migrating}
           disabled={migrating}
@@ -127,7 +127,7 @@ export default function AdminVerificationsScreen() {
         <EmptyState
           icon="shield-checkmark-outline"
           title="Nothing to review"
-          message="Tutors who submit their documents will show up here."
+          message="New tutor applications will appear here."
         />
       ) : (
         <FlatList
@@ -182,7 +182,7 @@ function PendingCard({ tutor, busy, disabled, onApprove, onReject }) {
 
       {courses.length > 0 ? (
         <View style={styles.courses}>
-          <Text style={styles.coursesLabel}>Submitted courses</Text>
+          <Text style={styles.coursesLabel}>Courses submitted</Text>
           {courses.map((course, index) => (
             <Text key={`${course.code}-${index}`} style={styles.course}>
               {[course.code, course.title].filter(Boolean).join(' · ')}
@@ -191,19 +191,19 @@ function PendingCard({ tutor, busy, disabled, onApprove, onReject }) {
           ))}
         </View>
       ) : (
-        <Text style={styles.noCourses}>No courses were submitted.</Text>
+        <Text style={styles.noCourses}>No courses added.</Text>
       )}
 
       {rejecting ? (
         <View style={styles.rejectBox}>
           <AppInput
-            label="Reason for rejecting"
+            label="Reason for rejection"
             value={reason}
             handleChangeText={(text) => {
               setReason(text);
               if (reasonError) setReasonError('');
             }}
-            placeholder="Tell the tutor what to fix"
+            placeholder="Let the tutor know what to update"
             error={reasonError}
             multiline
           />
@@ -222,7 +222,7 @@ function PendingCard({ tutor, busy, disabled, onApprove, onReject }) {
             </View>
             <View style={styles.action}>
               <AppButton
-                title="Confirm reject"
+                title="Confirm rejection"
                 variant="danger"
                 loading={busy}
                 disabled={disabled}

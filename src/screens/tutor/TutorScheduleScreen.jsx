@@ -48,7 +48,7 @@ export default function TutorScheduleScreen() {
     return (
       <EmptyState
         icon="calendar-outline"
-        title="Sign in to view your schedule"
+        title="Sign in to see your schedule"
         message="Your booking requests and sessions will appear here."
       />
     );
@@ -59,7 +59,7 @@ export default function TutorScheduleScreen() {
   if (bookings.status === 'error') {
     return (
       <ErrorState
-        title="Could not load your schedule"
+        title="Schedule isn’t available"
         message={getErrorMessage(bookings.error)}
         onRetry={bookings.retry}
       />
@@ -84,7 +84,7 @@ export default function TutorScheduleScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.monthRow}>
           <Text style={styles.month}>{formatMonth(new Date())}</Text>
-          <Text style={styles.view}>Live agenda</Text>
+          <Text style={styles.view}>Upcoming</Text>
         </View>
         <View style={styles.summary}>
           <Text style={styles.summaryText}>Upcoming {upcomingCount}</Text>
@@ -105,7 +105,7 @@ export default function TutorScheduleScreen() {
               </Text>
             </View>
             <Text style={styles.subject}>{session.subject || 'Tutoring session'}</Text>
-            <Text style={styles.student}>Student: {session.studentName || 'Student'}</Text>
+            <Text style={styles.student}>{session.studentName || 'Student'}</Text>
             <Text style={styles.meta}>{session.startTime} - {session.endTime}</Text>
             <Text style={styles.meta}>{session.location || 'Location not specified'}</Text>
           </View>
@@ -113,7 +113,7 @@ export default function TutorScheduleScreen() {
         {!sessions.length ? (
           <EmptyState
             title="No sessions yet"
-            message="Accepted booking requests and completed sessions will appear here."
+            message="Accepted requests and completed sessions will appear here."
           />
         ) : null}
       </ScrollView>

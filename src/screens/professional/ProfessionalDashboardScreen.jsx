@@ -8,5 +8,5 @@
 import PlaceholderScreen from '../shared/PlaceholderScreen';
 
 export default function ProfessionalDashboardScreen() {
-  return <PlaceholderScreen title="Professional dashboard" />;
+  return <PlaceholderScreen title="Tutor dashboard" />;
 }

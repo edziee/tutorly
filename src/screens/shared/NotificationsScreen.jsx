@@ -40,7 +40,7 @@ export default function NotificationsScreen({ navigation }) {
   const { status, notifications, error, retry } = useNotifications();
 
   const showSaveError = (failure) =>
-    Alert.alert('Could not update', getErrorMessage(failure, 'Please try again.'));
+    Alert.alert('Couldn’t update notifications', getErrorMessage(failure, 'Please try again.'));
 
   const handlePress = async (notification) => {
     try {
@@ -59,8 +59,8 @@ export default function NotificationsScreen({ navigation }) {
     return (
       <EmptyState
         icon="notifications-off-outline"
-        title="You are not logged in"
-        message="Log in to see your notifications."
+        title="Sign in to see notifications"
+        message="Your updates will appear here."
       />
     );
   }
@@ -68,7 +68,7 @@ export default function NotificationsScreen({ navigation }) {
   if (status === 'error') {
     return (
       <ErrorState
-        title="Could not load notifications"
+        title="Notifications aren’t available"
         message={getErrorMessage(error)}
         onRetry={retry}
       />
@@ -80,7 +80,7 @@ export default function NotificationsScreen({ navigation }) {
       <EmptyState
         icon="notifications-outline"
         title="No notifications yet"
-        message="Booking updates and new messages will show up here."
+        message="Booking updates and messages will appear here."
       />
     );
   }

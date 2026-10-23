@@ -78,7 +78,7 @@ function MentorHeader({ tutor, statusLabel }) {
       </View>
       <View style={styles.heroRule} />
       <Text style={styles.heroCopy}>
-        Complete your mentor profile to help students find the right academic support.
+        Add a few details so students can find you.
       </Text>
     </View>
   );
@@ -92,9 +92,9 @@ function EligibilityCard({ tutorType }) {
           <Ionicons name="ribbon-outline" size={18} color={colors.error} />
         </View>
         <View style={styles.eligibilityCopy}>
-          <Text style={styles.eligibilityTitle}>Professional Tutor Verification</Text>
+          <Text style={styles.eligibilityTitle}>Professional tutor requirements</Text>
           <Text style={styles.eligibilityBody}>
-            List each course you want to tutor. Grades are optional. Submit one description of your professional proof and a Google Drive link for the application.
+            List each course you teach. Grades are optional. Add proof details and a Google Drive link for your application.
           </Text>
         </View>
       </View>
@@ -107,14 +107,14 @@ function EligibilityCard({ tutorType }) {
         <Ionicons name="ribbon-outline" size={18} color={colors.error} />
       </View>
       <View style={styles.eligibilityCopy}>
-        <Text style={styles.eligibilityTitle}>Academic Eligibility Rule</Text>
+        <Text style={styles.eligibilityTitle}>Peer tutor requirements</Text>
         <Text style={styles.eligibilityBody}>
-          Applicants must hold a final grade from 1.00 to 1.50 in each course they wish to mentor.
+          To tutor a course, you need a final grade from 1.00 to 1.50.
         </Text>
         <View style={styles.thresholdBox}>
           <View style={styles.thresholdHeader}>
-            <Text style={styles.thresholdLabel}>Collegiate Grade Threshold</Text>
-            <Text style={styles.thresholdValue}>1.50 Max Cutoff</Text>
+            <Text style={styles.thresholdLabel}>Grade range</Text>
+            <Text style={styles.thresholdValue}>Highest eligible grade: 1.50</Text>
           </View>
           <View style={styles.thresholdBar}>
             <View style={[styles.thresholdSegment, styles.thresholdLow]} />
@@ -182,7 +182,7 @@ function CourseForm({ onAdd, tutorType }) {
     };
     const validationError = getTutorCourseValidationError(tutorType, course);
     if (validationError) {
-      Alert.alert(isPeerTutor ? 'Course not eligible or incomplete' : 'Course incomplete', validationError);
+      Alert.alert(isPeerTutor ? 'Check this course' : 'Course details needed', validationError);
       return;
     }
     onAdd(course);
@@ -197,24 +197,24 @@ function CourseForm({ onAdd, tutorType }) {
     <View style={styles.courseForm}>
       <View style={styles.addCourseHeading}>
         <Ionicons name="add-circle-outline" size={17} color={colors.primary} />
-        <Text style={styles.addCourseText}>Add Course</Text>
+        <Text style={styles.addCourseText}>Add a course</Text>
         {isPeerTutor ? (
           <Text style={styles.gradeScaleText}>Grade cutoff: 1.00–1.50</Text>
         ) : null}
       </View>
-      <FieldLabel required>Course Code or Subject Title</FieldLabel>
+      <FieldLabel required>Course code or subject</FieldLabel>
       <View style={styles.inputWithIcon}>
         <Ionicons name="book-outline" size={17} color={colors.mutedText} />
         <TextInput
           value={code}
           onChangeText={setCode}
-          placeholder="e.g., CS 201 - Data Structures, or MATH 110"
+          placeholder="e.g., CS 201 or MATH 110"
           placeholderTextColor={colors.placeholder}
           style={styles.input}
         />
       </View>
       <FieldLabel required={isPeerTutor}>
-        Final Collegiate Grade{isPeerTutor ? '' : ' (optional)'}
+        Final grade{isPeerTutor ? '' : ' (optional)'}
       </FieldLabel>
       <View style={styles.inputWithIcon}>
         <Ionicons name="star-outline" size={17} color={colors.mutedText} />
@@ -229,7 +229,7 @@ function CourseForm({ onAdd, tutorType }) {
       </View>
       {isPeerTutor ? (
         <>
-          <Text style={styles.fieldLabel}>Quick grade selection</Text>
+          <Text style={styles.fieldLabel}>Choose a grade</Text>
           <View style={styles.gradeOptions}>
             {gradeOptions.map((option) => (
               <Pressable
@@ -245,7 +245,7 @@ function CourseForm({ onAdd, tutorType }) {
           </View>
         </>
       ) : null}
-      <FieldLabel required>Course Title</FieldLabel>
+      <FieldLabel required>Course title</FieldLabel>
       <TextInput
         value={title}
         onChangeText={setTitle}
@@ -255,7 +255,7 @@ function CourseForm({ onAdd, tutorType }) {
       />
       {isPeerTutor ? (
         <>
-          <FieldLabel required>Proof document title</FieldLabel>
+          <FieldLabel required>Proof document name</FieldLabel>
           <TextInput
             value={proofName}
             onChangeText={setProofName}
@@ -263,7 +263,7 @@ function CourseForm({ onAdd, tutorType }) {
             placeholderTextColor={colors.placeholder}
             style={styles.textInput}
           />
-          <FieldLabel required>Google Drive sharing link</FieldLabel>
+          <FieldLabel required>Google Drive link</FieldLabel>
           <TextInput
             value={proofUrl}
             onChangeText={setProofUrl}
@@ -278,12 +278,12 @@ function CourseForm({ onAdd, tutorType }) {
       ) : null}
       <Text style={styles.fieldLabel}>
         {isPeerTutor
-          ? 'Share the course proof with the assigned reviewer. The app stores its link and details, not the file.'
-          : 'Add the course or courses you want to tutor. Your professional proof is submitted once for the application below.'}
+          ? 'Add a Google Drive proof link for each course. Tutorly stores the link, not the file.'
+          : 'Add the courses you want to tutor. You’ll add your professional proof below.'}
       </Text>
       <Pressable style={styles.addButton} onPress={addCourse}>
         <Ionicons name="add" size={18} color={colors.white} />
-        <Text style={styles.addButtonText}>Add Course to Mentorship List</Text>
+        <Text style={styles.addButtonText}>Add course</Text>
       </Pressable>
     </View>
   );
@@ -418,7 +418,7 @@ export default function TutorProfileScreen() {
       philosophy.trim().length < minimumPhilosophyLength ||
       !isCertified
     ) {
-      Alert.alert('Application incomplete', 'Complete your credentials, availability, teaching statement, and record confirmation.');
+      Alert.alert('A few details are missing', 'Complete your credentials, courses, availability, teaching statement, and certification before submitting.');
       return;
     }
     const evidenceError = getTutorApplicationEvidenceError({
@@ -429,7 +429,7 @@ export default function TutorProfileScreen() {
       applicationProofUrl,
     });
     if (evidenceError) {
-      Alert.alert('Application proof incomplete', evidenceError);
+      Alert.alert('Proof details needed', evidenceError);
       return;
     }
 
@@ -448,10 +448,10 @@ export default function TutorProfileScreen() {
         applicationProofName: applicationProofName.trim(),
         applicationProofUrl: applicationProofUrl.trim(),
       });
-      Alert.alert('Application submitted', 'Your application is saved and waiting for admin review.');
+      Alert.alert('Application submitted', 'We’ll review your application soon.');
       await loadApplication();
     } catch (error) {
-      Alert.alert('Unable to submit application', getErrorMessage(error, 'Please try again.'));
+      Alert.alert('Couldn’t submit your application', getErrorMessage(error, 'Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -461,7 +461,7 @@ export default function TutorProfileScreen() {
   if (loadStatus === 'error') {
     return (
       <ErrorState
-        title="Could not load your tutor profile"
+        title="Tutor profile isn’t available"
         message={getErrorMessage(loadError)}
         onRetry={loadApplication}
       />
@@ -482,7 +482,7 @@ export default function TutorProfileScreen() {
           <MentorHeader tutor={tutor} statusLabel={statusLabel} />
           <View style={styles.pageIntro}>
             <Text style={styles.pageTitle}>Tutor application</Text>
-            <Text style={styles.pageSubtitle}>Share your strengths, support your peers, and earn certified campus recognition.</Text>
+            <Text style={styles.pageSubtitle}>Tell students what you teach and when you’re available.</Text>
           </View>
           <EligibilityCard tutorType={tutorType} />
 
@@ -490,8 +490,8 @@ export default function TutorProfileScreen() {
             <SectionTitle
               title="Tutor category"
               subtitle={needsTutorTypeChoice
-                ? 'Choose your sign-up category to use the correct proof requirements'
-                : 'Category selected at sign-up'}
+                ? 'Choose the option that matches your experience.'
+                : 'Selected when you signed up.'}
             />
             {needsTutorTypeChoice ? (
               <View style={styles.selectionGrid}>
@@ -546,7 +546,7 @@ export default function TutorProfileScreen() {
           </Section>
 
           <Section>
-            <SectionTitle title="Credentials & Academic Background" subtitle="Give students confidence in your subject expertise" />
+            <SectionTitle title="Credentials" subtitle="Show students your subject expertise." />
             {credentials.map((credential, index) => (
               <View key={`credential-${index}`} style={styles.credentialEntry}>
                 <View style={styles.credentialLabelRow}>
@@ -560,7 +560,7 @@ export default function TutorProfileScreen() {
                 <TextInput
                   value={credential}
                   onChangeText={(value) => updateCredential(index, value)}
-                  placeholder="e.g., Summa Cum Laude Alumni"
+                  placeholder="e.g., Summa Cum Laude"
                   placeholderTextColor={colors.placeholder}
                   style={styles.credentialsInput}
                 />
@@ -572,21 +572,21 @@ export default function TutorProfileScreen() {
             </Pressable>
             <View style={styles.credentialHintRow}>
               <Ionicons name="shield-checkmark-outline" size={15} color={colors.secondary} />
-              <Text style={styles.credentialHint}>Credentials are reviewed alongside the Google Drive proof links you provide.</Text>
+              <Text style={styles.credentialHint}>We’ll review your credentials with your Google Drive proof links.</Text>
             </View>
           </Section>
 
           <Section>
             <SectionTitle
-              title="Courses You Wish to Tutor"
+              title="Courses you want to tutor"
               subtitle={tutorType === TUTOR_TYPES.PEER
-                ? 'Each course requires a final grade from 1.00 to 1.50 and its own Drive proof'
-                : 'List each course you want to tutor. Grades are optional for Alumni/Professor applicants.'}
-              action={<View style={styles.auditBadge}><Ionicons name="document-text-outline" size={14} color={colors.primary} /><Text style={styles.auditText}>Manual{`\n`}Entry & Audit</Text></View>}
+                ? 'Each course needs a grade from 1.00 to 1.50 and its own Drive proof.'
+                : 'List each course. Grades are optional for alumni and professors.'}
+              action={<View style={styles.auditBadge}><Ionicons name="document-text-outline" size={14} color={colors.primary} /><Text style={styles.auditText}>Proof{`\n`}review</Text></View>}
             />
             {tutorType === TUTOR_TYPES.PROFESSIONAL ? (
               <View style={styles.courseForm}>
-                <FieldLabel required>Type or description of professional proof</FieldLabel>
+                <FieldLabel required>Describe your professional proof</FieldLabel>
                 <TextInput
                   value={applicationProofName}
                   onChangeText={setApplicationProofName}
@@ -633,11 +633,11 @@ export default function TutorProfileScreen() {
           </Section>
 
           <Section>
-            <SectionTitle title="Mentoring Format & Modality" subtitle="Tell peers how you are equipped to facilitate" />
+            <SectionTitle title="Session format" subtitle="Choose how students can meet with you." />
             {[
-              ['Online Synchronous', 'Integrated in-app video room with auto-generated whiteboard canvas.', 'videocam-outline'],
-              ['On-Campus Study Rooms', 'Designated reservation slots at university quiet collaboration pods.', 'location-outline'],
-              ['Off-Campus / Partner Hubs', 'Partner study lounges and verified coffee spaces near campus perimeter.', 'cafe-outline'],
+              ['Online Synchronous', 'Meet in an online video room with a shared whiteboard.', 'videocam-outline'],
+              ['On-Campus Study Rooms', 'Meet in a reserved campus study room.', 'location-outline'],
+              ['Off-Campus / Partner Hubs', 'Meet at a partner study space near campus.', 'cafe-outline'],
             ].map(([format, description, icon]) => {
               const selected = selectedFormats.includes(format);
               return (
@@ -658,12 +658,12 @@ export default function TutorProfileScreen() {
           <Section>
             <SectionTitle
               title="Session Pricing"
-              subtitle="Set your session price and payment QR in Tutor Workspace after submitting your application."
+              subtitle="Set your price and payment QR in your workspace after you submit."
             />
           </Section>
 
           <Section>
-            <SectionTitle title="Preferred Tutoring Availability" subtitle="Choose the days and time windows when students can book you" />
+            <SectionTitle title="Availability" subtitle="Choose when students can book you." />
             <FieldLabel required>Preferred days</FieldLabel>
             <View style={styles.selectionGrid}>
               {tutoringDays.map((day) => {
@@ -704,8 +704,8 @@ export default function TutorProfileScreen() {
           </Section>
 
           <Section>
-            <SectionTitle title="Pedagogy & Approach" subtitle="Tell peers how you simplify complex collegiate material" />
-            <FieldLabel required>Teaching Philosophy Statement</FieldLabel>
+            <SectionTitle title="Teaching approach" subtitle="Describe how you help students understand a topic." />
+            <FieldLabel required>Teaching statement</FieldLabel>
             <TextInput
               value={philosophy}
               onChangeText={setPhilosophy}
@@ -714,7 +714,7 @@ export default function TutorProfileScreen() {
               style={styles.philosophyInput}
             />
             <View style={styles.characterRow}>
-              <Text style={styles.characterHint}>Minimum 80 characters for honor certification</Text>
+              <Text style={styles.characterHint}>At least 80 characters are required for certification.</Text>
               <Text style={[styles.characterCount, philosophy.trim().length < minimumPhilosophyLength && styles.characterCountWarning]}>{philosophy.trim().length} characters</Text>
             </View>
           </Section>
@@ -723,11 +723,11 @@ export default function TutorProfileScreen() {
             <View style={[styles.checkbox, isCertified && styles.checkboxSelected]}>
               {isCertified ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
             </View>
-            <Text style={styles.certificationText}>I certify that my uploaded and synced academic records are authentic and authorized for peer verification. I commit to mentoring with integrity.</Text>
+            <Text style={styles.certificationText}>I confirm my academic records are accurate and may be checked. I’ll mentor with integrity.</Text>
           </Pressable>
 
           <View style={styles.submitPanel}>
-            <AppButton title="Submit Tutor Application" onPress={submitApplication} loading={saving} />
+            <AppButton title="Submit application" onPress={submitApplication} loading={saving} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

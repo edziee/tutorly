@@ -42,8 +42,8 @@ import { getAuthErrorMessage } from '../../utils/errors';
 import { validateEmail, validatePasswordPresent } from '../../utils/validation';
 
 const modeOptions = [
-  { value: 'signIn', label: 'Sign In' },
-  { value: 'signUp', label: 'Sign Up / Register' },
+  { value: 'signIn', label: 'Sign in' },
+  { value: 'signUp', label: 'Create account' },
 ];
 
 export default function LoginScreen({ navigation, route }) {
@@ -93,7 +93,7 @@ export default function LoginScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
         >
           <AuthHeader
-            subtitle="Find trusted tutors, manage sessions, or teach on campus."
+            subtitle="Find a tutor, manage sessions, or share what you know."
             onLogoLongPress={() => navigation.navigate(ROUTES.ADMIN_LOGIN)}
           />
 
@@ -105,20 +105,20 @@ export default function LoginScreen({ navigation, route }) {
             }}
           />
 
-          <Text style={styles.sectionLabel}>SELECT ACADEMIC PORTAL ROLE</Text>
+          <Text style={styles.sectionLabel}>I want to...</Text>
           <View style={styles.roleRow}>
             <RoleCard
               title="Student"
-              description="Find top peer tutors with institutional grade records."
-              badge="Seek Help"
+              description="Find a tutor and get help with your studies."
+              badge="Learn"
               icon="school"
               selected={isStudent}
               onPress={() => setPortal(ROLES.STUDENT)}
             />
             <RoleCard
               title="Tutor"
-              description="Peer tutors, professors & alumni"
-              badge="Earn & Teach"
+              description="Share your knowledge with other students."
+              badge="Teach"
               icon="ribbon"
               selected={!isStudent}
               onPress={() => setPortal(ROLES.TUTOR)}
@@ -127,7 +127,7 @@ export default function LoginScreen({ navigation, route }) {
 
           <Card style={styles.formCard}>
             <AppInput
-              label="University Email"
+              label="University email"
               value={email}
               handleChangeText={setEmail}
               placeholder="qjdoe@tip.edu.ph"
@@ -140,7 +140,7 @@ export default function LoginScreen({ navigation, route }) {
               returnKeyType="next"
             />
             <AppInput
-              label="Portal Password"
+              label="Password"
               value={password}
               handleChangeText={setPassword}
               placeholder="Your password"
@@ -177,14 +177,14 @@ export default function LoginScreen({ navigation, route }) {
             ) : null}
 
             <AppButton
-              title={isStudent ? 'Sign In as Student' : 'Sign In as Tutor'}
+              title="Sign in"
               onPress={handleSubmit}
               loading={submitting}
             />
           </Card>
 
           <Pressable onPress={() => navigation.navigate(ROUTES.ADMIN_LOGIN)} hitSlop={10}>
-            <Text style={styles.adminLink}>Admin access</Text>
+            <Text style={styles.adminLink}>Admin sign in</Text>
           </Pressable>
           <Text style={styles.footer}>Terms of Service  •  Privacy Policy</Text>
         </ScrollView>
