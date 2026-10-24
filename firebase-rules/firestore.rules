@@ -254,6 +254,7 @@ service cloud.firestore {
           'name',
           'campusId',
           'tutorType',
+          'tutorVerificationStatus',
           'createdAt'
         ]) &&
         request.resource.data.keys().hasAll([
@@ -269,11 +270,36 @@ service cloud.firestore {
         request.resource.data.role in ['student', 'tutor'] &&
         (request.resource.data.role != 'tutor' ||
           (request.resource.data.tutorType in ['peer', 'professional'])) &&
+        (request.resource.data.role != 'tutor' ||
+          request.resource.data.tutorVerificationStatus == 'pending') &&
         (request.resource.data.role == 'tutor' ||
-          !('tutorType' in request.resource.data)) &&
+          (!('tutorType' in request.resource.data) &&
+            !('tutorVerificationStatus' in request.resource.data))) &&
         request.resource.data.name is string &&
         request.resource.data.campusId is string &&
         request.resource.data.createdAt == request.time;
+    }
+
+    function validAdminDirectTutorReview(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      return isAdmin() &&
+        request.auth.uid != uid &&
+        resource.data.get('role', '') == 'tutor' &&
+        resource.data.get('tutorVerificationStatus', '') == 'pending' &&
+        request.resource.data.tutorVerificationStatus in ['approved', 'rejected'] &&
+        request.resource.data.tutorVerificationReviewedBy == request.auth.uid &&
+        request.resource.data.tutorVerificationReviewedAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.tutorVerificationNote is string &&
+        (request.resource.data.tutorVerificationStatus != 'rejected' ||
+         request.resource.data.tutorVerificationNote.size() > 0) &&
+        changes.hasOnly([
+         'tutorVerificationStatus',
+         'tutorVerificationNote',
+         'tutorVerificationReviewedBy',
+         'tutorVerificationReviewedAt',
+         'updatedAt'
+        ]);
     }
 
     function validTutorApplicationCreate(uid) {
@@ -616,9 +642,10 @@ service cloud.firestore {
       allow create: if signedIn() &&
         request.auth.uid == uid &&
         validAccountCreate(uid);
-      allow update: if signedIn() &&
-        request.auth.uid == uid &&
-        validProfileUpdate(uid);
+      allow update: if validAdminDirectTutorReview(uid) ||
+        (signedIn() &&
+          request.auth.uid == uid &&
+          validProfileUpdate(uid));
       allow delete: if false;
     }
 

@@ -28,6 +28,8 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `email` | string | |
 | `role` | `'student'` \| `'tutor'` \| `'professional'` (legacy) \| `'admin'` | Set once at sign-up. Tutor accounts use `'tutor'`; newly created tutor accounts use the Professor / Alumni path. Existing peer tutor and `'professional'` accounts remain supported through the Tutor sign-in portal. A student applying to tutor keeps `role: 'student'`; application status is stored separately. Users must not be able to change their role, and nobody can sign up as `admin` (admins are created in the Firebase console) |
 | `tutorType` | `'peer'` \| `'professional'` | Tutor accounts only. Saved at sign-up to determine the verification evidence requirements; never user-editable. Existing accounts without it infer the type from their tutor application tier |
+| `tutorVerificationStatus` | `'pending'` \| `'approved'` \| `'rejected'` | Direct tutor sign-ups start pending and are reviewed by an admin using basic account details. This status alone does not create an approved public tutor profile or permit tutor operations |
+| `tutorVerificationNote`, `tutorVerificationReviewedBy`, `tutorVerificationReviewedAt` | string, uid, timestamp | Admin-only outcome details for direct tutor account review. Rejection requires a reason |
 | `name` | string | |
 | `phone`, `age`, `location` (city), `year`, `campus`, `campusAddress` | string | From the student profile screen |
 | `photoUrl` | string | Optional instructor-approved external image URL. If empty, show initials; do not use Firebase Storage |
@@ -63,7 +65,7 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 
 This document is readable only by its applicant and admins. Applicants may have a student, tutor, or legacy professional account role; applying never changes that role. Keep verification proof and payment QR fields here, never in `tutors/{uid}`, because Firestore security rules cannot hide selected fields from clients that can read a document.
 
-Tutor operations are granted only when both this private record and the matching `tutors/{uid}` public profile have `verificationStatus: 'approved'`, and the public profile has `publicProfileVersion: 2`. Pending and rejected applicants may see their own application status and evidence but cannot appear in tutor search, accept bookings, or update tutor booking details. A student applicant who is approved keeps all student access and may switch between student and tutor workspaces.
+Tutor operations are granted only when both this private record and the matching `tutors/{uid}` public profile have `verificationStatus: 'approved'`, and the public profile has `publicProfileVersion: 2`. Pending and rejected applicants may see their own application status and evidence but cannot appear in tutor search, accept bookings, or update tutor booking details. A student applicant who is approved keeps all student access and may switch between student and tutor workspaces. Direct tutor sign-ups are tracked separately using `users/{uid}.tutorVerificationStatus`; account approval alone does not publish a public tutor profile or authorize tutor-only operations.
 
 | Field | Type | Notes |
 |---|---|---|

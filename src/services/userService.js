@@ -6,11 +6,22 @@ import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firest
 import { requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
 import { isValidRole } from '../constants/roles';
-import { TUTOR_TYPES } from '../constants/statuses';
+import { TUTOR_TYPES, VERIFICATION_STATUS } from '../constants/statuses';
 
 // Fields a screen must never change through updateUserProfile. `role` is set
 // once at sign-up (the Week 3 security rules enforce this on the server too).
-const PROTECTED_FIELDS = ['id', 'uid', 'role', 'email', 'createdAt', 'tutorType'];
+const PROTECTED_FIELDS = [
+  'id',
+  'uid',
+  'role',
+  'email',
+  'createdAt',
+  'tutorType',
+  'tutorVerificationStatus',
+  'tutorVerificationNote',
+  'tutorVerificationReviewedBy',
+  'tutorVerificationReviewedAt',
+];
 
 /**
  * @param {string} uid
@@ -50,6 +61,9 @@ export async function createUserProfile(uid, data) {
     name: data.name ?? '',
     campusId: data.campusId ?? '',
     ...(data.role === 'tutor' ? { tutorType: data.tutorType } : {}),
+    ...(data.role === 'tutor'
+      ? { tutorVerificationStatus: VERIFICATION_STATUS.PENDING }
+      : {}),
     createdAt: serverTimestamp(),
   });
 }

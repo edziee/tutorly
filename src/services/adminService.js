@@ -12,6 +12,7 @@ import {
 
 import { requireAuth, requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
+import { ROLES } from '../constants/roles';
 import { VERIFICATION_STATUS } from '../constants/statuses';
 import { isHttpsUrl } from '../utils/validation';
 
@@ -30,6 +31,25 @@ function toTutorApplication(snapshot) {
     subject: courses[0]
       ? [courses[0].code, courses[0].title].filter(Boolean).join(': ')
       : '',
+  };
+}
+
+function toDirectTutorReview(snapshot) {
+  const account = snapshot.data();
+  return {
+    id: snapshot.id,
+    source: 'direct_signup',
+    name: account.name || '',
+    email: account.email || '',
+    campusId: account.campusId || '',
+    tutorType: account.tutorType || 'professional',
+    tier: 'Direct tutor account',
+    verificationStatus: account.tutorVerificationStatus,
+    verificationNote: account.tutorVerificationNote || '',
+    verificationReviewedBy: account.tutorVerificationReviewedBy,
+    verificationReviewedAt: account.tutorVerificationReviewedAt,
+    createdAt: account.createdAt,
+    courses: [],
   };
 }
 
@@ -119,13 +139,16 @@ export async function getUsers(filters = {}) {
     getDocs(collection(db, COLLECTIONS.TUTORS)),
   ]);
   const tutorById = new Map(tutorsSnapshot.docs.map((tutor) => [tutor.id, tutor.data()]));
-  return usersSnapshot.docs.map((user) => ({
-    ...user.data(),
-    id: user.id,
-    ...(tutorById.has(user.id)
-      ? { verificationStatus: tutorById.get(user.id).verificationStatus }
-      : {}),
-  }));
+  return usersSnapshot.docs.map((user) => {
+    const account = user.data();
+    const verificationStatus = tutorById.get(user.id)?.verificationStatus
+      ?? account.tutorVerificationStatus;
+    return {
+      ...account,
+      id: user.id,
+      ...(verificationStatus ? { verificationStatus } : {}),
+    };
+  });
 }
 
 /** Listen to applications that have completed admin review. */
@@ -135,9 +158,11 @@ export function subscribeToReviewedApplications(callback, onError) {
   const reviewedStatuses = [VERIFICATION_STATUS.APPROVED, VERIFICATION_STATUS.REJECTED];
   let applications = null;
   let legacyTutors = null;
+  let directAccounts = null;
   let stopped = false;
   let stopApplications = () => {};
   let stopLegacyTutors = () => {};
+  let stopDirectAccounts = () => {};
 
   const reviewedAt = (application) =>
     application.verificationReviewedAt ?? application.updatedAt ?? null;
@@ -145,12 +170,14 @@ export function subscribeToReviewedApplications(callback, onError) {
     typeof timestamp?.toMillis === 'function' ? timestamp.toMillis() : 0;
 
   const emit = () => {
-    if (applications === null || legacyTutors === null || stopped) return;
+    if (applications === null || legacyTutors === null || directAccounts === null || stopped) return;
     const reviewedById = new Map(legacyTutors.map((item) => [item.id, item]));
+    directAccounts.forEach((item) => reviewedById.set(item.id, item));
     applications.forEach((item) => reviewedById.set(item.id, item));
     callback(
       [...reviewedById.values()].sort((first, second) =>
-        timestampValue(reviewedAt(second)) - timestampValue(reviewedAt(first)),
+        timestampValue(second.verificationReviewedAt ?? second.tutorVerificationReviewedAt ?? reviewedAt(second)) -
+        timestampValue(first.verificationReviewedAt ?? first.tutorVerificationReviewedAt ?? reviewedAt(first)),
       ),
     );
   };
@@ -159,6 +186,7 @@ export function subscribeToReviewedApplications(callback, onError) {
     stopped = true;
     stopApplications();
     stopLegacyTutors();
+    stopDirectAccounts();
   };
 
   const handleError = (error) => {
@@ -185,6 +213,19 @@ export function subscribeToReviewedApplications(callback, onError) {
     ),
     (snapshot) => {
       legacyTutors = snapshot.docs.map(toTutorApplication);
+      emit();
+    },
+    handleError,
+  );
+  stopDirectAccounts = onSnapshot(
+    query(
+      collection(db, COLLECTIONS.USERS),
+      where('tutorVerificationStatus', 'in', reviewedStatuses),
+    ),
+    (snapshot) => {
+      directAccounts = snapshot.docs
+        .filter((account) => account.data().role === ROLES.TUTOR)
+        .map(toDirectTutorReview);
       emit();
     },
     handleError,
@@ -201,13 +242,16 @@ export function subscribeToPendingVerifications(callback, onError) {
   const { db } = requireFirebase();
   let applications = null;
   let legacyTutors = null;
+  let directAccounts = null;
   let stopped = false;
   let stopApplications = () => {};
   let stopLegacyTutors = () => {};
+  let stopDirectAccounts = () => {};
 
   const emit = () => {
-    if (applications === null || legacyTutors === null || stopped) return;
+    if (applications === null || legacyTutors === null || directAccounts === null || stopped) return;
     const pendingById = new Map(legacyTutors.map((item) => [item.id, item]));
+    directAccounts.forEach((item) => pendingById.set(item.id, item));
     applications.forEach((item) => pendingById.set(item.id, item));
     callback([...pendingById.values()]);
   };
@@ -216,6 +260,7 @@ export function subscribeToPendingVerifications(callback, onError) {
     stopped = true;
     stopApplications();
     stopLegacyTutors();
+    stopDirectAccounts();
   };
 
   const handleError = (error) => {
@@ -246,7 +291,58 @@ export function subscribeToPendingVerifications(callback, onError) {
     },
     handleError,
   );
+  stopDirectAccounts = onSnapshot(
+    query(
+      collection(db, COLLECTIONS.USERS),
+      where('tutorVerificationStatus', '==', VERIFICATION_STATUS.PENDING),
+    ),
+    (snapshot) => {
+      directAccounts = snapshot.docs
+        .filter((account) => account.data().role === ROLES.TUTOR)
+        .map(toDirectTutorReview);
+      emit();
+    },
+    handleError,
+  );
   return stop;
+}
+
+export async function setDirectTutorAccountVerificationStatus(uid, status, review = {}) {
+  if (!uid) throw new Error('A direct tutor account id is required.');
+  if (![VERIFICATION_STATUS.APPROVED, VERIFICATION_STATUS.REJECTED].includes(status)) {
+    throw new Error('Choose approved or rejected as the verification status.');
+  }
+  const reviewerId = requireSignedInAdmin();
+  if (review.reviewerId !== reviewerId) {
+    throw new Error('The signed-in admin must be the reviewer.');
+  }
+  if (reviewerId === uid) {
+    throw new Error('Admins cannot review their own tutor accounts.');
+  }
+  const reason = typeof review.reason === 'string' ? review.reason.trim() : '';
+  if (status === VERIFICATION_STATUS.REJECTED && !reason) {
+    throw new Error('A reason is required when rejecting a tutor account.');
+  }
+
+  const { db } = requireFirebase();
+  await runTransaction(db, async (transaction) => {
+    const userRef = doc(db, COLLECTIONS.USERS, uid);
+    const userSnapshot = await transaction.get(userRef);
+    if (!userSnapshot.exists() || userSnapshot.data().role !== ROLES.TUTOR) {
+      throw new Error('This direct tutor account no longer exists.');
+    }
+    if (userSnapshot.data().tutorVerificationStatus !== VERIFICATION_STATUS.PENDING) {
+      throw new Error('This tutor account is no longer waiting for review.');
+    }
+    const timestamp = serverTimestamp();
+    transaction.update(userRef, {
+      tutorVerificationStatus: status,
+      tutorVerificationNote: reason,
+      tutorVerificationReviewedBy: reviewerId,
+      tutorVerificationReviewedAt: timestamp,
+      updatedAt: timestamp,
+    });
+  });
 }
 
 /**

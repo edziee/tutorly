@@ -43,6 +43,19 @@ test('application review is admin-only and self-review is denied', () => {
   }
 });
 
+test('direct tutor signup status is pending and review is admin-only', async () => {
+  const adminReview = ruleFunction('validAdminDirectTutorReview');
+  assert.match(adminReview, /isAdmin\(\)/);
+  assert.match(adminReview, /request\.auth\.uid != uid/);
+  assert.match(adminReview, /resource\.data\.get\('role', ''\) == 'tutor'/);
+  assert.match(adminReview, /resource\.data\.get\('tutorVerificationStatus', ''\) == 'pending'/);
+  assert.match(adminReview, /request\.resource\.data\.tutorVerificationStatus in \['approved', 'rejected'\]/);
+  assert.match(adminReview, /request\.resource\.data\.tutorVerificationNote\.size\(\) > 0/);
+  assert.match(adminReview, /changes\.hasOnly/);
+  assert.match(ruleFunction('validAccountCreate'), /tutorVerificationStatus == 'pending'/);
+  assert.match(rules, /allow update: if validAdminDirectTutorReview\(uid\)/);
+});
+
 test('private application evidence is owner/admin-only and excluded from public profiles', () => {
   assert.match(
     rules,

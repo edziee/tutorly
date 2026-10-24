@@ -46,3 +46,10 @@ export function canUseTutorOperations(role, applicationStatus) {
     applicationStatus === 'approved'
   );
 }
+
+export function hasDirectTutorAccountStatus(role, tutorVerificationStatus) {
+  return (
+    role === ROLES.TUTOR &&
+    ['pending', 'approved', 'rejected'].includes(tutorVerificationStatus)
+  );
+}

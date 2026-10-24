@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { getTutorApplication } from '../services/tutorService';
 import { colors } from '../theme/colors';
 import { getErrorMessage } from '../utils/errors';
-import { canUseTutorOperations } from '../utils/workspace';
+import { canUseTutorOperations, hasDirectTutorAccountStatus } from '../utils/workspace';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -104,6 +104,10 @@ function TutorTabs() {
 
 export default function TutorNavigator() {
   const { user, setWorkspaceMode } = useAuth();
+  const isDirectTutorAccount = hasDirectTutorAccountStatus(
+    user?.role,
+    user?.tutorVerificationStatus,
+  );
   const [applicationStatus, setApplicationStatus] = useState('loading');
   const [loadError, setLoadError] = useState(null);
   const uid = user?.uid;
@@ -112,6 +116,10 @@ export default function TutorNavigator() {
     if (!uid) {
       setLoadError(new Error('Sign in again to open the tutor workspace.'));
       setApplicationStatus('error');
+      return;
+    }
+    if (isDirectTutorAccount) {
+      setApplicationStatus('not_submitted');
       return;
     }
     setApplicationStatus('loading');
@@ -123,7 +131,7 @@ export default function TutorNavigator() {
       setLoadError(error);
       setApplicationStatus('error');
     }
-  }, [uid]);
+  }, [isDirectTutorAccount, uid]);
 
   const returnToStudentProfile = async () => {
     try {
@@ -175,19 +183,22 @@ export default function TutorNavigator() {
   }
 
   const canUseTutorWorkspace = canUseTutorOperations(user?.role, applicationStatus);
+  const shouldShowTutorTabs = canUseTutorWorkspace || isDirectTutorAccount;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {canUseTutorWorkspace ? (
+      {shouldShowTutorTabs ? (
         <Stack.Screen name="TutorTabs" component={TutorTabs} />
       ) : (
         <Stack.Screen name="TutorApplicantStatus" component={TutorWorkspaceProfileScreen} />
       )}
-      <Stack.Screen
-        name={ROUTES.TUTOR_APPLICATION}
-        component={TutorApplicationScreen}
-        options={{ headerShown: true, title: 'Tutor application' }}
-      />
+      {!isDirectTutorAccount ? (
+        <Stack.Screen
+          name={ROUTES.TUTOR_APPLICATION}
+          component={TutorApplicationScreen}
+          options={{ headerShown: true, title: 'Tutor application' }}
+        />
+      ) : null}
       {canUseTutorWorkspace ? (
         <>
           <Stack.Screen

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppButton from '../../components/AppButton';
@@ -28,7 +28,7 @@ import {
   updateBookingStatus,
 } from '../../services/bookingService';
 import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
-import { canUseTutorOperations } from '../../utils/workspace';
+import { canUseTutorOperations, hasDirectTutorAccountStatus } from '../../utils/workspace';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 
@@ -70,7 +70,6 @@ function RequestCard({ request, onAccept, onDecline, working }) {
 
 export default function TutorWorkspaceProfileScreen({ navigation }) {
   const { user, signOut, setWorkspaceMode, workspaceModeError } = useAuth();
-  const [instantHelp, setInstantHelp] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const [application, setApplication] = useState(null);
@@ -82,6 +81,10 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   const [loadStatus, setLoadStatus] = useState('loading');
   const [loadError, setLoadError] = useState(null);
   const uid = user?.uid;
+  const isDirectTutorAccount = hasDirectTutorAccountStatus(
+    user?.role,
+    user?.tutorVerificationStatus,
+  );
   const canPerformTutorOperations = canUseTutorOperations(
     user?.role,
     application?.verificationStatus,
@@ -122,7 +125,9 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   const courses = application?.courses ?? [];
   const preferredDays = application?.preferredDays ?? [];
   const preferredTimeSlots = application?.preferredTimeSlots ?? [];
-  const verificationStatus = application?.verificationStatus ?? 'not_submitted';
+  const verificationStatus = application?.verificationStatus
+    ?? (isDirectTutorAccount ? user.tutorVerificationStatus : 'not_submitted');
+  const verificationNote = application?.verificationNote ?? user?.tutorVerificationNote;
 
   const loadApplication = useCallback(async () => {
     if (!uid) {
@@ -277,7 +282,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           <View style={styles.profileRow}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{tutorName.charAt(0)}</Text>
-              {verificationStatus === 'approved' ? (
+              {application?.verificationStatus === 'approved' ? (
                 <View style={styles.verified}><Ionicons name="checkmark" size={11} color={colors.white} /></View>
               ) : null}
             </View>
@@ -287,22 +292,36 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
                 <Badge>{tutorCategory}</Badge>
               </View>
               <Text style={styles.education}>
-                {application?.credentials || 'Add your credentials in your tutor application.'}
+                {application?.credentials || (isDirectTutorAccount
+                  ? 'Tutor account created from direct sign-up.'
+                  : 'Add your credentials in your tutor application.')}
               </Text>
             </View>
           </View>
           <View style={styles.rateRow}>
             <Text style={styles.rateLabel}>Verification status</Text>
-            <Text style={styles.rate}>{verificationStatus.replace('_', ' ')}</Text>
+            <Text style={styles.rate}>
+              {isDirectTutorAccount && verificationStatus === 'pending'
+                ? 'not verified'
+                : verificationStatus.replace('_', ' ')}
+            </Text>
           </View>
           <Text style={styles.profileDescription}>
             {verificationStatus === 'approved'
-              ? `${courses.length} course${courses.length === 1 ? '' : 's'} approved.`
+              ? isDirectTutorAccount && !application
+                ? 'Your account is verified. Tutor tools remain unavailable until approved tutor profile and course details exist.'
+                : `${courses.length} course${courses.length === 1 ? '' : 's'} approved.`
               : verificationStatus === 'pending'
-                ? 'Your application is waiting for admin review.'
+                ? isDirectTutorAccount
+                  ? 'Your tutor account is waiting for admin verification. Tutor tools remain unavailable until required tutor profile data is approved.'
+                  : 'Your application is waiting for admin review.'
                 : verificationStatus === 'rejected'
-                  ? application?.verificationNote || 'Your application needs changes before approval.'
-                  : 'Submit your tutor application and course proof for admin review.'}
+                  ? verificationNote || (isDirectTutorAccount
+                    ? 'Your tutor account was not verified. Contact support for next steps.'
+                    : 'Your application needs changes before approval.')
+                  : isDirectTutorAccount
+                    ? 'Your account is verified. Tutor tools remain unavailable until approved tutor profile and course details exist.'
+                    : 'Submit your tutor application and course proof for admin review.'}
           </Text>
           <View style={styles.courseList}>
             {courses.map((course) => (
@@ -333,28 +352,28 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
               ) : null}
             </View>
           ) : null}
-          <Pressable
-            style={styles.addCourse}
-            onPress={() => openTutorApplication(navigation)}
-          >
-            <Ionicons name="create-outline" size={15} color={colors.primary} />
-            <Text style={styles.addCourseText}>
-              {verificationStatus === 'not_submitted'
-                ? 'Start tutor application'
-                : 'View application and course details'}
-            </Text>
-          </Pressable>
+          {!isDirectTutorAccount ? (
+            <Pressable
+              style={styles.addCourse}
+              onPress={() => openTutorApplication(navigation)}
+            >
+              <Ionicons name="create-outline" size={15} color={colors.primary} />
+              <Text style={styles.addCourseText}>
+                {verificationStatus === 'not_submitted'
+                  ? 'Start tutor application'
+                  : 'View application and course details'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {canPerformTutorOperations ? (
           <>
-        <SectionTitle title="Schedule and availability" subtitle="When students can book you" action="Edit times" />
+        <SectionTitle
+          title="Schedule and availability"
+          subtitle="Availability submitted with your tutor application"
+        />
         <View style={styles.availabilityCard}>
-          <View style={styles.instantRow}>
-            <View style={styles.instantIcon}><Ionicons name="flash" size={16} color={colors.secondary} /></View>
-            <View style={styles.instantCopy}><Text style={styles.instantTitle}>Quick help sessions</Text><Text style={styles.instantSubtitle}>Let students request 15-minute drop-ins.</Text></View>
-            <Switch value={instantHelp} onValueChange={setInstantHelp} trackColor={{ false: colors.border, true: colors.secondary }} thumbColor={colors.white} />
-          </View>
           <Text style={styles.availabilityMeta}>
             Days: {preferredDays.length ? preferredDays.join(' · ') : 'Not set'}
           </Text>
@@ -441,8 +460,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
 
         <SectionTitle
           title="Sessions"
-          subtitle={`Upcoming (${upcomingSessions.length})`}
-          action={`Past (${completedSessions.length})`}
+          subtitle={`Upcoming (${upcomingSessions.length}) · Past (${completedSessions.length})`}
         />
         {sessions.map((session) => (
           <View key={session.id} style={styles.sessionCard}>
@@ -479,17 +497,25 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         ) : (
           <View style={styles.applicationAccessCard}>
             <Text style={styles.profileDescription}>
-              {verificationStatus === 'pending'
-                ? 'Tutor tools will be available after your application is approved.'
-                : verificationStatus === 'rejected'
-                  ? 'Update your application for another review. Tutor tools remain unavailable until approval.'
-                  : 'Submit an application to begin tutor verification. Tutor tools are available after approval.'}
+              {isDirectTutorAccount
+                ? verificationStatus === 'pending'
+                  ? 'Your direct tutor account is pending admin verification. Tutor actions remain unavailable until tutor profile details are separately approved.'
+                  : verificationStatus === 'rejected'
+                    ? verificationNote || 'Your tutor account was not verified. Contact support for next steps.'
+                    : 'Your account is verified, but tutor actions remain unavailable until an approved tutor profile and application exist.'
+                : verificationStatus === 'pending'
+                  ? 'Tutor tools will be available after your application is approved.'
+                  : verificationStatus === 'rejected'
+                    ? 'Update your application for another review. Tutor tools remain unavailable until approval.'
+                    : 'Submit an application to begin tutor verification. Tutor tools are available after approval.'}
             </Text>
-            <AppButton
-              title={verificationStatus === 'not_submitted' ? 'Apply to tutor' : 'Open tutor application'}
-              variant="secondary"
-              onPress={() => openTutorApplication(navigation)}
-            />
+            {!isDirectTutorAccount ? (
+              <AppButton
+                title={verificationStatus === 'not_submitted' ? 'Apply to tutor' : 'Open tutor application'}
+                variant="secondary"
+                onPress={() => openTutorApplication(navigation)}
+              />
+            ) : null}
           </View>
         )}
 
@@ -554,11 +580,6 @@ const styles = StyleSheet.create({
   sectionSubtitle: { marginTop: 2, color: colors.mutedText, fontSize: 11 },
   sectionAction: { color: colors.primary, fontSize: 10, fontWeight: '700' },
   availabilityCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
-  instantRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  instantIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.mint },
-  instantCopy: { flex: 1 },
-  instantTitle: { color: colors.text, fontSize: 12, fontWeight: '700' },
-  instantSubtitle: { marginTop: 2, color: colors.mutedText, fontSize: 11 },
   weekRow: { flexDirection: 'row', gap: 5, marginTop: spacing.md },
   day: { flex: 1, alignItems: 'center', padding: 7, borderRadius: 8, backgroundColor: colors.background },
   dayActive: { backgroundColor: '#E2DFFF' },

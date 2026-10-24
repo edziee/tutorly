@@ -6,6 +6,7 @@ import {
   canUseTutorOperations,
   getActiveWorkspace,
   getInitialWorkspaceMode,
+  hasDirectTutorAccountStatus,
   isStudentWorkspace,
   withWorkspaceMode,
   WORKSPACE_MODES,
@@ -53,6 +54,15 @@ test('existing professional and admin routing is unchanged', () => {
   assert.equal(getActiveWorkspace(ROLES.TUTOR, WORKSPACE_MODES.STUDENT), WORKSPACE_MODES.TUTOR);
   assert.equal(getActiveWorkspace(ROLES.PROFESSIONAL, WORKSPACE_MODES.STUDENT), WORKSPACE_MODES.TUTOR);
   assert.equal(getActiveWorkspace(ROLES.ADMIN, WORKSPACE_MODES.TUTOR), ROLES.ADMIN);
+});
+
+test('direct tutor signups are identifiable without treating student applicants as tutor accounts', () => {
+  assert.equal(hasDirectTutorAccountStatus(ROLES.TUTOR, 'pending'), true);
+  assert.equal(hasDirectTutorAccountStatus(ROLES.TUTOR, 'approved'), true);
+  assert.equal(hasDirectTutorAccountStatus(ROLES.TUTOR, 'rejected'), true);
+  assert.equal(hasDirectTutorAccountStatus(ROLES.TUTOR, 'not_submitted'), false);
+  assert.equal(hasDirectTutorAccountStatus(ROLES.STUDENT, 'pending'), false);
+  assert.equal(hasDirectTutorAccountStatus(ROLES.PROFESSIONAL, 'pending'), false);
 });
 
 test('student-only tutor discovery follows the selected workspace, not the account role alone', () => {
