@@ -25,7 +25,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | Field | Type | Notes |
 | --- | --- | --- |
 | `email` | string | |
-| `role` | `'student'` \| `'tutor'` \| `'professional'` (legacy) \| `'admin'` | Set once at sign-up. Peer tutors and Professor / Alumni accounts use `'tutor'`; existing `'professional'` accounts remain supported as tutors. A student applying to tutor keeps `role: 'student'`; application status is stored separately. Users must not be able to change their role, and nobody can sign up as `admin` (admins are created in the Firebase console) |
+| `role` | `'student'` \| `'tutor'` \| `'professional'` (legacy) \| `'admin'` | Set once at sign-up. Tutor accounts use `'tutor'`; newly created tutor accounts use the Professor / Alumni path. Existing peer tutor and `'professional'` accounts remain supported through the Tutor sign-in portal. A student applying to tutor keeps `role: 'student'`; application status is stored separately. Users must not be able to change their role, and nobody can sign up as `admin` (admins are created in the Firebase console) |
 | `tutorType` | `'peer'` \| `'professional'` | Tutor accounts only. Saved at sign-up to determine the verification evidence requirements; never user-editable. Existing accounts without it infer the type from their tutor application tier |
 | `name` | string | |
 | `phone`, `age`, `location` (city), `year`, `campus`, `campusAddress` | string | From the student profile screen |

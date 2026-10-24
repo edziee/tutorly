@@ -4,8 +4,8 @@
 // Plan tasks: "Build the UI for login and sign-up" (Member 3, Week 1) and
 // "Sign-up and login logic for students and tutors" (Member 1, Week 1).
 //
-// The Student / Tutor cards choose the portal. Tutors and professional tutors
-// both use "Tutor"; signIn checks the account role matches the selected portal.
+// The Student / Tutor cards choose the portal. Tutor is the single sign-in
+// portal for all existing tutor account types, including peer tutors.
 // The role can be passed in with
 // navigation.navigate(ROUTES.LOGIN, { role: 'tutor' }).
 //
