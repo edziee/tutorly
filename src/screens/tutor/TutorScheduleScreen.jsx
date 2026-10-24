@@ -17,7 +17,7 @@ import * as Calendar from 'expo-calendar';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { SessionTimer  } from '../../components/SessionStopwatch';
+import { SessionStopwatch  } from '../../components/SessionStopwatch';
 import ErrorState from '../../components/ErrorState';
 import ScreenContainer from '../../components/ScreenContainer';
 import { ROUTES } from '../../constants/routes';
@@ -119,7 +119,7 @@ function toScheduleBooking(booking) {
     ...booking,
     id: booking.id,
     bookingId: booking.id,
-    studentName: booking.studentName || 'Tutor',
+    studentName: booking.studentName || 'Student',
     subject: booking.subject || 'Tutoring session',
     dateKey: booking.dateKey,
     startTime: booking.startTime,
@@ -362,6 +362,8 @@ export default function ScheduleScreen() {
   const allSessions = [
     ...sessions.filter((session) => !session.bookingId),
   ];
+  const [bookingIdInSession, setBookingIdInSession] = useState("");
+  const [sessionTime, setSessionTime] = useState(0);
 
   useEffect(() => {
     setSessions(normalizeSessionStatuses(mockTutorSessions));
@@ -600,7 +602,7 @@ export default function ScheduleScreen() {
                   </View>
                   {modalMode === 'details' && activeSession ? (
                     <>
-                      <SessionTimer />
+                      <SessionStopwatch session={activeSession} bookingIdInSession={bookingIdInSession} setBookingIdInSession={setBookingIdInSession} sessionTime={sessionTime} setSessionTime={setSessionTime}/>
                     </>
                   ) : (
                     <>
