@@ -23,6 +23,7 @@ import { TUTOR_TIERS, TUTOR_TYPES } from '../constants/statuses';
 import { isHttpsUrl, getTutorApplicationEvidenceError } from '../utils/validation';
 import { tokenAmountUnitsFromPrice } from '../utils/tokenBookings';
 import { isValidTokenAmount } from '../utils/tokens';
+import { getTutorRateError } from '../utils/tutorPricing';
 
 function toPublicTutor(snapshot) {
   const data = snapshot.data();
@@ -126,13 +127,45 @@ export async function assertApprovedTutor(uid) {
 
 export async function updateTutorBookingDetails(uid, { hourlyRate } = {}) {
   if (!uid) throw new Error('updateTutorBookingDetails needs a tutor id.');
-  await assertApprovedTutor(uid);
-  if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) {
-    throw new Error('Enter a session token amount greater than zero.');
+  const auth = requireAuth();
+  if (auth.currentUser?.uid !== uid) {
+    throw new Error('Only the signed-in tutor can update their booking rate.');
   }
-  const rateUnits = tokenAmountUnitsFromPrice(hourlyRate);
 
   const { db } = requireFirebase();
+  const [userSnapshot, tutorSnapshot, applicationSnapshot] = await Promise.all([
+    getDoc(doc(db, COLLECTIONS.USERS, uid)),
+    getDoc(doc(db, COLLECTIONS.TUTORS, uid)),
+    getDoc(doc(db, COLLECTIONS.TUTOR_APPLICATIONS, uid)),
+  ]);
+  if (!userSnapshot.exists() || !tutorSnapshot.exists() || !applicationSnapshot.exists()) {
+    throw new Error('Submit your tutor application before setting a booking rate.');
+  }
+  const account = userSnapshot.data();
+  const tutor = tutorSnapshot.data();
+  const application = applicationSnapshot.data();
+  const accountTutorType = account.tutorType
+    ?? (account.role === ROLES.PROFESSIONAL ? TUTOR_TYPES.PROFESSIONAL : null);
+  const isStudentApplicant = account.role === ROLES.STUDENT &&
+    Object.values(TUTOR_TYPES).includes(application.tutorType);
+  const isTutorAccount = isTutorRole(account.role) &&
+    accountTutorType === application.tutorType;
+  if (!isStudentApplicant && !isTutorAccount) {
+    throw new Error('Only the account owner can update this tutor booking rate.');
+  }
+  if (
+    !['pending', 'approved'].includes(application.verificationStatus) ||
+    tutor.verificationStatus !== application.verificationStatus ||
+    tutor.publicProfileVersion !== 2 ||
+    tutor.tutorType !== application.tutorType
+  ) {
+    throw new Error('A pending or approved tutor application is required to set a booking rate.');
+  }
+
+  const rateError = getTutorRateError(application.tutorType, hourlyRate);
+  if (rateError) throw new Error(rateError);
+  const rateUnits = tokenAmountUnitsFromPrice(hourlyRate);
+
   const tutorRef = doc(db, COLLECTIONS.TUTORS, uid);
   await updateDoc(tutorRef, {
     hourlyRate: rateUnits / 100,
@@ -155,16 +188,19 @@ export async function getTutorApplication(uid) {
   }
   const { db } = requireFirebase();
   const applicationRef = doc(db, COLLECTIONS.TUTOR_APPLICATIONS, uid);
-  const snapshot = await getDoc(applicationRef);
+  const [snapshot, tutorSnapshot] = await Promise.all([
+    getDoc(applicationRef),
+    getDoc(doc(db, COLLECTIONS.TUTORS, uid)),
+  ]);
+  const hourlyRate = tutorSnapshot.exists() ? tutorSnapshot.data().hourlyRate : null;
   if (snapshot.exists()) {
-    return { ...snapshot.data(), id: snapshot.id, uid: snapshot.id };
+    return { ...snapshot.data(), hourlyRate, id: snapshot.id, uid: snapshot.id };
   }
 
   // Read legacy applications until they are resubmitted or reviewed and moved
   // into the private collection. The legacy record is only readable by its
   // owner and admins under the Firestore rules.
-  const legacySnapshot = await getDoc(doc(db, COLLECTIONS.TUTORS, uid));
-  const legacyApplication = legacySnapshot.exists() ? legacySnapshot.data() : null;
+  const legacyApplication = tutorSnapshot.exists() ? tutorSnapshot.data() : null;
   if (!legacyApplication || !Array.isArray(legacyApplication.courses)) return null;
   return { ...legacyApplication, id: legacySnapshot.id, uid: legacySnapshot.id };
 }

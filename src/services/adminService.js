@@ -243,16 +243,13 @@ export function subscribeToPendingVerifications(callback, onError) {
   const { db } = requireFirebase();
   let applications = null;
   let legacyTutors = null;
-  let directAccounts = null;
   let stopped = false;
   let stopApplications = () => {};
   let stopLegacyTutors = () => {};
-  let stopDirectAccounts = () => {};
 
   const emit = () => {
-    if (applications === null || legacyTutors === null || directAccounts === null || stopped) return;
+    if (applications === null || legacyTutors === null || stopped) return;
     const pendingById = new Map(legacyTutors.map((item) => [item.id, item]));
-    directAccounts.forEach((item) => pendingById.set(item.id, item));
     applications.forEach((item) => pendingById.set(item.id, item));
     callback([...pendingById.values()]);
   };
@@ -261,7 +258,6 @@ export function subscribeToPendingVerifications(callback, onError) {
     stopped = true;
     stopApplications();
     stopLegacyTutors();
-    stopDirectAccounts();
   };
 
   const handleError = (error) => {
@@ -292,58 +288,7 @@ export function subscribeToPendingVerifications(callback, onError) {
     },
     handleError,
   );
-  stopDirectAccounts = onSnapshot(
-    query(
-      collection(db, COLLECTIONS.USERS),
-      where('tutorVerificationStatus', '==', VERIFICATION_STATUS.PENDING),
-    ),
-    (snapshot) => {
-      directAccounts = snapshot.docs
-        .filter((account) => account.data().role === ROLES.TUTOR)
-        .map(toDirectTutorReview);
-      emit();
-    },
-    handleError,
-  );
   return stop;
-}
-
-export async function setDirectTutorAccountVerificationStatus(uid, status, review = {}) {
-  if (!uid) throw new Error('A direct tutor account id is required.');
-  if (![VERIFICATION_STATUS.APPROVED, VERIFICATION_STATUS.REJECTED].includes(status)) {
-    throw new Error('Choose approved or rejected as the verification status.');
-  }
-  const reviewerId = requireSignedInAdmin();
-  if (review.reviewerId !== reviewerId) {
-    throw new Error('The signed-in admin must be the reviewer.');
-  }
-  if (reviewerId === uid) {
-    throw new Error('Admins cannot review their own tutor accounts.');
-  }
-  const reason = typeof review.reason === 'string' ? review.reason.trim() : '';
-  if (status === VERIFICATION_STATUS.REJECTED && !reason) {
-    throw new Error('A reason is required when rejecting a tutor account.');
-  }
-
-  const { db } = requireFirebase();
-  await runTransaction(db, async (transaction) => {
-    const userRef = doc(db, COLLECTIONS.USERS, uid);
-    const userSnapshot = await transaction.get(userRef);
-    if (!userSnapshot.exists() || userSnapshot.data().role !== ROLES.TUTOR) {
-      throw new Error('This direct tutor account no longer exists.');
-    }
-    if (userSnapshot.data().tutorVerificationStatus !== VERIFICATION_STATUS.PENDING) {
-      throw new Error('This tutor account is no longer waiting for review.');
-    }
-    const timestamp = serverTimestamp();
-    transaction.update(userRef, {
-      tutorVerificationStatus: status,
-      tutorVerificationNote: reason,
-      tutorVerificationReviewedBy: reviewerId,
-      tutorVerificationReviewedAt: timestamp,
-      updatedAt: timestamp,
-    });
-  });
 }
 
 /**
@@ -370,10 +315,12 @@ export async function setVerificationStatus(tutorId, status, review = {}) {
   const { db } = requireFirebase();
   const tutorRef = doc(db, COLLECTIONS.TUTORS, tutorId);
   const applicationRef = doc(db, COLLECTIONS.TUTOR_APPLICATIONS, tutorId);
+  const userRef = doc(db, COLLECTIONS.USERS, tutorId);
   await runTransaction(db, async (transaction) => {
-    const [tutorSnapshot, applicationSnapshot] = await Promise.all([
+    const [tutorSnapshot, applicationSnapshot, userSnapshot] = await Promise.all([
       transaction.get(tutorRef),
       transaction.get(applicationRef),
+      transaction.get(userRef),
     ]);
     if (!tutorSnapshot.exists()) throw new Error('This tutor profile no longer exists.');
 
@@ -392,6 +339,20 @@ export async function setVerificationStatus(tutorId, status, review = {}) {
       reason,
       timestamp,
     );
+
+    if (
+      userSnapshot.exists() &&
+      userSnapshot.data().role === ROLES.TUTOR &&
+      userSnapshot.data().tutorVerificationStatus !== status
+    ) {
+      transaction.update(userRef, {
+        tutorVerificationStatus: status,
+        tutorVerificationNote: reason,
+        tutorVerificationReviewedBy: reviewerId,
+        tutorVerificationReviewedAt: timestamp,
+        updatedAt: timestamp,
+      });
+    }
 
     transaction.set(
       applicationRef,

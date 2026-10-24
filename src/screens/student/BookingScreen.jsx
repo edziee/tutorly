@@ -27,6 +27,7 @@ import {
   tokenAmountUnitsFromPrice,
 } from '../../utils/tokenBookings';
 import { formatTokenUnits } from '../../utils/tokens';
+import { getTutorRateError } from '../../utils/tutorPricing';
 
 const SESSION_HOURS = [1, 2, 3];
 
@@ -155,6 +156,8 @@ export default function BookingScreen({ navigation, route }) {
   );
   const tokenPricing = useMemo(() => {
     if (!hasPrice) return { breakdown: null, error: '' };
+    const rateError = getTutorRateError(tutor?.tutorType, price);
+    if (rateError) return { breakdown: null, error: rateError };
     try {
       const amountUnits = tokenAmountUnitsFromPrice(price);
       return {
@@ -164,7 +167,7 @@ export default function BookingScreen({ navigation, route }) {
     } catch (error) {
       return { breakdown: null, error: getErrorMessage(error) };
     }
-  }, [hasPrice, price]);
+  }, [hasPrice, price, tutor?.tutorType]);
   const tokenBreakdown = tokenPricing.breakdown;
   const availableDates = useMemo(() => (tutor ? getAvailableDates(tutor) : []), [tutor]);
   const [selectedDateKey, setSelectedDateKey] = useState('');
@@ -396,6 +399,9 @@ export default function BookingScreen({ navigation, route }) {
               <View style={styles.modeList}>
                 {tutorFormats.map((format) => {
                   const selected = sessionMode === format;
+                  const isOnline = format.toLowerCase().includes('online');
+                  const isOffCampus = format.toLowerCase().includes('off-campus');
+                  const formatLabel = format === 'Off-Campus / Partner Hubs' ? 'Off-Campus' : format;
                   return (
                     <Pressable
                       key={format}
@@ -410,11 +416,13 @@ export default function BookingScreen({ navigation, route }) {
                         color={selected ? colors.primary : colors.mutedText}
                       />
                       <View style={styles.modeCopy}>
-                        <Text style={styles.modeTitle}>{format}</Text>
+                        <Text style={styles.modeTitle}>{formatLabel}</Text>
                         <Text style={styles.modeDescription}>
-                          {format.toLowerCase().includes('online')
+                          {isOnline
                             ? 'Join your tutor online at the scheduled time.'
-                            : 'Meet at the tutor’s listed campus location.'}
+                            : isOffCampus
+                              ? 'Meet at an off-campus location agreed with your tutor.'
+                              : 'Meet at the tutor’s listed campus location.'}
                         </Text>
                       </View>
                       <Ionicons

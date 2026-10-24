@@ -29,7 +29,6 @@ import { VERIFICATION_STATUS } from '../../constants/statuses';
 import { useSubscription } from '../../hooks/useSubscription';
 import {
   migrateLegacyApprovedTutors,
-  setDirectTutorAccountVerificationStatus,
   setVerificationStatus,
   subscribeToPendingVerifications,
 } from '../../services/adminService';
@@ -81,10 +80,7 @@ export default function AdminVerificationsScreen() {
     }
     setBusyId(tutorId);
     try {
-      const setStatus = data.find((item) => item.id === tutorId)?.source === 'direct_signup'
-        ? setDirectTutorAccountVerificationStatus
-        : setVerificationStatus;
-      await setStatus(tutorId, newStatus, { reviewerId, reason });
+      await setVerificationStatus(tutorId, newStatus, { reviewerId, reason });
       return true;
     } catch (failure) {
       Alert.alert('Couldn’t save changes', getErrorMessage(failure, 'Please try again.'));
@@ -131,7 +127,7 @@ export default function AdminVerificationsScreen() {
         <EmptyState
           icon="shield-checkmark-outline"
           title="Nothing to review"
-          message="Tutor applications and direct tutor sign-ups awaiting review will appear here."
+          message="Tutor applications awaiting review will appear here."
         />
       ) : (
         <FlatList
@@ -182,23 +178,11 @@ function PendingCard({ tutor, busy, disabled, onApprove, onReject }) {
           ) : null}
         </View>
         {tutor.tier ? (
-          <StatusBadge
-            label={tutor.source === 'direct_signup' ? 'Not verified' : tutor.tier}
-            tone={tutor.source === 'direct_signup' ? 'warning' : 'info'}
-          />
+          <StatusBadge label={tutor.tier} tone="info" />
         ) : null}
       </View>
 
-      {tutor.source === 'direct_signup' ? (
-        <View style={styles.courses}>
-          <Text style={styles.coursesLabel}>Direct sign-up details</Text>
-          <Text style={styles.course}>Email: {tutor.email || 'Not provided'}</Text>
-          <Text style={styles.course}>Campus ID: {tutor.campusId || 'Not provided'}</Text>
-          <Text style={styles.course}>
-            No tutor courses or verification evidence were submitted at sign-up.
-          </Text>
-        </View>
-      ) : courses.length > 0 ? (
+      {courses.length > 0 ? (
         <View style={styles.courses}>
           <Text style={styles.coursesLabel}>Courses submitted</Text>
           {courses.map((course, index) => (

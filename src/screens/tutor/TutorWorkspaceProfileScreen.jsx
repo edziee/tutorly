@@ -36,6 +36,7 @@ import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { getTutorLeaderboards, TOP_RATED_MINIMUM_REVIEWS } from '../../utils/leaderboards';
 import { formatTokenUnits } from '../../utils/tokens';
+import { getMinimumTutorRate, getTutorRateError } from '../../utils/tutorPricing';
 
 function SectionTitle({ title, subtitle, action }) {
   return (
@@ -150,6 +151,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   const tutorType = application?.tutorType
     ?? user?.tutorType
     ?? (user?.role === ROLES.PROFESSIONAL ? TUTOR_TYPES.PROFESSIONAL : null);
+  const minimumTutorRate = getMinimumTutorRate(tutorType);
   const tutorCategory = application?.tier
     ?? (tutorType === TUTOR_TYPES.PROFESSIONAL
       ? 'Professional Tutor'
@@ -247,13 +249,16 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
 
   const saveBookingDetails = async () => {
     if (savingBookingDetails) return;
-    setSavingBookingDetails(true);
     setBookingDetailsError('');
+    const rateError = getTutorRateError(tutorType, Number(hourlyRate));
+    if (rateError) {
+      setBookingDetailsError(rateError);
+      return;
+    }
+    setSavingBookingDetails(true);
     try {
-      await updateTutorBookingDetails(uid, {
-        hourlyRate: Number(hourlyRate),
-      });
-      Alert.alert('Booking details saved', 'Students can see your session token amount.');
+      await updateTutorBookingDetails(uid, { hourlyRate: Number(hourlyRate) });
+      Alert.alert('Booking rate saved', 'Your session token amount has been saved.');
       await loadApplication();
     } catch (error) {
       setBookingDetailsError(getErrorMessage(error, 'Couldn’t save your booking details.'));
@@ -383,19 +388,17 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
               ) : null}
             </View>
           ) : null}
-          {!isDirectTutorAccount ? (
-            <Pressable
-              style={styles.addCourse}
-              onPress={() => openTutorApplication(navigation)}
-            >
-              <Ionicons name="create-outline" size={15} color={colors.primary} />
-              <Text style={styles.addCourseText}>
-                {verificationStatus === 'not_submitted'
-                  ? 'Start tutor application'
-                  : 'View application and course details'}
-              </Text>
-            </Pressable>
-          ) : null}
+          <Pressable
+            style={styles.addCourse}
+            onPress={() => openTutorApplication(navigation)}
+          >
+            <Ionicons name="create-outline" size={15} color={colors.primary} />
+            <Text style={styles.addCourseText}>
+              {!application
+                ? 'Complete tutor application'
+                : 'View application and course details'}
+            </Text>
+          </Pressable>
         </View>
 
         {canPerformTutorOperations ? (
@@ -481,26 +484,6 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           <Text style={styles.availabilityMeta}>
             Times: {preferredTimeSlots.length ? preferredTimeSlots.join(' · ') : 'Not set'}
           </Text>
-        </View>
-
-        <View style={styles.paymentSetupCard}>
-          <SectionTitle title="Booking rate" subtitle="Set the token amount students need to book a session." />
-          <AppInput
-            label="Session tokens"
-            value={hourlyRate}
-            handleChangeText={setHourlyRate}
-            placeholder="e.g. 280"
-            keyboardType="decimal-pad"
-          />
-          {bookingDetailsError ? (
-            <Text accessibilityRole="alert" style={styles.formError}>{bookingDetailsError}</Text>
-          ) : null}
-          <AppButton
-            title="Save details"
-            variant="outline"
-            onPress={saveBookingDetails}
-            loading={savingBookingDetails}
-          />
         </View>
 
         <SectionTitle
@@ -616,7 +599,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
             <Text style={styles.profileDescription}>
               {isDirectTutorAccount
                 ? verificationStatus === 'pending'
-                  ? 'Your direct tutor account is pending admin verification. Tutor actions remain unavailable until tutor profile details are separately approved.'
+                  ? 'Your application is awaiting admin review. You can set or update your booking rate now; tutor tools remain unavailable until approval.'
                   : verificationStatus === 'rejected'
                     ? verificationNote || 'Your tutor account was not verified. Contact support for next steps.'
                     : 'Your account is verified, but tutor actions remain unavailable until an approved tutor profile and application exist.'
@@ -635,6 +618,41 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
             ) : null}
           </View>
         )}
+
+        {['pending', 'approved'].includes(verificationStatus) && application ? (
+          <View style={styles.paymentSetupCard}>
+            <SectionTitle
+              title="Booking rate"
+              subtitle="Set the token amount students need to book a session."
+            />
+            <AppInput
+              label="Session tokens"
+              value={hourlyRate}
+              handleChangeText={(value) => {
+                setHourlyRate(value);
+                setBookingDetailsError(
+                  value.trim() ? getTutorRateError(tutorType, Number(value)) : '',
+                );
+              }}
+              placeholder="e.g. 280"
+              keyboardType="decimal-pad"
+            />
+            {minimumTutorRate ? (
+              <Text style={styles.availabilityMeta}>
+                Minimum rate: {minimumTutorRate} tokens per session.
+              </Text>
+            ) : null}
+            {bookingDetailsError ? (
+              <Text accessibilityRole="alert" style={styles.formError}>{bookingDetailsError}</Text>
+            ) : null}
+            <AppButton
+              title="Save details"
+              variant="outline"
+              onPress={saveBookingDetails}
+              loading={savingBookingDetails}
+            />
+          </View>
+        ) : null}
 
         {signOutError ? (
           <Text accessibilityRole="alert" style={styles.signOutError}>

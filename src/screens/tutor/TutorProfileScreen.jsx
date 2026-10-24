@@ -27,7 +27,6 @@ import {
 } from '../../utils/validation';
 
 const gradeOptions = ['1.00', '1.25', '1.50'];
-const minimumPhilosophyLength = 80;
 const tutoringDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const tutoringTimeSlots = ['8:00 AM - 10:00 AM', '10:00 AM - 12:00 PM', '2:00 PM - 4:00 PM', '4:00 PM - 6:00 PM', '6:00 PM - 8:00 PM'];
 
@@ -415,10 +414,9 @@ export default function TutorApplicationScreen() {
       preferredDays.length === 0 ||
       preferredTimeSlots.length === 0 ||
       selectedFormats.length === 0 ||
-      philosophy.trim().length < minimumPhilosophyLength ||
       !isCertified
     ) {
-      Alert.alert('A few details are missing', 'Complete your credentials, courses, availability, teaching statement, and certification before submitting.');
+      Alert.alert('A few details are missing', 'Complete your credentials, courses, availability, and certification before submitting.');
       return;
     }
     const evidenceError = getTutorApplicationEvidenceError({
@@ -635,18 +633,18 @@ export default function TutorApplicationScreen() {
           <Section>
             <SectionTitle title="Session format" subtitle="Choose how students can meet with you." />
             {[
-              ['Online Synchronous', 'Meet in an online video room with a shared whiteboard.', 'videocam-outline'],
-              ['On-Campus Study Rooms', 'Meet in a reserved campus study room.', 'location-outline'],
-              ['Off-Campus / Partner Hubs', 'Meet at a partner study space near campus.', 'cafe-outline'],
-            ].map(([format, description, icon]) => {
-              const selected = selectedFormats.includes(format);
+              { value: 'Online Synchronous', label: 'Online Synchronous', description: 'Meet in an online video room with a shared whiteboard.', icon: 'videocam-outline' },
+              { value: 'On-Campus Study Rooms', label: 'On-Campus Study Rooms', description: 'Meet in a reserved campus study room.', icon: 'location-outline' },
+              { value: 'Off-Campus / Partner Hubs', label: 'Off-Campus', description: 'Meet at an off-campus location.', icon: 'cafe-outline' },
+            ].map(({ value, label, description, icon }) => {
+              const selected = selectedFormats.includes(value);
               return (
-                <Pressable key={format} style={styles.formatRow} onPress={() => toggleFormat(format)}>
+                <Pressable key={value} style={styles.formatRow} onPress={() => toggleFormat(value)}>
                   <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
                     {selected ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
                   </View>
                   <View style={styles.formatCopy}>
-                    <Text style={styles.formatTitle}>{format}</Text>
+                    <Text style={styles.formatTitle}>{label}</Text>
                     <Text style={styles.formatDescription}>{description}</Text>
                   </View>
                   <Ionicons name={icon} size={16} color={selected ? colors.secondary : colors.mutedText} />
@@ -705,7 +703,7 @@ export default function TutorApplicationScreen() {
 
           <Section>
             <SectionTitle title="Teaching approach" subtitle="Describe how you help students understand a topic." />
-            <FieldLabel required>Teaching statement</FieldLabel>
+            <FieldLabel>Teaching statement (optional)</FieldLabel>
             <TextInput
               value={philosophy}
               onChangeText={setPhilosophy}
@@ -713,10 +711,6 @@ export default function TutorApplicationScreen() {
               textAlignVertical="top"
               style={styles.philosophyInput}
             />
-            <View style={styles.characterRow}>
-              <Text style={styles.characterHint}>At least 80 characters are required for certification.</Text>
-              <Text style={[styles.characterCount, philosophy.trim().length < minimumPhilosophyLength && styles.characterCountWarning]}>{philosophy.trim().length} characters</Text>
-            </View>
           </Section>
 
           <Pressable style={styles.certificationRow} onPress={() => setIsCertified((current) => !current)}>

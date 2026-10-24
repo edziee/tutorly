@@ -122,10 +122,6 @@ export default function TutorNavigator() {
       setApplicationStatus('error');
       return;
     }
-    if (isDirectTutorAccount) {
-      setApplicationStatus('not_submitted');
-      return;
-    }
     setApplicationStatus('loading');
     setLoadError(null);
     try {
@@ -187,7 +183,7 @@ export default function TutorNavigator() {
   }
 
   const canUseTutorWorkspace = canUseTutorOperations(user?.role, applicationStatus);
-  const shouldShowTutorTabs = canUseTutorWorkspace || isDirectTutorAccount;
+  const shouldShowTutorTabs = canUseTutorWorkspace;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -196,13 +192,11 @@ export default function TutorNavigator() {
       ) : (
         <Stack.Screen name="TutorApplicantStatus" component={TutorWorkspaceProfileScreen} />
       )}
-      {!isDirectTutorAccount ? (
-        <Stack.Screen
-          name={ROUTES.TUTOR_APPLICATION}
-          component={TutorApplicationScreen}
-          options={{ headerShown: true, title: 'Tutor application' }}
-        />
-      ) : null}
+      <Stack.Screen
+        name={ROUTES.TUTOR_APPLICATION}
+        component={TutorApplicationScreen}
+        options={{ headerShown: true, title: 'Tutor application' }}
+      />
       <Stack.Screen
         name={ROUTES.WALLET}
         component={WalletScreen}

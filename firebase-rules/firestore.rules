@@ -78,6 +78,12 @@ service cloud.firestore {
         scaledPrice <= units + 0.000001;
     }
 
+    function validTutorTokenRate(tutorType, price) {
+      return validTokenPrice(price) &&
+        ((tutorType == 'peer' && price >= 200) ||
+          (tutorType == 'professional' && price >= 300));
+    }
+
     function validWalletShape(data) {
       return data.keys().hasOnly([
           'availableUnits',
@@ -651,12 +657,21 @@ service cloud.firestore {
         request.resource.data.createdAt == request.time;
     }
 
-    function validAdminDirectTutorReview(uid) {
+    function validAdminTutorAccountReviewSync(uid) {
       let changes = request.resource.data.diff(resource.data).affectedKeys();
       return isAdmin() &&
         request.auth.uid != uid &&
         resource.data.get('role', '') == 'tutor' &&
-        resource.data.get('tutorVerificationStatus', '') == 'pending' &&
+        resource.data.get('tutorVerificationStatus', '') in
+          ['pending', 'approved', 'rejected'] &&
+        resource.data.tutorVerificationStatus !=
+          request.resource.data.tutorVerificationStatus &&
+        exists(applicationPath(uid)) &&
+        get(applicationPath(uid)).data.get('verificationStatus', '') == 'pending' &&
+        getAfter(applicationPath(uid)).data.verificationStatus ==
+          request.resource.data.tutorVerificationStatus &&
+        getAfter(tutorPath(uid)).data.verificationStatus ==
+          request.resource.data.tutorVerificationStatus &&
         request.resource.data.tutorVerificationStatus in ['approved', 'rejected'] &&
         request.resource.data.tutorVerificationReviewedBy == request.auth.uid &&
         request.resource.data.tutorVerificationReviewedAt == request.time &&
@@ -766,12 +781,21 @@ service cloud.firestore {
     }
 
     function validTutorBookingDetailsUpdate(uid) {
+      let tutor = request.resource.data;
+      let application = get(applicationPath(uid)).data;
       return signedIn() &&
         request.auth.uid == uid &&
-        isApprovedTutor(uid) &&
+        exists(applicationPath(uid)) &&
+        isTutorTypeForAccount(uid, application.get('tutorType', '')) &&
+        application.get('verificationStatus', '') in ['pending', 'approved'] &&
+        tutor.get('verificationStatus', '') == application.get('verificationStatus', '') &&
+        tutor.get('publicProfileVersion', 0) == 2 &&
+        tutor.get('tutorType', '') == application.get('tutorType', '') &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['hourlyRate', 'updatedAt']) &&
-        validTokenPrice(request.resource.data.hourlyRate) &&
+        validTutorTokenRate(
+          application.get('tutorType', ''),
+          tutor.hourlyRate) &&
         request.resource.data.updatedAt == request.time;
     }
 
@@ -1032,7 +1056,7 @@ service cloud.firestore {
         isApprovedTutor(data.tutorId) &&
         publicTutor.verificationStatus == 'approved' &&
         validProfileVersion(publicTutor) &&
-        validTokenPrice(publicTutor.hourlyRate) &&
+        validTutorTokenRate(publicTutor.get('tutorType', ''), publicTutor.hourlyRate) &&
         data.totalAmount == publicTutor.hourlyRate &&
         data.studentName == expectedStudentName &&
         data.tutorName == publicTutor.name &&
@@ -1356,7 +1380,7 @@ service cloud.firestore {
       allow create: if signedIn() &&
         request.auth.uid == uid &&
         validAccountCreate(uid);
-      allow update: if validAdminDirectTutorReview(uid) ||
+      allow update: if validAdminTutorAccountReviewSync(uid) ||
         (signedIn() &&
           request.auth.uid == uid &&
           validProfileUpdate(uid));

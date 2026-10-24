@@ -43,17 +43,32 @@ test('application review is admin-only and self-review is denied', () => {
   }
 });
 
-test('direct tutor signup status is pending and review is admin-only', async () => {
-  const adminReview = ruleFunction('validAdminDirectTutorReview');
-  assert.match(adminReview, /isAdmin\(\)/);
-  assert.match(adminReview, /request\.auth\.uid != uid/);
-  assert.match(adminReview, /resource\.data\.get\('role', ''\) == 'tutor'/);
-  assert.match(adminReview, /resource\.data\.get\('tutorVerificationStatus', ''\) == 'pending'/);
-  assert.match(adminReview, /request\.resource\.data\.tutorVerificationStatus in \['approved', 'rejected'\]/);
-  assert.match(adminReview, /request\.resource\.data\.tutorVerificationNote\.size\(\) > 0/);
-  assert.match(adminReview, /changes\.hasOnly/);
+test('direct tutor signup accounts cannot be reviewed without an application', async () => {
   assert.match(ruleFunction('validAccountCreate'), /tutorVerificationStatus == 'pending'/);
-  assert.match(rules, /allow update: if validAdminDirectTutorReview\(uid\)/);
+  assert.doesNotMatch(rules, /function validAdminDirectTutorReview/);
+
+  const adminService = await readFile(new URL('./adminService.js', import.meta.url), 'utf8');
+  const pendingSubscription = adminService.match(
+    /export function subscribeToPendingVerifications\([\s\S]*?export async function setVerificationStatus/,
+  )?.[0];
+  assert.ok(pendingSubscription, 'Expected pending verification subscription');
+  assert.doesNotMatch(pendingSubscription, /COLLECTIONS\.USERS/);
+  assert.doesNotMatch(adminService, /setDirectTutorAccountVerificationStatus/);
+});
+
+test('application approval synchronizes the matching direct tutor account', async () => {
+  const adminService = await readFile(
+    new URL('./adminService.js', import.meta.url),
+    'utf8',
+  );
+  const applicationReview = adminService.match(
+    /export async function setVerificationStatus\([\s\S]*?export async function migrateLegacyApprovedTutors/,
+  )?.[0];
+  assert.ok(applicationReview, 'Expected application review implementation');
+  assert.match(applicationReview, /transaction\.get\(userRef\)/);
+  assert.match(applicationReview, /userSnapshot\.data\(\)\.role === ROLES\.TUTOR/);
+  assert.match(applicationReview, /tutorVerificationStatus: status/);
+  assert.match(ruleFunction('validAdminTutorAccountReviewSync'), /getAfter\(applicationPath\(uid\)\)/);
 });
 
 test('private application evidence is owner/admin-only and excluded from public profiles', () => {
@@ -105,6 +120,18 @@ test('booking prices are validated in whole minor units without direct float equ
   assert.match(ruleFunction('validBookingCreate'), /availableUnits', -1\) >=\s*data\.tokenAmountUnits/);
   assert.doesNotMatch(ruleFunction('validBookingCreate'), /validBookingReserveApplied/);
   assert.doesNotMatch(ruleFunction('validBookingCreate'), /data\.totalAmount \* 100 == data\.tokenAmountUnits/);
+});
+
+test('tutor rates and bookings enforce the minimum for each tutor type', () => {
+  const minimumRate = ruleFunction('validTutorTokenRate');
+  assert.match(minimumRate, /tutorType == 'peer' && price >= 200/);
+  assert.match(minimumRate, /tutorType == 'professional' && price >= 300/);
+  const rateUpdate = ruleFunction('validTutorBookingDetailsUpdate');
+  assert.match(rateUpdate, /application\.get\('verificationStatus', ''\) in \['pending', 'approved'\]/);
+  assert.match(rateUpdate, /isTutorTypeForAccount\(uid, application\.get\('tutorType', ''\)\)/);
+  assert.match(rateUpdate, /validTutorTokenRate/);
+  assert.doesNotMatch(rateUpdate, /isApprovedTutor\(uid\)/);
+  assert.match(ruleFunction('validBookingCreate'), /validTutorTokenRate/);
 });
 
 test('booking tokens move on acceptance, refund on cancellation, and settle on completion', async () => {
