@@ -101,6 +101,8 @@ test('booking prices are validated in whole minor units without direct float equ
   assert.match(ruleFunction('validBookingCreate'), /tokenPriceMatchesUnits\(data\.totalAmount, data\.tokenAmountUnits\)/);
   assert.match(ruleFunction('validBookingCreate'), /data\.tokenStatus == 'pending'/);
   assert.match(ruleFunction('validBookingCreate'), /validBookingTokenSplit\(data\)/);
+  assert.match(ruleFunction('validBookingCreate'), /exists\(walletPath\(request\.auth\.uid\)\)/);
+  assert.match(ruleFunction('validBookingCreate'), /availableUnits', -1\) >=\s*data\.tokenAmountUnits/);
   assert.doesNotMatch(ruleFunction('validBookingCreate'), /validBookingReserveApplied/);
   assert.doesNotMatch(ruleFunction('validBookingCreate'), /data\.totalAmount \* 100 == data\.tokenAmountUnits/);
 });
@@ -124,7 +126,10 @@ test('booking tokens move on acceptance, refund on cancellation, and settle on c
   )?.[0];
   assert.ok(createBooking, 'Expected createBooking implementation');
   assert.match(createBooking, /TOKEN_BOOKING_STATUS\.PENDING/);
-  assert.doesNotMatch(createBooking, /transaction\.get\(walletRef\)/);
+  assert.match(createBooking, /COLLECTIONS\.WALLETS, booking\.studentId/);
+  assert.match(createBooking, /transaction\.get\(walletRef\)/);
+  assert.match(createBooking, /assertBookingBalance\(walletSnapshot\.data\(\), tokenAmountUnits\)/);
+  assert.doesNotMatch(createBooking, /transaction\.update\(walletRef/);
   assert.doesNotMatch(createBooking, /TOKEN_TRANSACTION_TYPES\.BOOKING_RESERVE/);
 });
 

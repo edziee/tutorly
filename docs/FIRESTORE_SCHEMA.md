@@ -90,16 +90,18 @@ bookings. Wallets are initialized lazily when an account opens its wallet;
 admins can also initialize a target account's zero-balance wallet before an
 adjustment. Signup does not create the wallet.
 
-Only an admin can make manual credits/debits. A booking request does not move
-tokens. When the tutor accepts, 20% of the session price is charged to the
-student and held in the tutor's wallet; the remaining 80% is held in the
-student's wallet. The deposit is rounded to the nearest 0.01 token and the
-remainder is the exact difference from the full price. On completion, the
-deposit is released and the full session price becomes available to the tutor.
-If either participant cancels an accepted booking, the deposit is refunded and
-the remaining held tokens are released. These transitions atomically update
-wallets, booking state, and `tokenTransactions`. Wallet documents are never
-directly deleted.
+Only an admin can make manual credits/debits. A booking request requires the
+student to have the full session price in available tokens, but does not move
+tokens. The balance is checked again when the tutor accepts because it may
+change while the request is pending. On acceptance, 20% of the session price
+is charged to the student and held in the tutor's wallet; the remaining 80% is
+held in the student's wallet. The deposit is rounded to the nearest 0.01 token
+and the remainder is the exact difference from the full price. On completion,
+the deposit is released and the full session price becomes available to the
+tutor. If either participant cancels an accepted booking, the deposit is
+refunded and the remaining held tokens are released. These transitions
+atomically update wallets, booking state, and `tokenTransactions`. Wallet
+documents are never directly deleted.
 
 | Field | Type | Notes |
 |---|---|---|

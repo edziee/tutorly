@@ -9,7 +9,6 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -26,6 +25,7 @@ import { assertApprovedTutor } from './tutorService';
 import { bookingsOverlap, getBookingTimeError, parseTimeToMinutes } from '../utils/bookings';
 import {
   acceptBookingTokens,
+  assertBookingBalance,
   refundAcceptedBookingTokens,
   refundReservedTokens,
   settleAcceptedBookingTokens,
@@ -61,6 +61,7 @@ export async function createBooking(booking) {
   const tokenAmountUnits = tokenAmountUnitsFromPrice(booking.totalAmount);
   const { depositUnits } = splitBookingTokens(tokenAmountUnits);
   const { db } = requireFirebase();
+  const walletRef = doc(db, COLLECTIONS.WALLETS, booking.studentId);
   const bookingRef = doc(collection(db, COLLECTIONS.BOOKINGS));
   const studentBookingsQuery = query(
     collection(db, COLLECTIONS.BOOKINGS),
@@ -80,15 +81,22 @@ export async function createBooking(booking) {
   }
 
   const timestamp = serverTimestamp();
-  await setDoc(bookingRef, {
-    ...booking,
-    totalAmount: tokenAmountUnits / 100,
-    tokenAmountUnits,
-    tokenDepositUnits: depositUnits,
-    tokenStatus: TOKEN_BOOKING_STATUS.PENDING,
-    status: BOOKING_STATUS.REQUESTED,
-    createdAt: timestamp,
-    updatedAt: timestamp,
+  await runTransaction(db, async (transaction) => {
+    const walletSnapshot = await transaction.get(walletRef);
+    if (!walletSnapshot.exists()) {
+      throw new Error('Your token wallet is unavailable. Open your wallet and try again.');
+    }
+    assertBookingBalance(walletSnapshot.data(), tokenAmountUnits);
+    transaction.set(bookingRef, {
+      ...booking,
+      totalAmount: tokenAmountUnits / 100,
+      tokenAmountUnits,
+      tokenDepositUnits: depositUnits,
+      tokenStatus: TOKEN_BOOKING_STATUS.PENDING,
+      status: BOOKING_STATUS.REQUESTED,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
   });
   return bookingRef.id;
 }

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   acceptBookingTokens,
+  assertBookingBalance,
   refundAcceptedBookingTokens,
   refundReservedTokens,
   reserveTokens,
@@ -29,6 +30,27 @@ test('booking split rounds the session-price deposit to the nearest hundredth to
     remainingUnits: 987,
   });
   assert.throws(() => splitBookingTokens(4), /at least 0\.05 tokens/);
+});
+
+test('booking request requires the full session price in available tokens', () => {
+  assert.doesNotThrow(() => assertBookingBalance(
+    { availableUnits: 10000, heldUnits: 500 },
+    10000,
+  ));
+  assert.throws(
+    () => assertBookingBalance(
+      { availableUnits: 1999, heldUnits: 0 },
+      2000,
+    ),
+    /not have enough available tokens/,
+  );
+  assert.throws(
+    () => assertBookingBalance(
+      { availableUnits: 10000, heldUnits: 0 },
+      0,
+    ),
+    /valid token amount is required/,
+  );
 });
 
 test('tutor acceptance charges the deposit and holds the remaining session price', () => {

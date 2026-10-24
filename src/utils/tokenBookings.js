@@ -24,13 +24,21 @@ export function splitBookingTokens(amountUnits) {
   return { depositUnits, remainingUnits };
 }
 
+export function assertBookingBalance(wallet, amountUnits) {
+  assertWallet(wallet);
+  if (!Number.isSafeInteger(amountUnits) || amountUnits <= 0) {
+    throw new Error('A valid token amount is required for this booking.');
+  }
+  if (wallet.availableUnits < amountUnits) {
+    throw new Error('You do not have enough available tokens for this booking.');
+  }
+}
+
 export function acceptBookingTokens(studentWallet, tutorWallet, amountUnits) {
   assertWallet(studentWallet);
   assertWallet(tutorWallet);
   const { depositUnits, remainingUnits } = splitBookingTokens(amountUnits);
-  if (studentWallet.availableUnits < amountUnits) {
-    throw new Error('The student does not have enough available tokens for this booking.');
-  }
+  assertBookingBalance(studentWallet, amountUnits);
   const studentHeldUnits = studentWallet.heldUnits + remainingUnits;
   const tutorHeldUnits = tutorWallet.heldUnits + depositUnits;
   if (!Number.isSafeInteger(studentHeldUnits) || !Number.isSafeInteger(tutorHeldUnits)) {

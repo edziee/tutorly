@@ -20,6 +20,8 @@ import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { getErrorMessage } from '../../utils/errors';
 import { createBooking } from '../../services/bookingService';
+import { useSubscription } from '../../hooks/useSubscription';
+import { subscribeToWallet } from '../../services/walletService';
 import {
   splitBookingTokens,
   tokenAmountUnitsFromPrice,
@@ -143,6 +145,27 @@ function SectionHeading({ title, trailing }) {
 export default function BookingScreen({ navigation, route }) {
   const { user } = useAuth();
   const tutor = route.params?.tutor;
+  const price = Number(tutor?.hourlyRate);
+  const hasPrice = Number.isFinite(price) && price > 0;
+  const wallet = useSubscription(
+    (onData, onError) => user?.uid
+      ? subscribeToWallet(user.uid, onData, onError)
+      : undefined,
+    [user?.uid],
+  );
+  const tokenPricing = useMemo(() => {
+    if (!hasPrice) return { breakdown: null, error: '' };
+    try {
+      const amountUnits = tokenAmountUnitsFromPrice(price);
+      return {
+        breakdown: { amountUnits, ...splitBookingTokens(amountUnits) },
+        error: '',
+      };
+    } catch (error) {
+      return { breakdown: null, error: getErrorMessage(error) };
+    }
+  }, [hasPrice, price]);
+  const tokenBreakdown = tokenPricing.breakdown;
   const availableDates = useMemo(() => (tutor ? getAvailableDates(tutor) : []), [tutor]);
   const [selectedDateKey, setSelectedDateKey] = useState('');
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -179,8 +202,15 @@ export default function BookingScreen({ navigation, route }) {
     ? durationHours
     : validDurations[validDurations.length - 1] ?? 0;
   const tutorFormats = tutor.formats ?? [];
-  const price = Number(tutor.hourlyRate);
-  const hasPrice = Number.isFinite(price) && price > 0;
+  const availableUnits = wallet.data?.availableUnits;
+  const hasWalletBalance = wallet.status === 'ready' &&
+    Number.isSafeInteger(availableUnits) &&
+    availableUnits >= 0;
+  const hasEnoughTokens = Boolean(
+    tokenBreakdown &&
+    hasWalletBalance &&
+    availableUnits >= tokenBreakdown.amountUnits,
+  );
   const endTime = activeSlot && safeDuration
     ? formatTime(toMinutes(activeSlot.startTime) + safeDuration * 60)
     : '';
@@ -212,14 +242,29 @@ export default function BookingScreen({ navigation, route }) {
       return;
     }
 
-    try {
-      const amountUnits = tokenAmountUnitsFromPrice(price);
-      const { depositUnits, remainingUnits } = splitBookingTokens(amountUnits);
-      setTokenNotice({ amountUnits, depositUnits, remainingUnits });
-      setSubmitError('');
-    } catch (error) {
-      setSubmitError(getErrorMessage(error, 'This session price cannot be split into token amounts.'));
+    if (wallet.status !== 'ready') {
+      setSubmitError(wallet.status === 'error'
+        ? `Could not verify your token balance: ${getErrorMessage(wallet.error)}`
+        : 'Checking your token balance. Please try again in a moment.');
+      return;
     }
+    if (!hasWalletBalance) {
+      setSubmitError('Your token balance is unavailable. Open your wallet and try again.');
+      return;
+    }
+    if (!tokenBreakdown) {
+      setSubmitError('This session price cannot be split into token amounts.');
+      return;
+    }
+    if (!hasEnoughTokens) {
+      setSubmitError(
+        `Not enough available tokens. This session costs ${formatTokenUnits(tokenBreakdown.amountUnits)} tokens, and you have ${formatTokenUnits(availableUnits)} available.`,
+      );
+      return;
+    }
+
+    setTokenNotice(tokenBreakdown);
+    setSubmitError('');
   };
 
   const submitBooking = async () => {
@@ -461,6 +506,22 @@ export default function BookingScreen({ navigation, route }) {
             <Text style={styles.helperText}>
               No tokens are deducted when you send a request. If the tutor accepts, the full session price is deducted from your available balance.
             </Text>
+            <Text style={[
+              styles.balanceNote,
+              hasWalletBalance && tokenBreakdown && !hasEnoughTokens && styles.balanceWarning,
+            ]}>
+              {wallet.status === 'loading'
+                ? 'Checking your available token balance...'
+                : wallet.status === 'error'
+                  ? `Could not load your token balance. ${getErrorMessage(wallet.error)}`
+                  : !hasWalletBalance
+                    ? 'Your token balance is unavailable. Open your wallet and try again.'
+                    : !tokenBreakdown
+                      ? tokenPricing.error || 'This session price is not valid for token booking.'
+                      : hasEnoughTokens
+                        ? `${formatTokenUnits(availableUnits)} tokens available`
+                        : `Not enough tokens: ${formatTokenUnits(tokenBreakdown.amountUnits)} required; ${formatTokenUnits(availableUnits)} available.`}
+            </Text>
           </View>
 
           <View style={styles.card}>
@@ -504,7 +565,8 @@ export default function BookingScreen({ navigation, route }) {
             title="Request Session"
             onPress={handleBook}
             loading={submitting}
-            disabled={!activeDate || !activeSlot || !safeDuration || !sessionMode || !hasPrice}
+            disabled={!activeDate || !activeSlot || !safeDuration || !sessionMode ||
+              !hasPrice || wallet.status !== 'ready' || !hasEnoughTokens}
           />
         </View>
 
@@ -645,6 +707,8 @@ const styles = StyleSheet.create({
   priceDivider: { height: 1, marginVertical: spacing.xs, backgroundColor: colors.divider },
   totalLabel: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   totalValue: { color: colors.primary, fontSize: 17, fontWeight: '800' },
+  balanceNote: { marginTop: spacing.xs, color: colors.mutedText, fontSize: 10, lineHeight: 15 },
+  balanceWarning: { color: colors.errorText, fontWeight: '700' },
   reviewRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.xs },
   reviewAvatar: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.peach },
   reviewInitial: { color: colors.text, fontSize: 11, fontWeight: '700' },

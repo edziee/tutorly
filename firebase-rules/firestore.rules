@@ -1002,6 +1002,9 @@ service cloud.firestore {
         data.totalAmount is number &&
         data.totalAmount > 0 &&
         tokenPriceMatchesUnits(data.totalAmount, data.tokenAmountUnits) &&
+        exists(walletPath(request.auth.uid)) &&
+        get(walletPath(request.auth.uid)).data.get('availableUnits', -1) >=
+          data.tokenAmountUnits &&
         validBookingTokenSplit(data) &&
         data.durationHours is number &&
         data.durationHours > 0 &&
