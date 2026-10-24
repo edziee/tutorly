@@ -37,6 +37,10 @@ test('our own team messages are shown as written', () => {
 test('getErrorMessage maps common Firestore codes and falls back to the given text', () => {
   assert.match(getErrorMessage({ code: 'permission-denied' }), /access/);
   assert.match(getErrorMessage({ code: 'unavailable' }), /internet/);
+  assert.match(
+    getErrorMessage({ code: 'booking/tutor-overlap' }),
+    /accepted session during this time/,
+  );
   assert.equal(getErrorMessage(new Error('boom'), 'Could not load users.'), 'Could not load users.');
   assert.equal(getErrorMessage(null), 'Something went wrong. Please try again.');
 });

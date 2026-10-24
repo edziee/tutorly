@@ -38,6 +38,9 @@ export function getAuthErrorMessage(error) {
 // For errors when loading or saving data.
 export function getErrorMessage(error, fallback = GENERIC) {
   if (isTeamMessage(error?.message)) return error.message;
+  if (error?.code === 'booking/tutor-overlap') {
+    return 'You already have an accepted session during this time. Decline this request or keep the existing booking.';
+  }
   if (error?.code === 'permission-denied') return 'You don’t have access to this.';
   if (error?.code === 'unavailable') return 'Check your internet connection and try again.';
   return fallback;

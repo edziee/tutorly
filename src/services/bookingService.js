@@ -4,10 +4,12 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -45,32 +47,30 @@ export async function createBooking(booking) {
   }
   const { db } = requireFirebase();
   const bookingRef = doc(collection(db, COLLECTIONS.BOOKINGS));
-  await runTransaction(db, async (transaction) => {
-    const studentBookingsQuery = query(
-      collection(db, COLLECTIONS.BOOKINGS),
-      where('studentId', '==', booking.studentId),
-      where('dateKey', '==', booking.dateKey),
+  const studentBookingsQuery = query(
+    collection(db, COLLECTIONS.BOOKINGS),
+    where('studentId', '==', booking.studentId),
+    where('dateKey', '==', booking.dateKey),
+  );
+  const snapshot = await getDocs(studentBookingsQuery);
+  const hasConflict = snapshot.docs.some((item) => {
+    const existing = item.data();
+    return (
+      [BOOKING_STATUS.REQUESTED, BOOKING_STATUS.UPCOMING].includes(existing.status) &&
+      bookingsOverlap(booking, existing)
     );
-    const snapshot = await transaction.get(studentBookingsQuery);
-    const hasConflict = snapshot.docs.some((item) => {
-      const existing = item.data();
-      return (
-        [BOOKING_STATUS.REQUESTED, BOOKING_STATUS.UPCOMING].includes(existing.status) &&
-        bookingsOverlap(booking, existing)
-      );
-    });
-    if (hasConflict) {
-      throw new Error('You already have a request or booking at an overlapping time.');
-    }
+  });
+  if (hasConflict) {
+    throw new Error('You already have a request or booking at an overlapping time.');
+  }
 
-    transaction.set(bookingRef, {
-      ...booking,
-      status: BOOKING_STATUS.REQUESTED,
-      paymentStatus: BOOKING_PAYMENT_STATUS.AWAITING_TUTOR_ACCEPTANCE,
-      paymentReportedAt: null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+  await setDoc(bookingRef, {
+    ...booking,
+    status: BOOKING_STATUS.REQUESTED,
+    paymentStatus: BOOKING_PAYMENT_STATUS.AWAITING_TUTOR_ACCEPTANCE,
+    paymentReportedAt: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
   return bookingRef.id;
 }
@@ -162,31 +162,41 @@ export async function updateBookingStatus(bookingId, status) {
   }
   const { db } = requireFirebase();
   const bookingRef = doc(db, COLLECTIONS.BOOKINGS, bookingId);
+  if (status === BOOKING_STATUS.UPCOMING) {
+    const bookingSnapshot = await getDoc(bookingRef);
+    if (!bookingSnapshot.exists()) throw new Error('This booking no longer exists.');
+    const requestedBooking = bookingSnapshot.data();
+    if (
+      requestedBooking.tutorId !== userId ||
+      requestedBooking.status !== BOOKING_STATUS.REQUESTED
+    ) {
+      throw new Error('Only the assigned tutor can respond to a pending request.');
+    }
+    const tutorBookingsQuery = query(
+      collection(db, COLLECTIONS.BOOKINGS),
+      where('tutorId', '==', requestedBooking.tutorId),
+      where('dateKey', '==', requestedBooking.dateKey),
+      where('status', '==', BOOKING_STATUS.UPCOMING),
+    );
+    const tutorBookings = await getDocs(tutorBookingsQuery);
+    const hasConflict = tutorBookings.docs.some((item) =>
+      item.id !== bookingId && bookingsOverlap(requestedBooking, item.data()),
+    );
+    if (hasConflict) {
+      const error = new Error('A session already occupies this time.');
+      error.code = 'booking/tutor-overlap';
+      throw error;
+    }
+  }
   await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(bookingRef);
     if (!snapshot.exists()) throw new Error('This booking no longer exists.');
     const booking = snapshot.data();
     const isTutor = booking.tutorId === userId;
     const isStudent = booking.studentId === userId;
-    let bookingUpdate = {};
     if (status === BOOKING_STATUS.UPCOMING || status === BOOKING_STATUS.REJECTED) {
       if (!isTutor || booking.status !== BOOKING_STATUS.REQUESTED) {
         throw new Error('Only the assigned tutor can respond to a pending request.');
-      }
-      if (status === BOOKING_STATUS.UPCOMING) {
-        const tutorBookingsQuery = query(
-          collection(db, COLLECTIONS.BOOKINGS),
-          where('tutorId', '==', booking.tutorId),
-          where('dateKey', '==', booking.dateKey),
-          where('status', '==', BOOKING_STATUS.UPCOMING),
-        );
-        const tutorBookings = await transaction.get(tutorBookingsQuery);
-        const hasConflict = tutorBookings.docs.some((item) =>
-          item.id !== bookingId && bookingsOverlap(booking, item.data()),
-        );
-        if (hasConflict) {
-          throw new Error('You already have an accepted booking at an overlapping time.');
-        }
       }
     } else if (status === BOOKING_STATUS.COMPLETED) {
       if (!isTutor || booking.status !== BOOKING_STATUS.UPCOMING) {
@@ -201,9 +211,7 @@ export async function updateBookingStatus(bookingId, status) {
     ) {
       throw new Error('Contact the tutor before cancelling after a payment has been reported or confirmed.');
     }
-
     transaction.update(bookingRef, {
-      ...bookingUpdate,
       status,
       ...(status === BOOKING_STATUS.UPCOMING
         ? { paymentStatus: BOOKING_PAYMENT_STATUS.AWAITING_PAYMENT }
@@ -302,7 +310,7 @@ export async function rescheduleBooking(bookingId, newTime) {
       where('studentId', '==', studentId),
       where('dateKey', '==', newTime.dateKey),
     );
-    const studentBookings = await transaction.get(studentBookingsQuery);
+    const studentBookings = await getDocs(studentBookingsQuery);
     const hasConflict = studentBookings.docs.some((item) => {
       const existing = item.data();
       return (

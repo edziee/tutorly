@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -16,12 +15,11 @@ import ScreenContainer from '../../components/ScreenContainer';
 import { BOOKING_PAYMENT_STATUS, BOOKING_STATUS } from '../../constants/statuses';
 import { ROUTES } from '../../constants/routes';
 import { useAuth } from '../../context/AuthContext';
-import { reportBookingPayment, subscribeToBooking } from '../../services/bookingService';
+import { subscribeToBooking } from '../../services/bookingService';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { useSubscription } from '../../hooks/useSubscription';
 import { getErrorMessage } from '../../utils/errors';
-import { isHttpsUrl } from '../../utils/validation';
 
 function formatDate(dateKey) {
   if (typeof dateKey !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return 'Date unavailable';
@@ -47,23 +45,13 @@ export default function PaymentScreen({ navigation, route }) {
     ),
     [bookingId, user?.uid],
   );
-  const [reported, setReported] = useState(false);
-  const [reporting, setReporting] = useState(false);
-  const [imageFailed, setImageFailed] = useState(false);
-  const [actionError, setActionError] = useState('');
-
-  useEffect(() => {
-    setReported(false);
-    setImageFailed(false);
-    setActionError('');
-  }, [bookingId]);
 
   if (!bookingId) {
     return (
       <ScreenContainer>
         <ErrorState
           title="Choose a session"
-          message="Select an accepted session from your schedule to see the tutor’s payment QR."
+          message="Select an accepted session from your schedule to see its payment details."
           onRetry={() => navigation.navigate(ROUTES.SCHEDULE)}
         />
       </ScreenContainer>
@@ -99,30 +87,9 @@ export default function PaymentScreen({ navigation, route }) {
   }
 
   const isAccepted = booking.status === BOOKING_STATUS.UPCOMING;
-  const alreadyReported = reported || booking.paymentStatus === BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION;
+  const alreadyReported = booking.paymentStatus === BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION;
   const isSettled = booking.paymentStatus === BOOKING_PAYMENT_STATUS.SETTLED;
-  const qrUrl = booking.tutorQrUrl;
-  const hasQr = isHttpsUrl(qrUrl) && !imageFailed;
   const amount = Number(booking.totalAmount);
-  const canReport = isAccepted &&
-    booking.paymentStatus === BOOKING_PAYMENT_STATUS.AWAITING_PAYMENT &&
-    hasQr &&
-    Number.isFinite(amount) &&
-    amount > 0;
-
-  const handleReportPayment = async () => {
-    if (!canReport || !user?.uid || reporting) return;
-    setReporting(true);
-    setActionError('');
-    try {
-      await reportBookingPayment(booking.id, user.uid);
-      setReported(true);
-    } catch (error) {
-      setActionError(getErrorMessage(error, 'Couldn’t report your payment. Please try again.'));
-    } finally {
-      setReporting(false);
-    }
-  };
 
   return (
     <ScreenContainer>
@@ -137,8 +104,8 @@ export default function PaymentScreen({ navigation, route }) {
             <Ionicons name="arrow-back" size={21} color={colors.text} />
           </Pressable>
           <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>Pay your tutor</Text>
-            <Text style={styles.headerSubtitle}>QR payment</Text>
+            <Text style={styles.headerTitle}>Session payment</Text>
+            <Text style={styles.headerSubtitle}>Payment details</Text>
           </View>
           <Ionicons name="shield-checkmark-outline" size={23} color={colors.primary} />
         </View>
@@ -146,12 +113,12 @@ export default function PaymentScreen({ navigation, route }) {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.policyBanner}>
             <View style={styles.policyIcon}>
-              <Ionicons name="qr-code-outline" size={20} color={colors.primary} />
+              <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
             </View>
             <View style={styles.policyCopy}>
-              <Text style={styles.policyTitle}>Pay your tutor by QR</Text>
+              <Text style={styles.policyTitle}>Payment instructions unavailable</Text>
               <Text style={styles.policyText}>
-                Tutorly doesn’t collect payments. Check the amount and recipient in your e-wallet before you send.
+                Payment options are being updated. You can review the session fee here, but payment is not available yet.
               </Text>
             </View>
           </View>
@@ -199,44 +166,13 @@ export default function PaymentScreen({ navigation, route }) {
           </View>
 
           <View style={styles.paymentCard}>
-            <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle}>Tutor’s payment QR</Text>
-              <View style={styles.dynamicTag}>
-                <Text style={styles.dynamicTagText}>Tutor provided</Text>
-              </View>
-            </View>
-            {isAccepted && hasQr ? (
-              <Image
-                accessibilityLabel={`${booking.tutorName} payment QR code`}
-                source={{ uri: qrUrl }}
-                onError={() => setImageFailed(true)}
-                style={styles.qrImage}
-                resizeMode="contain"
-              />
-            ) : !isAccepted ? (
-              <View style={styles.missingQr}>
-                <Ionicons name="hourglass-outline" size={28} color={colors.mutedText} />
-                <Text style={styles.missingQrTitle}>Payment isn’t available yet</Text>
-                <Text style={styles.missingQrText}>
-                  {booking.status === BOOKING_STATUS.REQUESTED
-                    ? 'Wait for the tutor to accept this session before paying.'
-                    : 'This booking is no longer active. No payment is due.'}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.missingQr}>
-                <Ionicons name="alert-circle-outline" size={28} color={colors.warningText} />
-                <Text style={styles.missingQrTitle}>Payment QR isn’t available</Text>
-                <Text style={styles.missingQrText}>
-                  Ask {booking.tutorName || 'your tutor'} to add a secure payment QR before you pay.
-                </Text>
-              </View>
-            )}
-            {isAccepted ? (
-              <Text style={styles.scanInstructions}>
-                Open your e-wallet, scan the QR, and check the recipient and amount before sending.
-              </Text>
-            ) : null}
+            <Ionicons name="time-outline" size={28} color={colors.mutedText} />
+            <Text style={styles.paymentNoticeTitle}>Payment isn’t available yet</Text>
+            <Text style={styles.paymentNoticeText}>
+              {booking.status === BOOKING_STATUS.REQUESTED
+                ? 'Payment instructions will be available after the payment options are updated.'
+                : 'Payment instructions will appear here when they are available.'}
+            </Text>
           </View>
 
           <View style={styles.priceCard}>
@@ -256,13 +192,6 @@ export default function PaymentScreen({ navigation, route }) {
             </View>
           </View>
 
-          <View style={styles.protectionCard}>
-            <Ionicons name="shield-checkmark" size={17} color={colors.success} />
-            <Text style={styles.protectionText}>
-              Your payment stays pending until your tutor confirms it.
-            </Text>
-          </View>
-          {actionError ? <Text accessibilityRole="alert" style={styles.errorText}>{actionError}</Text> : null}
         </ScrollView>
 
         <View style={styles.footer}>
@@ -281,19 +210,16 @@ export default function PaymentScreen({ navigation, route }) {
               <Ionicons name="hourglass-outline" size={18} color={colors.mutedText} />
               <Text style={styles.reportedText}>
                 {booking.status === BOOKING_STATUS.REQUESTED
-                  ? 'You can pay after your tutor accepts.'
+                  ? 'Payment instructions will be available when payment options are ready.'
                   : 'This booking is no longer active. No payment is due.'}
               </Text>
             </View>
           ) : (
-            <AppButton
-              title="I’ve paid — notify tutor"
-              onPress={handleReportPayment}
-              loading={reporting}
-              disabled={!canReport}
-            />
+            <AppButton title="Payment unavailable" disabled />
           )}
-          <Text style={styles.footerNote}>This reports your transfer. Your tutor must still confirm payment.</Text>
+          {!isSettled && !alreadyReported ? (
+            <Text style={styles.footerNote}>You can’t report a payment until payment options are available.</Text>
+          ) : null}
         </View>
       </View>
     </ScreenContainer>
@@ -326,16 +252,10 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   detailText: { flex: 1, color: colors.text, fontSize: 10 },
   sessionNote: { marginTop: spacing.sm, color: colors.mutedText, fontSize: 9, lineHeight: 14 },
-  paymentCard: { alignItems: 'center', padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },
-  sectionHeading: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  paymentCard: { minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },
   sectionTitle: { color: colors.heading, fontSize: 14, fontWeight: '700' },
-  dynamicTag: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.mint },
-  dynamicTagText: { color: colors.successText, fontSize: 9, fontWeight: '700' },
-  qrImage: { width: 210, height: 210, borderRadius: radius.sm, backgroundColor: colors.white },
-  missingQr: { width: '100%', minHeight: 168, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: '#F2D8AA', borderRadius: radius.sm, backgroundColor: '#FFF8E8' },
-  missingQrTitle: { color: colors.warningText, fontSize: 12, fontWeight: '700' },
-  missingQrText: { color: colors.mutedText, fontSize: 10, lineHeight: 15, textAlign: 'center' },
-  scanInstructions: { marginTop: spacing.sm, color: colors.mutedText, fontSize: 10, lineHeight: 15, textAlign: 'center' },
+  paymentNoticeTitle: { color: colors.heading, fontSize: 12, fontWeight: '700' },
+  paymentNoticeText: { color: colors.mutedText, fontSize: 10, lineHeight: 15, textAlign: 'center' },
   priceCard: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
   priceLabel: { color: colors.mutedText, fontSize: 10 },
@@ -344,9 +264,6 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginTop: spacing.sm, backgroundColor: colors.divider },
   totalLabel: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   totalValue: { color: colors.primary, fontSize: 17, fontWeight: '800' },
-  protectionCard: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: '#F0F3F2' },
-  protectionText: { flex: 1, color: colors.text, fontSize: 10, lineHeight: 15 },
-  errorText: { color: colors.errorText, fontSize: 11, lineHeight: 16 },
   footer: { gap: spacing.xs, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
   reportedBanner: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: '#DFF5EF' },
   reportedText: { flexShrink: 1, color: colors.successText, fontSize: 11, fontWeight: '700' },
