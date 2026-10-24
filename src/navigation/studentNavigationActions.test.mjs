@@ -63,3 +63,20 @@ test('student navigation has four tabs and keeps student features accessible', a
   );
   assert.equal((navigator.match(/<Tab\.Screen/g) || []).length, 6); // four tabs plus booking and payment routes
 });
+
+test('student and tutor headers open the shared wallet screen without changing account mode', async () => {
+  const [studentNavigator, tutorNavigator, indicator, walletScreen] = await Promise.all([
+    readFile(new URL('./StudentNavigator.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('./TutorNavigator.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/TokenBalanceIndicator.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../screens/shared/WalletScreen.jsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(studentNavigator, /name=\{ROUTES\.WALLET\}\s+component=\{WalletScreen\}/);
+  assert.match(tutorNavigator, /name=\{ROUTES\.WALLET\}\s+component=\{WalletScreen\}/);
+  assert.match(studentNavigator, /onWalletPress=\{\(\) => navigation\.navigate\(ROUTES\.WALLET\)\}/);
+  assert.match(tutorNavigator, /onWalletPress=\{\(\) => navigation\.navigate\(ROUTES\.WALLET\)\}/);
+  assert.match(indicator, /onPress=\{onBalancePress\}/);
+  assert.match(indicator, /onPress=\{openRequestForm\}/);
+  assert.match(walletScreen, /subscribeToTokenTransactions/);
+  assert.match(walletScreen, /assertApprovedTutor/);
+});

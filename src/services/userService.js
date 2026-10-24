@@ -1,7 +1,7 @@
 // Reads and writes the user document (users/{uid}): name, role, contact info,
 // campus, streak and so on. See docs/FIRESTORE_SCHEMA.md for the fields.
 // Owner: Member 1. Stores user profiles in Firestore.
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 import { requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
@@ -54,7 +54,8 @@ export async function createUserProfile(uid, data) {
   }
 
   const { db } = requireFirebase();
-  await setDoc(doc(db, COLLECTIONS.USERS, uid), {
+  const batch = writeBatch(db);
+  batch.set(doc(db, COLLECTIONS.USERS, uid), {
     uid,
     email: data.email,
     role: data.role,
@@ -66,6 +67,13 @@ export async function createUserProfile(uid, data) {
       : {}),
     createdAt: serverTimestamp(),
   });
+  batch.set(doc(db, COLLECTIONS.WALLETS, uid), {
+    availableUnits: 0,
+    heldUnits: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
 }
 
 /**

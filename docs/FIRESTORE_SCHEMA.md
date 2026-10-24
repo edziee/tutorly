@@ -12,8 +12,10 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | --- | --- | --- |
 | `users/{uid}` | An account of any role | The user (never the `role` after sign-up) |
 | `tutors/{uid}` | Public profile fields students need to find and book a tutor, same id as their user | The applicant submits a pending profile; admin publishes approval |
-| `tutorApplications/{uid}` | Private application evidence and payment QR details, same id as their user | The student or tutor applicant; admin reviews verification |
-| `bookings/{id}` | A session between a student and a tutor | Student creates, tutor answers |
+| `tutorApplications/{uid}` | Private application evidence, same id as their user | The student or tutor applicant; admin reviews verification |
+| `wallets/{uid}` | Private integer token balances for one account | Initialized by the account; adjusted only by atomic booking transitions or an admin |
+| `tokenTransactions/{id}` | Immutable audit record for one token movement | Admin or an atomic booking lifecycle transition |
+| `bookings/{id}` | A session between a student and a tutor, including its token hold state | Student creates, tutor answers |
 | `conversations/{id}` | A chat between one student and one tutor | Either person in the chat |
 | `conversations/{id}/messages/{id}` | One message | Either person in the chat |
 | `notifications/{id}` | One in-app alert for one user | The app, on events |
@@ -56,14 +58,14 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `courseNames` | newline-separated string | Public course code/title labels only. The app derives its display list from this field; do not put grades or proof details here |
 | `online` | boolean | |
 | `photoUrl` | string | Optional instructor-approved external image URL; otherwise use initials |
-| `hourlyRate` | number | The tutor's session price in pesos (the current booking flow treats it as the fee for a session of up to 3 hours). |
+| `hourlyRate` | number | The tutor's session price in tokens for one session. One token is nominally ₱1; values are limited to two decimal places. |
 | `verificationStatus` | `'not_submitted'` \| `'pending'` \| `'approved'` \| `'rejected'` | `VERIFICATION_STATUS`. Students only see `approved` tutors |
 | `verificationNote` | string | Public profile field; rejected tutors are not visible to students |
 | `publicProfileVersion` | number | Must be `2` before students can read a profile. This keeps legacy documents containing proof fields private until migrated |
 
 ## `tutorApplications/{uid}` (private)
 
-This document is readable only by its applicant and admins. Applicants may have a student, tutor, or legacy professional account role; applying never changes that role. Keep verification proof and payment QR fields here, never in `tutors/{uid}`, because Firestore security rules cannot hide selected fields from clients that can read a document.
+This document is readable only by its applicant and admins. Applicants may have a student, tutor, or legacy professional account role; applying never changes that role. Keep verification proof here, never in `tutors/{uid}`, because Firestore security rules cannot hide selected fields from clients that can read a document. A legacy payment QR value may remain in older private application records, but new records do not use the QR payment flow.
 
 Tutor operations are granted only when both this private record and the matching `tutors/{uid}` public profile have `verificationStatus: 'approved'`, and the public profile has `publicProfileVersion: 2`. Pending and rejected applicants may see their own application status and evidence but cannot appear in tutor search, accept bookings, or update tutor booking details. A student applicant who is approved keeps all student access and may switch between student and tutor workspaces. Direct tutor sign-ups are tracked separately using `users/{uid}.tutorVerificationStatus`; account approval alone does not publish a public tutor profile or authorize tutor-only operations.
 
@@ -74,10 +76,53 @@ Tutor operations are granted only when both this private record and the matching
 | `courses` | array of `{ id, code, title, grade, proofUrl?, proofName? }` | Peer tutors require eligible grades and course-level proof. Alumni/Professors may leave grades blank |
 | `applicationProofName`, `applicationProofUrl` | string | Alumni/Professor proof description and HTTPS Google Drive URL |
 | `teachingPhilosophy` | string | Tutor application text |
-| `paymentQrUrl` | string | Optional HTTPS QR image URL. Copied to a booking only when the tutor accepts it |
+| `paymentQrUrl` | string | Legacy private field. New tutor applications do not collect QR payment details; retain only as needed for historical records |
 | `verificationStatus`, `verificationNote` | string | Pending/approved/rejected status and rejection reason |
 | `verificationReviewedBy`, `verificationReviewedAt` | string, timestamp | Admin reviewer and review time |
 | `createdAt`, `updatedAt` | timestamp | |
+
+## `wallets/{uid}` (private)
+
+Wallets are readable only by their owner and admins. Balances are stored as
+integer minor units to avoid floating-point arithmetic: 100 units equals one
+token. `availableUnits` can be spent; `heldUnits` is reserved for active
+bookings. New accounts create their zero-balance wallet in the same batch as
+their user profile. Existing accounts initialize their own zero wallet when
+opening the wallet; this cannot credit tokens.
+
+Only an admin can make manual credits/debits. Booking reservation, refund, and
+settlement update the affected wallets atomically with the booking and
+`tokenTransactions` ledger entries. Firestore rules validate these paired
+changes. Wallet documents are never directly deleted.
+
+| Field | Type | Notes |
+|---|---|---|
+| `availableUnits`, `heldUnits` | non-negative integers | 100 units = 1 token = nominally ₱1 |
+| `createdAt`, `updatedAt` | timestamp | |
+| `lastTransactionId` | string, optional | Points to the most recent ledger event for this wallet |
+
+## `tokenTransactions/{id}` (private, append-only)
+
+Entries are readable by the wallet owner and admins. Clients cannot update or
+delete ledger records. Admin credits and debits require a reason and may
+include an external Google Form reference. The admin screen reuses one
+operation id when retrying an adjustment, preventing duplicate credits after a
+lost response. Top-ups and cash-outs themselves
+remain external requests: an admin verifies them before recording a wallet
+adjustment. The app does not process real-money payments or automatically
+convert tokens to cash. The app applies no exchange fees; admins must disclose
+any external fee before processing a request.
+
+| Field | Type | Notes |
+|---|---|---|
+| `type` | string | `admin_credit`, `admin_debit`, `booking_reserve`, `booking_refund`, `booking_settlement_debit`, or `booking_settlement_credit` |
+| `accountId` | string | Wallet whose balance changed |
+| `amountUnits` | positive integer | Absolute amount moved |
+| `availableDelta`, `heldDelta` | integers | Exact change to the corresponding wallet balance |
+| `actorUid` | string | Signed-in account that initiated the event |
+| `reason`, `formReference` | string | Audit context; reference is empty for booking events |
+| `bookingId` | string, optional | Present for booking lifecycle events |
+| `createdAt` | timestamp | |
 
 ## `bookings/{id}`
 
@@ -93,10 +138,11 @@ Tutor operations are granted only when both this private record and the matching
 | `location` | string | |
 | `sessionMode` | string | The session format selected by the student, copied from the tutor's listed formats |
 | `notes` | string | |
-| `totalAmount` | number | Pesos. The screen formats it |
-| `paymentStatus` | `'awaiting_tutor_acceptance'` \| `'awaiting_payment'` \| `'pending_verification'` \| `'settled'` \| `'not_applicable'` | A QR transfer is not considered paid/settled until the tutor manually verifies the student's report |
-| `tutorQrUrl`, `tutorPhotoUrl` | string | QR image and optional tutor photo copied to the booking when the tutor accepts; only booking participants and admins can read it |
-| `paymentReportedAt`, `paymentVerifiedAt` | timestamp | Student report time and tutor verification time |
+| `totalAmount` | number | Token amount for new bookings; legacy records retain their historical peso amount |
+| `tokenAmountUnits` | positive integer | Exact token amount in minor units (100 units = 1 token) |
+| `tokenStatus` | `'reserved'` \| `'refunded'` \| `'settled'` | New bookings reserve tokens at request time, refund on rejection/cancellation, and transfer to the tutor when completed |
+| `paymentStatus`, `tutorQrUrl`, `paymentReportedAt`, `paymentVerifiedAt` | legacy values | Retained only for historical peso bookings; new booking flow does not write QR payment fields |
+| `tutorPhotoUrl` | string | Optional tutor photo copied to the booking when the tutor accepts; only booking participants and admins can read it |
 | `review`, `rating` | string, number | The mock data's `rating` holds review text; a star rating is optional |
 | `checkedInAt`, `checkInCoordinates` | timestamp, map | Week 3 |
 | `createdAt`, `updatedAt` | timestamp | |
@@ -161,7 +207,7 @@ Before publishing role-based rules, migrate existing tutor documents. Reviewing 
 3. **Who creates notifications:** the app creates the notification document after a booking, message or verification write succeeds. Cloud Functions and scheduled functions are intentionally not used on the Spark plan. These alerts are best effort and are not a trusted audit log.
 4. **Tier names:** some mock data says `Faculty` or `Faculty Tier`. The real data uses `Professor` only.
 5. **Drive sharing policy:** confirm the admin reviewer's Google account and whether tutors must share only with that account or whether "Anyone with the link" is acceptable for the demo.
-6. **Booking payment states:** Member 2 must confirm the exact `paymentStatus` values for the simulated payment flow; do not persist display labels such as "Escrow protected" unless the team agrees they are the canonical values.
+6. **Token request forms:** set the student top-up and tutor cash-out Google Form URLs using the public Expo environment variables in `.env.example`. Admins must verify the external request and manually record any adjustment.
 
 ## Chat notification delivery
 

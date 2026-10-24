@@ -16,6 +16,7 @@ import StudentProfileScreen from '../screens/student/StudentProfileScreen';
 import BookingScreen from '../screens/student/BookingScreen';
 import PaymentScreen from '../screens/student/PaymentScreen';
 import TutorApplicationScreen from '../screens/tutor/TutorProfileScreen';
+import WalletScreen from '../screens/shared/WalletScreen';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
@@ -64,6 +65,9 @@ function StudentTabs() {
             title={tabConfig[route.name].title}
             initials={studentInitials}
             imageUri={user?.photoUrl}
+            userId={user?.uid}
+            role={user?.role}
+            onWalletPress={() => navigation.navigate(ROUTES.WALLET)}
             onProfilePress={() => navigation.navigate('Profile')}
             onNotificationsPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}
           />
@@ -158,6 +162,11 @@ export default function StudentNavigator() {
         name={ROUTES.TUTOR_APPLICATION}
         component={TutorApplicationScreen}
         options={{ title: 'Tutor application' }}
+      />
+      <Stack.Screen
+        name={ROUTES.WALLET}
+        component={WalletScreen}
+        options={{ title: 'Token wallet' }}
       />
     </Stack.Navigator>
   );

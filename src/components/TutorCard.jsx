@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { formatTokenUnits } from '../utils/tokens';
 
 const tierStyles = {
   Professor: { backgroundColor: colors.primary, color: colors.white, iconColor: colors.white },
@@ -73,7 +74,9 @@ export default function TutorCard({ tutor, handlePress }) {
 
       <View style={styles.bottomDetails}>
         <Text style={styles.price} numberOfLines={2}>
-          {Number.isFinite(tutor.hourlyRate) ? `₱${tutor.hourlyRate}` : 'Price not set'}
+          {Number.isFinite(tutor.hourlyRate)
+            ? `${formatTokenUnits(Math.round(tutor.hourlyRate * 100))} tokens`
+            : 'Price not set'}
           <Text style={styles.priceUnit}> / session</Text>
         </Text>
         <View style={styles.bookButton}>

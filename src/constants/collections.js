@@ -6,6 +6,8 @@ export const COLLECTIONS = {
   USERS: 'users', // one document per account, includes the role field
   TUTORS: 'tutors', // public tutor profile, same id as the user's uid
   TUTOR_APPLICATIONS: 'tutorApplications', // private tutor verification data
+  WALLETS: 'wallets', // private token balances, one per account
+  TOKEN_TRANSACTIONS: 'tokenTransactions', // immutable token movement ledger
   BOOKINGS: 'bookings', // sessions between a student and a tutor
   CONVERSATIONS: 'conversations', // one chat between a student and a tutor
   MESSAGES: 'messages', // subcollection: conversations/{id}/messages

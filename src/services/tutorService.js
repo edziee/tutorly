@@ -21,6 +21,8 @@ import { COLLECTIONS } from '../constants/collections';
 import { isTutorRole, ROLES } from '../constants/roles';
 import { TUTOR_TIERS, TUTOR_TYPES } from '../constants/statuses';
 import { isHttpsUrl, getTutorApplicationEvidenceError } from '../utils/validation';
+import { tokenAmountUnitsFromPrice } from '../utils/tokenBookings';
+import { isValidTokenAmount } from '../utils/tokens';
 
 function toPublicTutor(snapshot) {
   const data = snapshot.data();
@@ -54,7 +56,7 @@ function toPublicTutor(snapshot) {
     photoUrl: data.photoUrl ?? '',
     rating: Number.isFinite(data.rating) ? data.rating : null,
     reviewCount: Number.isFinite(data.reviewCount) ? data.reviewCount : 0,
-    hourlyRate: Number.isFinite(data.hourlyRate) ? data.hourlyRate : null,
+    hourlyRate: isValidTokenAmount(data.hourlyRate) ? data.hourlyRate : null,
   };
 }
 
@@ -124,10 +126,14 @@ export async function updateTutorBookingDetails(uid, { hourlyRate } = {}) {
   if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) {
     throw new Error('Enter a session token amount greater than zero.');
   }
+  const rateUnits = tokenAmountUnitsFromPrice(hourlyRate);
 
   const { db } = requireFirebase();
   const tutorRef = doc(db, COLLECTIONS.TUTORS, uid);
-  await updateDoc(tutorRef, { hourlyRate, updatedAt: serverTimestamp() });
+  await updateDoc(tutorRef, {
+    hourlyRate: rateUnits / 100,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 /**

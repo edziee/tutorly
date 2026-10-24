@@ -235,7 +235,7 @@ export default function BookingScreen({ navigation, route }) {
   };
 
   const tierLabel = tutor.tier || 'Tutor';
-  const displayPrice = hasPrice ? `₱${price.toFixed(2)}` : 'Price not set';
+  const displayPrice = hasPrice ? `${price.toFixed(2)} tokens` : 'Price not set';
 
   return (
     <ScreenContainer>
@@ -436,7 +436,9 @@ export default function BookingScreen({ navigation, route }) {
               <Text style={styles.totalLabel}>Total due to tutor</Text>
               <Text style={styles.totalValue}>{displayPrice}</Text>
             </View>
-            <Text style={styles.helperText}>Pay your tutor by QR after they accept your request.</Text>
+            <Text style={styles.helperText}>
+              Tokens are reserved when you send this request and returned if it is declined or cancelled.
+            </Text>
           </View>
 
           <View style={styles.card}>

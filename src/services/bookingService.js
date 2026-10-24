@@ -1,5 +1,5 @@
-// Bookings (bookings/{id}): requests, accepted sessions, QR payment reporting,
-// rescheduling and check-in.
+// Bookings (bookings/{id}): token reservations, session status, rescheduling,
+// and check-in. Older peso/payment fields are retained only on legacy records.
 import {
   collection,
   doc,
@@ -9,17 +9,26 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore';
 
 import { requireAuth, requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
-import { BOOKING_PAYMENT_STATUS, BOOKING_STATUS } from '../constants/statuses';
+import {
+  BOOKING_PAYMENT_STATUS,
+  BOOKING_STATUS,
+  TOKEN_BOOKING_STATUS,
+  TOKEN_TRANSACTION_TYPES,
+} from '../constants/statuses';
 import { assertApprovedTutor } from './tutorService';
 import { bookingsOverlap, getBookingTimeError, parseTimeToMinutes } from '../utils/bookings';
-import { isHttpsUrl } from '../utils/validation';
+import {
+  refundReservedTokens,
+  reserveTokens,
+  settleReservedTokens,
+  tokenAmountUnitsFromPrice,
+} from '../utils/tokenBookings';
 
 function requireText(value, field) {
   if (typeof value !== 'string' || !value.trim()) {
@@ -45,8 +54,15 @@ export async function createBooking(booking) {
   if (!auth.currentUser || auth.currentUser.uid !== booking.studentId) {
     throw new Error('Sign in as the student requesting this session.');
   }
+  const tokenAmountUnits = tokenAmountUnitsFromPrice(booking.totalAmount);
   const { db } = requireFirebase();
   const bookingRef = doc(collection(db, COLLECTIONS.BOOKINGS));
+  const walletRef = doc(db, COLLECTIONS.WALLETS, booking.studentId);
+  const ledgerRef = doc(
+    db,
+    COLLECTIONS.TOKEN_TRANSACTIONS,
+    `${bookingRef.id}_reserve`,
+  );
   const studentBookingsQuery = query(
     collection(db, COLLECTIONS.BOOKINGS),
     where('studentId', '==', booking.studentId),
@@ -64,13 +80,47 @@ export async function createBooking(booking) {
     throw new Error('You already have a request or booking at an overlapping time.');
   }
 
-  await setDoc(bookingRef, {
-    ...booking,
-    status: BOOKING_STATUS.REQUESTED,
-    paymentStatus: BOOKING_PAYMENT_STATUS.AWAITING_TUTOR_ACCEPTANCE,
-    paymentReportedAt: null,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+  await runTransaction(db, async (transaction) => {
+    const [wallet, existingBooking, existingLedger] = await Promise.all([
+      transaction.get(walletRef),
+      transaction.get(bookingRef),
+      transaction.get(ledgerRef),
+    ]);
+    if (existingBooking.exists() || existingLedger.exists()) {
+      throw new Error('Could not create a unique booking request. Please try again.');
+    }
+    if (!wallet.exists()) {
+      throw new Error('Your token wallet is still being initialized. Please retry shortly.');
+    }
+    const walletData = wallet.data();
+    const reservedWallet = reserveTokens(walletData, tokenAmountUnits);
+    const timestamp = serverTimestamp();
+    transaction.update(walletRef, {
+      ...reservedWallet,
+      updatedAt: timestamp,
+      lastTransactionId: ledgerRef.id,
+    });
+    transaction.set(bookingRef, {
+      ...booking,
+      totalAmount: tokenAmountUnits / 100,
+      tokenAmountUnits,
+      tokenStatus: TOKEN_BOOKING_STATUS.RESERVED,
+      status: BOOKING_STATUS.REQUESTED,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    transaction.set(ledgerRef, {
+      type: TOKEN_TRANSACTION_TYPES.BOOKING_RESERVE,
+      accountId: booking.studentId,
+      amountUnits: tokenAmountUnits,
+      availableDelta: -tokenAmountUnits,
+      heldDelta: tokenAmountUnits,
+      actorUid: booking.studentId,
+      reason: 'Tokens reserved for booking request.',
+      formReference: '',
+      bookingId: bookingRef.id,
+      createdAt: timestamp,
+    });
   });
   return bookingRef.id;
 }
@@ -205,6 +255,127 @@ export async function updateBookingStatus(bookingId, status) {
     } else if ((!isTutor && !isStudent) || ![BOOKING_STATUS.REQUESTED, BOOKING_STATUS.UPCOMING].includes(booking.status)) {
       throw new Error('Only a participant can cancel an active booking.');
     }
+
+    if (booking.tokenStatus) {
+      if (booking.tokenStatus !== TOKEN_BOOKING_STATUS.RESERVED) {
+        throw new Error('This booking no longer has reserved tokens to move.');
+      }
+      const studentWalletRef = doc(db, COLLECTIONS.WALLETS, booking.studentId);
+      const refundRef = doc(
+        db,
+        COLLECTIONS.TOKEN_TRANSACTIONS,
+        `${bookingId}_refund`,
+      );
+      if (status === BOOKING_STATUS.REJECTED || status === BOOKING_STATUS.CANCELLED) {
+        const [wallet, existingRefund] = await Promise.all([
+          transaction.get(studentWalletRef),
+          transaction.get(refundRef),
+        ]);
+        if (!wallet.exists()) throw new Error('The student wallet is unavailable.');
+        if (existingRefund.exists()) throw new Error('This booking refund has already been recorded.');
+        const walletData = wallet.data();
+        const refundedWallet = refundReservedTokens(walletData, booking.tokenAmountUnits);
+        const timestamp = serverTimestamp();
+        transaction.update(studentWalletRef, {
+          ...refundedWallet,
+          updatedAt: timestamp,
+          lastTransactionId: refundRef.id,
+        });
+        transaction.set(refundRef, {
+          type: TOKEN_TRANSACTION_TYPES.BOOKING_REFUND,
+          accountId: booking.studentId,
+          amountUnits: booking.tokenAmountUnits,
+          availableDelta: booking.tokenAmountUnits,
+          heldDelta: -booking.tokenAmountUnits,
+          actorUid: userId,
+          reason: status === BOOKING_STATUS.REJECTED
+            ? 'Tutor rejected the booking request.'
+            : 'Booking cancelled; reserved tokens returned.',
+          formReference: '',
+          bookingId,
+          createdAt: timestamp,
+        });
+      } else if (status === BOOKING_STATUS.COMPLETED) {
+        const tutorWalletRef = doc(db, COLLECTIONS.WALLETS, booking.tutorId);
+        const debitRef = doc(
+          db,
+          COLLECTIONS.TOKEN_TRANSACTIONS,
+          `${bookingId}_settlement_debit`,
+        );
+        const creditRef = doc(
+          db,
+          COLLECTIONS.TOKEN_TRANSACTIONS,
+          `${bookingId}_settlement_credit`,
+        );
+        const [studentWallet, tutorWallet, oldDebit, oldCredit] = await Promise.all([
+          transaction.get(studentWalletRef),
+          transaction.get(tutorWalletRef),
+          transaction.get(debitRef),
+          transaction.get(creditRef),
+        ]);
+        if (!studentWallet.exists() || !tutorWallet.exists()) {
+          throw new Error('A booking wallet is unavailable. Contact support.');
+        }
+        if (oldDebit.exists() || oldCredit.exists()) {
+          throw new Error('This booking settlement has already been recorded.');
+        }
+        const studentData = studentWallet.data();
+        const tutorData = tutorWallet.data();
+        const settledWallets = settleReservedTokens(
+          studentData,
+          tutorData,
+          booking.tokenAmountUnits,
+        );
+        const timestamp = serverTimestamp();
+        transaction.update(studentWalletRef, {
+          ...settledWallets.student,
+          updatedAt: timestamp,
+          lastTransactionId: debitRef.id,
+        });
+        transaction.update(tutorWalletRef, {
+          ...settledWallets.tutor,
+          updatedAt: timestamp,
+          lastTransactionId: creditRef.id,
+        });
+        transaction.set(debitRef, {
+          type: TOKEN_TRANSACTION_TYPES.BOOKING_SETTLEMENT_DEBIT,
+          accountId: booking.studentId,
+          amountUnits: booking.tokenAmountUnits,
+          availableDelta: 0,
+          heldDelta: -booking.tokenAmountUnits,
+          actorUid: userId,
+          reason: 'Tokens transferred to tutor after session completion.',
+          formReference: '',
+          bookingId,
+          createdAt: timestamp,
+        });
+        transaction.set(creditRef, {
+          type: TOKEN_TRANSACTION_TYPES.BOOKING_SETTLEMENT_CREDIT,
+          accountId: booking.tutorId,
+          amountUnits: booking.tokenAmountUnits,
+          availableDelta: booking.tokenAmountUnits,
+          heldDelta: 0,
+          actorUid: userId,
+          reason: 'Tokens received after session completion.',
+          formReference: '',
+          bookingId,
+          createdAt: timestamp,
+        });
+      }
+      const tokenUpdates = {
+        status,
+        updatedAt: serverTimestamp(),
+        ...(status === BOOKING_STATUS.REJECTED || status === BOOKING_STATUS.CANCELLED
+          ? { tokenStatus: TOKEN_BOOKING_STATUS.REFUNDED }
+          : {}),
+        ...(status === BOOKING_STATUS.COMPLETED
+          ? { tokenStatus: TOKEN_BOOKING_STATUS.SETTLED }
+          : {}),
+      };
+      transaction.update(bookingRef, tokenUpdates);
+      return;
+    }
+
     if (
       status === BOOKING_STATUS.CANCELLED &&
       [BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION, BOOKING_PAYMENT_STATUS.SETTLED].includes(booking.paymentStatus)
@@ -219,62 +390,6 @@ export async function updateBookingStatus(bookingId, status) {
       ...(status === BOOKING_STATUS.REJECTED || status === BOOKING_STATUS.CANCELLED
         ? { paymentStatus: BOOKING_PAYMENT_STATUS.NOT_APPLICABLE }
         : {}),
-      updatedAt: serverTimestamp(),
-    });
-  });
-}
-
-export async function reportBookingPayment(bookingId, studentId) {
-  requireText(bookingId, 'id');
-  requireText(studentId, 'student');
-  const auth = requireAuth();
-  if (auth.currentUser?.uid !== studentId) {
-    throw new Error('Sign in as the student who booked this session.');
-  }
-  const { db } = requireFirebase();
-  const bookingRef = doc(db, COLLECTIONS.BOOKINGS, bookingId);
-  await runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(bookingRef);
-    if (!snapshot.exists()) throw new Error('This booking no longer exists.');
-    const booking = snapshot.data();
-    if (booking.studentId !== studentId) throw new Error('Only the student who booked can report payment.');
-    if (booking.status !== BOOKING_STATUS.UPCOMING) {
-      throw new Error('Payment is available only after the tutor accepts the session.');
-    }
-    if (booking.paymentStatus !== BOOKING_PAYMENT_STATUS.AWAITING_PAYMENT) {
-      throw new Error('This booking is not waiting for a payment report.');
-    }
-    if (!isHttpsUrl(booking.tutorQrUrl)) {
-      throw new Error('The tutor has not configured a valid payment QR yet.');
-    }
-    transaction.update(bookingRef, {
-      paymentStatus: BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION,
-      paymentReportedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  });
-}
-
-export async function confirmBookingPayment(bookingId) {
-  requireText(bookingId, 'id');
-  const auth = requireAuth();
-  const tutorId = auth.currentUser?.uid;
-  if (!tutorId) throw new Error('Sign in as the tutor to verify this payment.');
-  await assertApprovedTutor(tutorId);
-  const { db } = requireFirebase();
-  const bookingRef = doc(db, COLLECTIONS.BOOKINGS, bookingId);
-  await runTransaction(db, async (transaction) => {
-    const snapshot = await transaction.get(bookingRef);
-    if (!snapshot.exists()) throw new Error('This booking no longer exists.');
-    const booking = snapshot.data();
-    if (booking.tutorId !== tutorId) throw new Error('Only the assigned tutor can verify this payment.');
-    if (![BOOKING_STATUS.UPCOMING, BOOKING_STATUS.COMPLETED].includes(booking.status) ||
-      booking.paymentStatus !== BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION) {
-      throw new Error('This booking has no payment report waiting for verification.');
-    }
-    transaction.update(bookingRef, {
-      paymentStatus: BOOKING_PAYMENT_STATUS.SETTLED,
-      paymentVerifiedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
   });
@@ -297,7 +412,9 @@ export async function rescheduleBooking(bookingId, newTime) {
     if (booking.studentId !== studentId || booking.status !== BOOKING_STATUS.UPCOMING) {
       throw new Error('Only the student can reschedule an accepted session.');
     }
-    if (booking.paymentStatus !== BOOKING_PAYMENT_STATUS.AWAITING_PAYMENT) {
+    if (booking.tokenStatus
+      ? booking.tokenStatus !== TOKEN_BOOKING_STATUS.RESERVED
+      : booking.paymentStatus !== BOOKING_PAYMENT_STATUS.AWAITING_PAYMENT) {
       throw new Error('This session cannot be rescheduled after payment has been reported.');
     }
     const durationHours = (
@@ -330,10 +447,6 @@ export async function rescheduleBooking(bookingId, newTime) {
       updatedAt: serverTimestamp(),
     });
   });
-}
-
-export async function markBookingPaid(bookingId, studentId) {
-  return reportBookingPayment(bookingId, studentId);
 }
 
 export async function checkInToBooking(bookingId, coordinates) {

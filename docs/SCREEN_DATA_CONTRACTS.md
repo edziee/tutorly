@@ -33,7 +33,10 @@ The student workspace has four visible tabs: Tutors, Profile, Schedule, and Mess
 | `AdminVerificationsScreen` | `adminService.subscribeToPendingVerifications(callback)` | `id`, `name`, `tutorType`, `tier`, `subject`, `courses: [{ id, code, title, grade, proofName?, proofUrl? }]`, and optional application-level `applicationProofName` / `applicationProofUrl`. A tutor must leave this list once approved or rejected |
 | `AdminVerificationsScreen` | `adminService.setVerificationStatus(tutorId, status, { reviewerId, reason })` | `status` is `approved` or `rejected`. `reason` is only sent when rejecting |
 | `AdminVerificationsScreen` | `adminService.setDirectTutorAccountVerificationStatus(uid, status, { reviewerId, reason })` | Direct tutor sign-ups are reviewed using basic account fields. Approval changes account status only; it does not enable tutor operations without approved tutor profile and application data |
-| `AdminBookingsScreen` | `adminService.getBookingsOverview()` | `id`, `subject`, `studentName`, `tutorName`, `dateKey`, `startTime`, `endTime`, `status`, `totalAmount` (a number in pesos) |
+| `AdminBookingsScreen` | `adminService.getBookingsOverview()` | `id`, `subject`, `studentName`, `tutorName`, `dateKey`, `startTime`, `endTime`, `status`, `tokenAmountUnits` for new token bookings; legacy rows retain peso `totalAmount` |
+| `AppHeader` | `walletService.subscribeToWallet(uid, callback)` | A student/tutor sees the live available token balance; tapping it opens wallet history, and the plus button opens the configured top-up or cash-out Google Form |
+| `WalletScreen` | `walletService.subscribeToWallet(uid, callback)`, `subscribeToTokenTransactions(uid, callback)` | Own available/held balances and up to 50 newest ledger entries. An admin verifies external forms and manually adjusts balances |
+| `AdminWalletsScreen` | `adminService.getUsers()`, `walletService.getAllWalletsForAdmin()`, `adjustWalletBalance(uid, adjustment)`, `subscribeToTokenTransactions(uid, callback)` | Admin-only account lookup, wallet adjustment with required reason/reference, and recent immutable ledger entries |
 
 ## Not built yet
 
@@ -41,3 +44,4 @@ The student workspace has four visible tabs: Tutors, Profile, Schedule, and Mess
 - **Opening a notification:** tapping one only marks it read. Going to the booking or chat it is about needs those screens. `data` (`{ bookingId }` or `{ conversationId }`) is where the target will come from.
 - **Google login and "Forgot password?":** left out because there is no service function for them. Ask Member 1 to add `signInWithGoogle` and `sendPasswordReset` and tell Member 3.
 - **Leaderboard data:** there is no service function for it yet; Profile displays the leaderboard and honors already present in `user.stats`.
+- **Token requests:** real-money top-ups and cash-outs are submitted using role-specific Google Forms. Admins verify requests and record manual wallet credits/debits; booking token holds/refunds/settlements are atomic and ledgered. See [FIRESTORE_SCHEMA.md](FIRESTORE_SCHEMA.md).

@@ -67,3 +67,70 @@ test('private application evidence is owner/admin-only and excluded from public 
   assert.match(publicProfile, /!\('applicationProofUrl' in data\)/);
   assert.match(publicProfile, /!\('paymentQrUrl' in data\)/);
 });
+
+test('token wallets are owner/admin-readable and only updated with an authorized ledger event', () => {
+  assert.match(
+    rules,
+    /match \/wallets\/\{uid\} \{\s+allow get: if isAdmin\(\) \|\| \(signedIn\(\) && request\.auth\.uid == uid\);\s+allow list: if isAdmin\(\);\s+allow create: if validWalletInitialization\(uid\);\s+allow update: if validWalletUpdate\(uid\);\s+allow delete: if false;/,
+  );
+  const initialization = ruleFunction('validWalletInitialization');
+  assert.match(initialization, /account\.get\('role', ''\) in \['student', 'tutor', 'professional'\]/);
+  assert.match(initialization, /request\.resource\.data\.availableUnits == 0/);
+  const update = ruleFunction('validWalletUpdate');
+  assert.match(update, /validWalletEntry\(uid, transactionId\)/);
+  assert.match(update, /entry\.type in \['admin_credit', 'admin_debit'\]/);
+  assert.match(update, /isApprovedTutor\(request\.auth\.uid\)/);
+});
+
+test('token ledger is append-only and owner/admin-readable', () => {
+  assert.match(
+    rules,
+    /match \/tokenTransactions\/\{transactionId\} \{\s+allow get, list: if isAdmin\(\) \|\|\s*\(signedIn\(\) && resource\.data\.accountId == request\.auth\.uid\);\s+allow create: if validTokenTransactionCreate\(transactionId\);\s+allow update, delete: if false;/,
+  );
+  assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingReserveEntry/);
+  assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingRefundEntry/);
+  assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingSettlementDebit/);
+  assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingSettlementCredit/);
+});
+
+test('booking prices are validated in whole minor units without direct float equality', () => {
+  assert.match(ruleFunction('validTokenPrice'), /% 1/);
+  assert.match(ruleFunction('tokenPriceMatchesUnits'), /scaledPrice >= units - 0\.000001/);
+  assert.match(ruleFunction('validBookingCreate'), /tokenPriceMatchesUnits\(data\.totalAmount, data\.tokenAmountUnits\)/);
+  assert.doesNotMatch(ruleFunction('validBookingCreate'), /data\.totalAmount \* 100 == data\.tokenAmountUnits/);
+});
+
+test('manual wallet adjustments require an admin and reuse the same id on retries', async () => {
+  const adminEntry = ruleFunction('validAdminWalletEntry');
+  assert.match(adminEntry, /isAdmin\(\)/);
+  assert.match(adminEntry, /entry\.type in \['admin_credit', 'admin_debit'\]/);
+  assert.match(adminEntry, /entry\.availableDelta == entry\.amountUnits/);
+  const walletService = await readFile(
+    new URL('./walletService.js', import.meta.url),
+    'utf8',
+  );
+  const adminScreen = await readFile(
+    new URL('../screens/admin/AdminWalletsScreen.jsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(walletService, /operationId/);
+  assert.match(walletService, /prior\.accountId === targetUid/);
+  assert.match(walletService, /prior\.formReference === cleanReference/);
+  assert.match(adminScreen, /adjustmentOperation\?\.signature === signature/);
+});
+
+test('wallet initialization preserves the signed-up role and never starts with value', async () => {
+  const userService = await readFile(
+    new URL('./userService.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(userService, /role: data\.role/);
+  assert.match(userService, /availableUnits: 0,\s+heldUnits: 0/);
+  assert.match(ruleFunction('validWalletInitialization'), /availableUnits == 0/);
+  assert.match(ruleFunction('validWalletInitialization'), /heldUnits == 0/);
+  assert.match(ruleFunction('validAccountCreate'), /request\.resource\.data\.role in \['student', 'tutor'\]/);
+  const profileUpdate = ruleFunction('validProfileUpdate');
+  const mutableFields = profileUpdate.match(/changes\.hasOnly\(\[([\s\S]*?)\]\)/);
+  assert.ok(mutableFields, 'Expected an explicit allowlist for profile changes');
+  assert.doesNotMatch(mutableFields[1], /'role'/);
+});

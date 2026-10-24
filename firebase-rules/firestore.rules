@@ -18,6 +18,18 @@ service cloud.firestore {
       return /databases/$(database)/documents/tutorApplications/$(uid);
     }
 
+    function walletPath(uid) {
+      return /databases/$(database)/documents/wallets/$(uid);
+    }
+
+    function tokenTransactionPath(transactionId) {
+      return /databases/$(database)/documents/tokenTransactions/$(transactionId);
+    }
+
+    function bookingPath(bookingId) {
+      return /databases/$(database)/documents/bookings/$(bookingId);
+    }
+
     function hasAccount() {
       return signedIn() && exists(userPath(request.auth.uid));
     }
@@ -48,6 +60,262 @@ service cloud.firestore {
 
     function validProfileVersion(data) {
       return data.get('publicProfileVersion', 0) == 2;
+    }
+
+    function validTokenPrice(price) {
+      let fraction = (price * 100) % 1;
+      return price is number &&
+        price > 0 &&
+        (fraction <= 0.000001 || fraction >= 0.999999);
+    }
+
+    function tokenPriceMatchesUnits(price, units) {
+      let scaledPrice = price * 100;
+      return validTokenPrice(price) &&
+        units is int &&
+        units > 0 &&
+        scaledPrice >= units - 0.000001 &&
+        scaledPrice <= units + 0.000001;
+    }
+
+    function validWalletShape(data) {
+      return data.keys().hasOnly([
+          'availableUnits',
+          'heldUnits',
+          'createdAt',
+          'updatedAt',
+          'lastTransactionId'
+        ]) &&
+        data.keys().hasAll([
+          'availableUnits',
+          'heldUnits',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.availableUnits is int &&
+        data.availableUnits >= 0 &&
+        data.heldUnits is int &&
+        data.heldUnits >= 0 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        (!('lastTransactionId' in data) || data.lastTransactionId is string);
+    }
+
+    function validWalletInitialization(uid) {
+      let account = getAfter(userPath(uid)).data;
+      return signedIn() &&
+        existsAfter(userPath(uid)) &&
+        account.get('role', '') in ['student', 'tutor', 'professional'] &&
+        request.resource.data.availableUnits == 0 &&
+        request.resource.data.heldUnits == 0 &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        !('lastTransactionId' in request.resource.data) &&
+        validWalletShape(request.resource.data) &&
+        ((request.auth.uid == uid) ||
+          isAdmin());
+    }
+
+    function validLedgerBase(transactionId, entry) {
+      return entry.keys().hasOnly([
+          'type',
+          'accountId',
+          'amountUnits',
+          'availableDelta',
+          'heldDelta',
+          'actorUid',
+          'reason',
+          'formReference',
+          'bookingId',
+          'createdAt'
+        ]) &&
+        entry.keys().hasAll([
+          'type',
+          'accountId',
+          'amountUnits',
+          'availableDelta',
+          'heldDelta',
+          'actorUid',
+          'reason',
+          'formReference',
+          'createdAt'
+        ]) &&
+        entry.accountId is string &&
+        entry.amountUnits is int &&
+        entry.amountUnits > 0 &&
+        entry.availableDelta is int &&
+        entry.heldDelta is int &&
+        entry.actorUid == request.auth.uid &&
+        entry.reason is string &&
+        entry.reason.size() > 0 &&
+        entry.reason.size() <= 300 &&
+        entry.formReference is string &&
+        entry.formReference.size() <= 200 &&
+        entry.createdAt == request.time &&
+        exists(walletPath(entry.accountId)) &&
+        existsAfter(walletPath(entry.accountId)) &&
+        getAfter(walletPath(entry.accountId)).data.lastTransactionId == transactionId &&
+        getAfter(walletPath(entry.accountId)).data.availableUnits -
+          get(walletPath(entry.accountId)).data.availableUnits == entry.availableDelta &&
+        getAfter(walletPath(entry.accountId)).data.heldUnits -
+          get(walletPath(entry.accountId)).data.heldUnits == entry.heldDelta;
+    }
+
+    function validAdminWalletEntry(transactionId, entry) {
+      let account = get(userPath(entry.accountId)).data;
+      return isAdmin() &&
+        account.get('role', '') in ['student', 'tutor', 'professional'] &&
+        entry.type in ['admin_credit', 'admin_debit'] &&
+        entry.heldDelta == 0 &&
+        ((entry.type == 'admin_credit' &&
+            entry.availableDelta == entry.amountUnits) ||
+          (entry.type == 'admin_debit' &&
+            entry.availableDelta == -entry.amountUnits)) &&
+        validLedgerBase(transactionId, entry);
+    }
+
+    function validBookingReserveEntry(transactionId, entry) {
+      let booking = getAfter(bookingPath(entry.bookingId)).data;
+      return entry.type == 'booking_reserve' &&
+        entry.accountId == booking.studentId &&
+        entry.actorUid == booking.studentId &&
+        entry.availableDelta == -entry.amountUnits &&
+        entry.heldDelta == entry.amountUnits &&
+        booking.status == 'requested' &&
+        booking.tokenStatus == 'reserved' &&
+        booking.tokenAmountUnits == entry.amountUnits &&
+        booking.createdAt == request.time &&
+        validLedgerBase(transactionId, entry);
+    }
+
+    function validBookingRefundEntry(transactionId, entry) {
+      let booking = getAfter(bookingPath(entry.bookingId)).data;
+      return entry.type == 'booking_refund' &&
+        entry.accountId == booking.studentId &&
+        entry.amountUnits == booking.tokenAmountUnits &&
+        entry.availableDelta == entry.amountUnits &&
+        entry.heldDelta == -entry.amountUnits &&
+        booking.status in ['rejected', 'cancelled'] &&
+        booking.tokenStatus == 'refunded' &&
+        (entry.actorUid == booking.studentId ||
+          entry.actorUid == booking.tutorId) &&
+        (entry.actorUid == booking.studentId ||
+          isApprovedTutor(entry.actorUid)) &&
+        validLedgerBase(transactionId, entry);
+    }
+
+    function validBookingSettlementDebit(transactionId, entry) {
+      let booking = getAfter(bookingPath(entry.bookingId)).data;
+      let credit = getAfter(tokenTransactionPath(
+        entry.bookingId + '_settlement_credit'
+      )).data;
+      let tutorWallet = getAfter(walletPath(booking.tutorId)).data;
+      return entry.type == 'booking_settlement_debit' &&
+        entry.accountId == booking.studentId &&
+        entry.actorUid == booking.tutorId &&
+        entry.amountUnits == booking.tokenAmountUnits &&
+        entry.availableDelta == 0 &&
+        entry.heldDelta == -entry.amountUnits &&
+        booking.status == 'completed' &&
+        booking.tokenStatus == 'settled' &&
+        isApprovedTutor(entry.actorUid) &&
+        credit.type == 'booking_settlement_credit' &&
+        credit.accountId == booking.tutorId &&
+        credit.actorUid == entry.actorUid &&
+        credit.amountUnits == entry.amountUnits &&
+        tutorWallet.availableUnits ==
+          get(walletPath(booking.tutorId)).data.availableUnits + entry.amountUnits &&
+        tutorWallet.heldUnits ==
+          get(walletPath(booking.tutorId)).data.heldUnits &&
+        validLedgerBase(transactionId, entry);
+    }
+
+    function validBookingSettlementCredit(transactionId, entry) {
+      let booking = getAfter(bookingPath(entry.bookingId)).data;
+      let debit = getAfter(tokenTransactionPath(
+        entry.bookingId + '_settlement_debit'
+      )).data;
+      let studentWallet = getAfter(walletPath(booking.studentId)).data;
+      return entry.type == 'booking_settlement_credit' &&
+        entry.accountId == booking.tutorId &&
+        entry.actorUid == booking.tutorId &&
+        entry.amountUnits == booking.tokenAmountUnits &&
+        entry.availableDelta == entry.amountUnits &&
+        entry.heldDelta == 0 &&
+        booking.status == 'completed' &&
+        booking.tokenStatus == 'settled' &&
+        isApprovedTutor(entry.actorUid) &&
+        debit.type == 'booking_settlement_debit' &&
+        debit.accountId == booking.studentId &&
+        debit.actorUid == entry.actorUid &&
+        debit.amountUnits == entry.amountUnits &&
+        studentWallet.availableUnits ==
+          get(walletPath(booking.studentId)).data.availableUnits &&
+        studentWallet.heldUnits ==
+          get(walletPath(booking.studentId)).data.heldUnits - entry.amountUnits &&
+        validLedgerBase(transactionId, entry);
+    }
+
+    function validTokenTransactionCreate(transactionId) {
+      let entry = request.resource.data;
+      return signedIn() &&
+        validLedgerBase(transactionId, entry) &&
+        (validAdminWalletEntry(transactionId, entry) ||
+          validBookingReserveEntry(transactionId, entry) ||
+          validBookingRefundEntry(transactionId, entry) ||
+          validBookingSettlementDebit(transactionId, entry) ||
+          validBookingSettlementCredit(transactionId, entry));
+    }
+
+    function validWalletEntry(uid, transactionId) {
+      let entry = getAfter(tokenTransactionPath(transactionId)).data;
+      return entry.accountId == uid &&
+        entry.actorUid == request.auth.uid &&
+        entry.availableDelta ==
+          request.resource.data.availableUnits - resource.data.availableUnits &&
+        entry.heldDelta ==
+          request.resource.data.heldUnits - resource.data.heldUnits &&
+        entry.amountUnits is int &&
+        entry.amountUnits > 0 &&
+        request.resource.data.lastTransactionId == transactionId &&
+        request.resource.data.updatedAt == request.time &&
+        validWalletShape(request.resource.data);
+    }
+
+    function validWalletUpdate(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      let transactionId = request.resource.data.get('lastTransactionId', '');
+      let entry = getAfter(tokenTransactionPath(transactionId)).data;
+      return changes.hasOnly([
+          'availableUnits',
+          'heldUnits',
+          'updatedAt',
+          'lastTransactionId'
+        ]) &&
+        validWalletEntry(uid, transactionId) &&
+        ((isAdmin() &&
+            entry.type in ['admin_credit', 'admin_debit'] &&
+            entry.actorUid == request.auth.uid) ||
+          (entry.type == 'booking_reserve' &&
+            isStudent() &&
+            uid == request.auth.uid &&
+            entry.availableDelta == -entry.amountUnits &&
+            entry.heldDelta == entry.amountUnits) ||
+          (entry.type == 'booking_refund' &&
+            uid == entry.accountId &&
+            entry.availableDelta == entry.amountUnits &&
+            entry.heldDelta == -entry.amountUnits &&
+            (isStudent() || isApprovedTutor(request.auth.uid))) ||
+          (entry.type == 'booking_settlement_debit' &&
+            uid == entry.accountId &&
+            entry.availableDelta == 0 &&
+            entry.heldDelta == -entry.amountUnits &&
+            isApprovedTutor(request.auth.uid)) ||
+          (entry.type == 'booking_settlement_credit' &&
+            uid == entry.accountId &&
+            entry.availableDelta == entry.amountUnits &&
+            entry.heldDelta == 0 &&
+            isApprovedTutor(request.auth.uid)));
     }
 
     function isApprovedTutor(uid) {
@@ -138,8 +406,7 @@ service cloud.firestore {
         (!('photoUrl' in data) ||
           data.photoUrl == '' ||
           data.photoUrl.matches('^https://.+')) &&
-        (!('hourlyRate' in data) ||
-          (data.hourlyRate is number && data.hourlyRate > 0)) &&
+        (!('hourlyRate' in data) || validTokenPrice(data.hourlyRate)) &&
         (!('rating' in data) ||
           (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
         (!('reviewCount' in data) ||
@@ -394,8 +661,7 @@ service cloud.firestore {
         isApprovedTutor(uid) &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['hourlyRate', 'updatedAt']) &&
-        request.resource.data.hourlyRate is number &&
-        request.resource.data.hourlyRate > 0 &&
+        validTokenPrice(request.resource.data.hourlyRate) &&
         request.resource.data.updatedAt == request.time;
     }
 
@@ -444,7 +710,85 @@ service cloud.firestore {
         ]);
     }
 
-    function validBookingCreate() {
+    function validBookingReserveApplied(bookingId, data) {
+      let walletBefore = get(walletPath(data.studentId)).data;
+      let walletAfter = getAfter(walletPath(data.studentId)).data;
+      let entry = getAfter(tokenTransactionPath(bookingId + '_reserve')).data;
+      return data.tokenStatus == 'reserved' &&
+        data.tokenAmountUnits is int &&
+        data.tokenAmountUnits > 0 &&
+        tokenPriceMatchesUnits(data.totalAmount, data.tokenAmountUnits) &&
+        walletAfter.availableUnits ==
+          walletBefore.availableUnits - data.tokenAmountUnits &&
+        walletAfter.heldUnits ==
+          walletBefore.heldUnits + data.tokenAmountUnits &&
+        walletAfter.lastTransactionId == bookingId + '_reserve' &&
+        entry.type == 'booking_reserve' &&
+        entry.accountId == data.studentId &&
+        entry.amountUnits == data.tokenAmountUnits &&
+        entry.availableDelta == -data.tokenAmountUnits &&
+        entry.heldDelta == data.tokenAmountUnits &&
+        entry.actorUid == data.studentId &&
+        entry.bookingId == bookingId;
+    }
+
+    function validBookingRefundApplied(bookingId, booking) {
+      let walletBefore = get(walletPath(booking.studentId)).data;
+      let walletAfter = getAfter(walletPath(booking.studentId)).data;
+      let entry = getAfter(tokenTransactionPath(bookingId + '_refund')).data;
+      return booking.tokenStatus == 'refunded' &&
+        entry.type == 'booking_refund' &&
+        entry.bookingId == bookingId &&
+        entry.accountId == booking.studentId &&
+        entry.amountUnits == booking.tokenAmountUnits &&
+        entry.availableDelta == booking.tokenAmountUnits &&
+        entry.heldDelta == -booking.tokenAmountUnits &&
+        (entry.actorUid == booking.studentId ||
+          entry.actorUid == booking.tutorId) &&
+        walletAfter.availableUnits ==
+          walletBefore.availableUnits + booking.tokenAmountUnits &&
+        walletAfter.heldUnits ==
+          walletBefore.heldUnits - booking.tokenAmountUnits &&
+        walletAfter.lastTransactionId == bookingId + '_refund';
+    }
+
+    function validBookingSettlementApplied(bookingId, booking) {
+      let studentBefore = get(walletPath(booking.studentId)).data;
+      let studentAfter = getAfter(walletPath(booking.studentId)).data;
+      let tutorBefore = get(walletPath(booking.tutorId)).data;
+      let tutorAfter = getAfter(walletPath(booking.tutorId)).data;
+      let debit = getAfter(tokenTransactionPath(
+        bookingId + '_settlement_debit'
+      )).data;
+      let credit = getAfter(tokenTransactionPath(
+        bookingId + '_settlement_credit'
+      )).data;
+      return booking.tokenStatus == 'settled' &&
+        debit.type == 'booking_settlement_debit' &&
+        debit.bookingId == bookingId &&
+        debit.accountId == booking.studentId &&
+        debit.actorUid == booking.tutorId &&
+        debit.amountUnits == booking.tokenAmountUnits &&
+        debit.availableDelta == 0 &&
+        debit.heldDelta == -booking.tokenAmountUnits &&
+        credit.type == 'booking_settlement_credit' &&
+        credit.bookingId == bookingId &&
+        credit.accountId == booking.tutorId &&
+        credit.actorUid == booking.tutorId &&
+        credit.amountUnits == booking.tokenAmountUnits &&
+        credit.availableDelta == booking.tokenAmountUnits &&
+        credit.heldDelta == 0 &&
+        studentAfter.availableUnits == studentBefore.availableUnits &&
+        studentAfter.heldUnits ==
+          studentBefore.heldUnits - booking.tokenAmountUnits &&
+        studentAfter.lastTransactionId == bookingId + '_settlement_debit' &&
+        tutorAfter.availableUnits ==
+          tutorBefore.availableUnits + booking.tokenAmountUnits &&
+        tutorAfter.heldUnits == tutorBefore.heldUnits &&
+        tutorAfter.lastTransactionId == bookingId + '_settlement_credit';
+    }
+
+    function validBookingCreate(bookingId) {
       let data = request.resource.data;
       let publicTutor = get(tutorPath(data.tutorId)).data;
       let student = get(userPath(request.auth.uid)).data;
@@ -457,8 +801,7 @@ service cloud.firestore {
         isApprovedTutor(data.tutorId) &&
         publicTutor.verificationStatus == 'approved' &&
         validProfileVersion(publicTutor) &&
-        publicTutor.hourlyRate is number &&
-        publicTutor.hourlyRate > 0 &&
+        validTokenPrice(publicTutor.hourlyRate) &&
         data.totalAmount == publicTutor.hourlyRate &&
         data.studentName == expectedStudentName &&
         data.tutorName == publicTutor.name &&
@@ -479,10 +822,10 @@ service cloud.firestore {
           'sessionMode',
           'notes',
           'totalAmount',
+          'tokenAmountUnits',
+          'tokenStatus',
           'tutorPhotoUrl',
           'status',
-          'paymentStatus',
-          'paymentReportedAt',
           'createdAt',
           'updatedAt'
         ]) &&
@@ -501,18 +844,20 @@ service cloud.firestore {
           'sessionMode',
           'notes',
           'totalAmount',
+          'tokenAmountUnits',
+          'tokenStatus',
           'tutorPhotoUrl',
           'status',
-          'paymentStatus',
-          'paymentReportedAt',
           'createdAt',
           'updatedAt'
         ]) &&
         data.status == 'requested' &&
-        data.paymentStatus == 'awaiting_tutor_acceptance' &&
-        data.paymentReportedAt == null &&
+        data.tokenStatus == 'reserved' &&
         data.totalAmount is number &&
         data.totalAmount > 0 &&
+        data.tokenAmountUnits is int &&
+        data.tokenAmountUnits > 0 &&
+        tokenPriceMatchesUnits(data.totalAmount, data.tokenAmountUnits) &&
         data.durationHours is number &&
         data.durationHours > 0 &&
         data.durationHours <= 8 &&
@@ -521,7 +866,8 @@ service cloud.firestore {
         data.startTime is string &&
         data.endTime is string &&
         data.createdAt == request.time &&
-        data.updatedAt == request.time;
+        data.updatedAt == request.time &&
+        validBookingReserveApplied(bookingId, data);
     }
 
     function isBookingStudent() {
@@ -533,50 +879,72 @@ service cloud.firestore {
         resource.data.tutorId == request.auth.uid;
     }
 
-    function validTutorResponse() {
+    function validTutorResponse(bookingId) {
       let data = request.resource.data;
       let changes = data.diff(resource.data).affectedKeys();
+      let tokenBooking = 'tokenStatus' in resource.data;
       return isBookingTutor() &&
         resource.data.status == 'requested' &&
         data.status in ['upcoming', 'rejected'] &&
-        changes.hasOnly([
-          'status',
-          'paymentStatus',
-          'tutorPhotoUrl',
-          'updatedAt'
-        ]) &&
         data.updatedAt == request.time &&
-        ((data.status == 'upcoming' &&
-            data.paymentStatus == 'awaiting_payment') ||
-          (data.status == 'rejected' &&
-            data.paymentStatus == 'not_applicable'));
+        (tokenBooking
+          ? (changes.hasOnly(['status', 'tokenStatus', 'updatedAt']) &&
+              ((data.status == 'upcoming' &&
+                  data.tokenStatus == 'reserved' &&
+                  resource.data.tokenStatus == 'reserved') ||
+                (data.status == 'rejected' &&
+                  data.tokenStatus == 'refunded' &&
+                  validBookingRefundApplied(bookingId, data))))
+          : (changes.hasOnly([
+                'status',
+                'paymentStatus',
+                'tutorPhotoUrl',
+                'updatedAt'
+              ]) &&
+              ((data.status == 'upcoming' &&
+                  data.paymentStatus == 'awaiting_payment') ||
+                (data.status == 'rejected' &&
+                  data.paymentStatus == 'not_applicable'))));
     }
 
-    function validBookingCancellation() {
+    function validBookingCancellation(bookingId) {
       let data = request.resource.data;
+      let tokenBooking = 'tokenStatus' in resource.data;
       return (isBookingStudent() || isBookingTutor()) &&
         resource.data.status in ['requested', 'upcoming'] &&
-        !(resource.data.paymentStatus in ['pending_verification', 'settled']) &&
         data.status == 'cancelled' &&
-        data.paymentStatus == 'not_applicable' &&
-        data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'paymentStatus', 'updatedAt']) &&
-        data.updatedAt == request.time;
+        data.updatedAt == request.time &&
+        (tokenBooking
+          ? (data.tokenStatus == 'refunded' &&
+              data.diff(resource.data).affectedKeys()
+                .hasOnly(['status', 'tokenStatus', 'updatedAt']) &&
+              validBookingRefundApplied(bookingId, data))
+          : (!(resource.data.paymentStatus in ['pending_verification', 'settled']) &&
+              data.paymentStatus == 'not_applicable' &&
+              data.diff(resource.data).affectedKeys()
+                .hasOnly(['status', 'paymentStatus', 'updatedAt'])));
     }
 
-    function validBookingCompletion() {
+    function validBookingCompletion(bookingId) {
       let data = request.resource.data;
+      let tokenBooking = 'tokenStatus' in resource.data;
       return isBookingTutor() &&
         resource.data.status == 'upcoming' &&
         data.status == 'completed' &&
-        data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'updatedAt']) &&
-        data.updatedAt == request.time;
+        data.updatedAt == request.time &&
+        (tokenBooking
+          ? (data.tokenStatus == 'settled' &&
+              data.diff(resource.data).affectedKeys()
+                .hasOnly(['status', 'tokenStatus', 'updatedAt']) &&
+              validBookingSettlementApplied(bookingId, data))
+          : (data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'updatedAt'])));
     }
 
     function validPaymentReport() {
       let data = request.resource.data;
       return isBookingStudent() &&
+        !('tokenStatus' in resource.data) &&
         resource.data.status == 'upcoming' &&
         resource.data.paymentStatus == 'awaiting_payment' &&
         data.paymentStatus == 'pending_verification' &&
@@ -589,6 +957,7 @@ service cloud.firestore {
     function validPaymentVerification() {
       let data = request.resource.data;
       return isBookingTutor() &&
+        !('tokenStatus' in resource.data) &&
         resource.data.status in ['upcoming', 'completed'] &&
         resource.data.paymentStatus == 'pending_verification' &&
         data.paymentStatus == 'settled' &&
@@ -602,7 +971,10 @@ service cloud.firestore {
       let data = request.resource.data;
       return isBookingStudent() &&
         resource.data.status == 'upcoming' &&
-        resource.data.paymentStatus == 'awaiting_payment' &&
+        (('tokenStatus' in resource.data &&
+            resource.data.tokenStatus == 'reserved') ||
+          (!('tokenStatus' in resource.data) &&
+            resource.data.paymentStatus == 'awaiting_payment')) &&
         data.dateKey is string &&
         data.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
         data.startTime is string &&
@@ -677,14 +1049,29 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /wallets/{uid} {
+      allow get: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow list: if isAdmin();
+      allow create: if validWalletInitialization(uid);
+      allow update: if validWalletUpdate(uid);
+      allow delete: if false;
+    }
+
+    match /tokenTransactions/{transactionId} {
+      allow get, list: if isAdmin() ||
+        (signedIn() && resource.data.accountId == request.auth.uid);
+      allow create: if validTokenTransactionCreate(transactionId);
+      allow update, delete: if false;
+    }
+
     match /bookings/{bookingId} {
       allow get, list: if isAdmin() ||
         (isBookingStudent()) ||
         (isBookingTutor());
-      allow create: if validBookingCreate();
-      allow update: if validTutorResponse() ||
-        validBookingCancellation() ||
-        validBookingCompletion() ||
+      allow create: if validBookingCreate(bookingId);
+      allow update: if validTutorResponse(bookingId) ||
+        validBookingCancellation(bookingId) ||
+        validBookingCompletion(bookingId) ||
         validPaymentReport() ||
         validPaymentVerification() ||
         validReschedule() ||

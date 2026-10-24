@@ -8,6 +8,7 @@ import { ROUTES } from '../constants/routes';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import AdminVerificationsScreen from '../screens/admin/AdminVerificationsScreen';
 import AdminReviewHistoryScreen from '../screens/admin/AdminReviewHistoryScreen';
+import AdminWalletsScreen from '../screens/admin/AdminWalletsScreen';
 import AdminHeader from '../components/AdminHeader';
 import { colors } from '../theme/colors';
 
@@ -17,12 +18,14 @@ const tabIcons = {
   [ROUTES.ADMIN_DASHBOARD]: 'grid-outline',
   [ROUTES.ADMIN_VERIFICATIONS]: 'shield-checkmark-outline',
   [ROUTES.ADMIN_REVIEW_HISTORY]: 'time-outline',
+  [ROUTES.ADMIN_WALLETS]: 'wallet-outline',
 };
 
 const tabTitles = {
   [ROUTES.ADMIN_DASHBOARD]: 'Dashboard',
   [ROUTES.ADMIN_VERIFICATIONS]: 'Awaiting review',
   [ROUTES.ADMIN_REVIEW_HISTORY]: 'Review history',
+  [ROUTES.ADMIN_WALLETS]: 'Token wallets',
 };
 
 export default function AdminNavigator() {
@@ -53,6 +56,11 @@ export default function AdminNavigator() {
         name={ROUTES.ADMIN_REVIEW_HISTORY}
         component={AdminReviewHistoryScreen}
         options={{ title: 'Review history' }}
+      />
+      <Tab.Screen
+        name={ROUTES.ADMIN_WALLETS}
+        component={AdminWalletsScreen}
+        options={{ title: 'Token wallets' }}
       />
     </Tab.Navigator>
   );

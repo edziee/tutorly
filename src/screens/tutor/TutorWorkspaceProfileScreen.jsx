@@ -9,10 +9,11 @@ import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
 import WorkspaceSwitchCard from '../../components/WorkspaceSwitchCard';
+import TokenBalanceIndicator from '../../components/TokenBalanceIndicator';
 import { openTutorApplication } from '../../navigation/studentNavigationActions';
 import { ROLES } from '../../constants/roles';
+import { ROUTES } from '../../constants/routes';
 import {
-  BOOKING_PAYMENT_STATUS,
   BOOKING_STATUS,
   TUTOR_TYPES,
 } from '../../constants/statuses';
@@ -23,7 +24,6 @@ import {
   updateTutorBookingDetails,
 } from '../../services/tutorService';
 import {
-  confirmBookingPayment,
   subscribeToTutorBookings,
   updateBookingStatus,
 } from '../../services/bookingService';
@@ -31,6 +31,7 @@ import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
 import { canUseTutorOperations, hasDirectTutorAccountStatus } from '../../utils/workspace';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
+import { formatTokenUnits } from '../../utils/tokens';
 
 function SectionTitle({ title, subtitle, action }) {
   return (
@@ -58,7 +59,9 @@ function RequestCard({ request, onAccept, onDecline, working }) {
           <Text style={styles.requestMeta}>{request.subject} · {request.dateKey} · {request.startTime}</Text>
           {request.notes ? <Text style={styles.requestNote}>{request.notes}</Text> : null}
         </View>
-        <Text style={styles.requestAmount}>₱{Number(request.totalAmount || 0).toFixed(2)}</Text>
+        <Text style={styles.requestAmount}>
+          {formatTokenUnits(request.tokenAmountUnits)} tokens
+        </Text>
       </View>
       <View style={styles.requestActions}>
         <AppButton title="Accept" variant="secondary" onPress={onAccept} loading={working} />
@@ -98,11 +101,6 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     [uid, canPerformTutorOperations],
   );
   const pendingRequests = (bookingResults.data ?? []).filter((booking) => booking.status === 'requested');
-  const paymentsToVerify = (bookingResults.data ?? []).filter(
-    (booking) =>
-      [BOOKING_STATUS.UPCOMING, BOOKING_STATUS.COMPLETED].includes(booking.status) &&
-      booking.paymentStatus === BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION,
-  );
   const sessions = (bookingResults.data ?? [])
     .filter((booking) =>
       [BOOKING_STATUS.UPCOMING, BOOKING_STATUS.COMPLETED].includes(booking.status),
@@ -241,19 +239,6 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     }
   };
 
-  const verifyPayment = async (bookingId) => {
-    if (workingBookingId) return;
-    setWorkingBookingId(bookingId);
-    setBookingActionError('');
-    try {
-      await confirmBookingPayment(bookingId);
-    } catch (error) {
-      setBookingActionError(getErrorMessage(error, 'Couldn’t verify this payment.'));
-    } finally {
-      setWorkingBookingId('');
-    }
-  };
-
   return (
     <ScreenContainer>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -261,6 +246,15 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           <View style={styles.activeDot} />
           <Text style={styles.activeText}>Tutor workspace</Text>
         </View>
+        {!canPerformTutorOperations && [ROLES.STUDENT, ROLES.TUTOR, ROLES.PROFESSIONAL].includes(user?.role) ? (
+          <View style={styles.applicantWallet}>
+            <TokenBalanceIndicator
+              userId={uid}
+              role={user.role}
+              onBalancePress={() => navigation.navigate(ROUTES.WALLET)}
+            />
+          </View>
+        ) : null}
         {user?.role === ROLES.STUDENT ? (
           <View style={styles.workspaceActions}>
             <WorkspaceSwitchCard
@@ -435,30 +429,6 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         ) : null}
 
         <SectionTitle
-          title="Confirm payments"
-          subtitle={`${paymentsToVerify.length} transfer${paymentsToVerify.length === 1 ? '' : 's'} to review`}
-          action="Check before confirming"
-        />
-        {paymentsToVerify.map((booking) => (
-          <View key={booking.id} style={styles.paymentVerificationCard}>
-            <View style={styles.requestCopy}>
-              <Text style={styles.requestName}>{booking.studentName || 'Student'}</Text>
-              <Text style={styles.requestMeta}>{booking.subject} · ₱{Number(booking.totalAmount || 0).toFixed(2)}</Text>
-              <Text style={styles.requestNote}>Confirm only after checking the transfer in your payment app.</Text>
-            </View>
-            <AppButton
-              title="Confirm payment"
-              variant="secondary"
-              onPress={() => verifyPayment(booking.id)}
-              loading={workingBookingId === booking.id}
-            />
-          </View>
-        ))}
-        {bookingResults.status === 'ready' && !paymentsToVerify.length ? (
-          <Text style={styles.emptyRequests}>Payment reports will appear here.</Text>
-        ) : null}
-
-        <SectionTitle
           title="Sessions"
           subtitle={`Upcoming (${upcomingSessions.length}) · Past (${completedSessions.length})`}
         />
@@ -487,6 +457,32 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
               <Text style={styles.sessionMeta}>
                 {[session.subject, session.location].filter(Boolean).join(' · ')}
               </Text>
+              <Text style={styles.sessionMeta}>
+                {formatTokenUnits(session.tokenAmountUnits)} tokens
+                {session.tokenStatus === 'settled'
+                  ? ' received'
+                  : session.tokenStatus === 'reserved'
+                    ? ' held for this session'
+                    : ''}
+              </Text>
+              {session.status === BOOKING_STATUS.UPCOMING ? (
+                <AppButton
+                  title="Mark session complete"
+                  variant="secondary"
+                  onPress={() => Alert.alert(
+                    'Complete this session?',
+                    'Only confirm after the tutoring session has taken place. This transfers the held tokens to your wallet.',
+                    [
+                      { text: 'Keep session upcoming', style: 'cancel' },
+                      {
+                        text: 'Confirm completion',
+                        onPress: () => respondToBooking(session.id, BOOKING_STATUS.COMPLETED),
+                      },
+                    ],
+                  )}
+                  loading={workingBookingId === session.id}
+                />
+              ) : null}
             </View>
           </View>
         ))}
@@ -544,6 +540,7 @@ const styles = StyleSheet.create({
   paymentVerificationCard: { gap: spacing.sm, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },
   emptyRequests: { padding: spacing.md, borderRadius: radius.md, color: colors.mutedText, backgroundColor: colors.surface, fontSize: 12 },
   activeBanner: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: 999, backgroundColor: '#E6E8EA' },
+  applicantWallet: { alignItems: 'flex-end', marginTop: spacing.sm },
   activeDot: { width: 7, height: 7, borderRadius: 4, marginRight: 6, backgroundColor: colors.secondary },
   activeText: { color: colors.text, fontSize: 11, fontWeight: '600' },
   profileCard: { marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface, shadowColor: colors.black, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },

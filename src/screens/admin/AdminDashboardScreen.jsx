@@ -140,6 +140,12 @@ export default function AdminDashboardScreen({ navigation }) {
           detail="See all bookings and their status"
           onPress={() => goTo(ROUTES.ADMIN_BOOKINGS)}
         />
+        <Shortcut
+          icon="wallet-outline"
+          title="Manage token wallets"
+          detail="Review balances and record verified top-ups, payouts, or adjustments"
+          onPress={() => goTo(ROUTES.ADMIN_WALLETS)}
+        />
         {signOutError ? (
           <Text accessibilityRole="alert" style={styles.signOutError}>
             {signOutError}

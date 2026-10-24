@@ -17,6 +17,7 @@ export const ROUTES = {
   TUTOR_APPLICATION: 'TutorApplication',
   BOOKING: 'Booking',
   PAYMENT: 'Payment',
+  WALLET: 'Wallet',
   TUTORS_MAP: 'TutorsMap',
   CHECK_IN: 'CheckIn',
 
@@ -33,4 +34,5 @@ export const ROUTES = {
   ADMIN_VERIFICATIONS: 'AdminVerifications',
   ADMIN_BOOKINGS: 'AdminBookings',
   ADMIN_REVIEW_HISTORY: 'AdminReviewHistory',
+  ADMIN_WALLETS: 'AdminWallets',
 };

@@ -37,6 +37,21 @@ export const BOOKING_PAYMENT_STATUS = {
   NOT_APPLICABLE: 'not_applicable',
 };
 
+export const TOKEN_BOOKING_STATUS = {
+  RESERVED: 'reserved',
+  REFUNDED: 'refunded',
+  SETTLED: 'settled',
+};
+
+export const TOKEN_TRANSACTION_TYPES = {
+  ADMIN_CREDIT: 'admin_credit',
+  ADMIN_DEBIT: 'admin_debit',
+  BOOKING_RESERVE: 'booking_reserve',
+  BOOKING_REFUND: 'booking_refund',
+  BOOKING_SETTLEMENT_DEBIT: 'booking_settlement_debit',
+  BOOKING_SETTLEMENT_CREDIT: 'booking_settlement_credit',
+};
+
 // Verification of tutors and professional tutors, reviewed by an admin.
 export const VERIFICATION_STATUS = {
   NOT_SUBMITTED: 'not_submitted',

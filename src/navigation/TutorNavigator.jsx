@@ -16,6 +16,7 @@ import TutorScheduleScreen from '../screens/tutor/TutorScheduleScreen';
 import ChatScreen from '../screens/shared/ChatScreen';
 import ConversationScreen from '../screens/shared/ConversationScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import WalletScreen from '../screens/shared/WalletScreen';
 import AppHeader from '../components/AppHeader';
 import { useAuth } from '../context/AuthContext';
 import { getTutorApplication } from '../services/tutorService';
@@ -70,6 +71,9 @@ function TutorTabs() {
             title={tabs[route.name].title}
             initials={initials}
             imageUri={user?.photoUrl}
+            userId={user?.uid}
+            role={user?.role}
+            onWalletPress={() => navigation.navigate(ROUTES.WALLET)}
             onNotificationsPress={() =>
               navigation.navigate(ROUTES.NOTIFICATIONS)
             }
@@ -199,6 +203,11 @@ export default function TutorNavigator() {
           options={{ headerShown: true, title: 'Tutor application' }}
         />
       ) : null}
+      <Stack.Screen
+        name={ROUTES.WALLET}
+        component={WalletScreen}
+        options={{ headerShown: true, title: 'Token wallet' }}
+      />
       {canUseTutorWorkspace ? (
         <>
           <Stack.Screen

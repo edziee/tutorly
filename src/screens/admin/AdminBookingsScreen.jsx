@@ -21,7 +21,8 @@ import { getBookingsOverview } from '../../services/adminService';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { getErrorMessage } from '../../utils/errors';
-import { formatDateKey, formatPeso } from '../../utils/format';
+import { formatDateKey } from '../../utils/format';
+import { formatTokenUnits } from '../../utils/tokens';
 
 const statusFilters = [
   { value: 'all', label: 'All' },
@@ -108,7 +109,11 @@ function BookingRow({ booking }) {
         <Text numberOfLines={1} style={styles.when}>
           {when}
         </Text>
-        <Text style={styles.amount}>{formatPeso(booking.totalAmount)}</Text>
+        <Text style={styles.amount}>
+          {booking.tokenAmountUnits != null
+            ? `${formatTokenUnits(booking.tokenAmountUnits)} tokens`
+            : `₱${Number(booking.totalAmount || 0).toFixed(2)} (legacy)`}
+        </Text>
       </View>
     </View>
   );

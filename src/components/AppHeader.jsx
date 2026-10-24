@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import NotificationBell from './NotificationBell';
 import StudentAvatar from './StudentAvatar';
+import TokenBalanceIndicator from './TokenBalanceIndicator';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 
@@ -25,12 +26,16 @@ export function AppHeaderBrand({ title }) {
 export function AppHeaderActions({
   initials,
   imageUri,
+  userId,
+  role,
+  onWalletPress,
   onProfilePress,
   profileAccessibilityLabel = 'Open student profile',
   onNotificationsPress,
 }) {
   return (
     <View style={styles.actions}>
+      <TokenBalanceIndicator userId={userId} role={role} onBalancePress={onWalletPress} />
       <NotificationBell onPress={onNotificationsPress} />
       <Pressable
         accessibilityRole="button"
@@ -50,6 +55,9 @@ export default function AppHeader({
   title,
   initials,
   imageUri,
+  userId,
+  role,
+  onWalletPress,
   onProfilePress,
   profileAccessibilityLabel,
   onNotificationsPress,
@@ -61,6 +69,9 @@ export default function AppHeader({
         <AppHeaderActions
           initials={initials}
           imageUri={imageUri}
+          userId={userId}
+          role={role}
+          onWalletPress={onWalletPress}
           onProfilePress={onProfilePress}
           profileAccessibilityLabel={profileAccessibilityLabel}
           onNotificationsPress={onNotificationsPress}
@@ -114,8 +125,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingRight: spacing.md,
+    gap: spacing.sm,
+    paddingRight: spacing.xs,
   },
   avatarButton: {
     width: 30,
