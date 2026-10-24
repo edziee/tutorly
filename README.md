@@ -47,14 +47,14 @@ Runtime demo datasets and fallback identities have been removed. The remaining t
 
 ## Tech stack
 
-- [Expo](https://docs.expo.dev/versions/v57.0.0/) SDK 57 with React Native 0.86 and React 19
+- [Expo](https://docs.expo.dev/versions/v58.0.0/) SDK 58 with React Native 0.88 and React 19.3
 - React Navigation (bottom tabs and native stack)
 - Expo modules in use: `expo-calendar`, `expo-document-picker`, `expo-image-picker`, `expo-notifications`, `expo-font`, `expo-location`
 - `@react-native-async-storage/async-storage` for data kept on the device
 - Firebase JS SDK (`firebase` 12) for Authentication and Firestore. It runs in Expo Go
 - Still to decide: a map library (see [`docs/members/MEMBER_2_STUDENT_FEATURES.md`](docs/members/MEMBER_2_STUDENT_FEATURES.md))
 
-Expo has changed a lot between versions. Before writing code, check the [SDK 57 docs](https://docs.expo.dev/versions/v57.0.0/) instead of relying on older tutorials. This is also noted in `AGENTS.md` for AI coding tools.
+Expo has changed a lot between versions. Before writing code, check the [SDK 58 docs](https://docs.expo.dev/versions/v58.0.0/) instead of relying on older tutorials. This is also noted in `AGENTS.md` for AI coding tools.
 
 ## Getting started
 

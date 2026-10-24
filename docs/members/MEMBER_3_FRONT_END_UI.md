@@ -51,7 +51,7 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 ## Watch out for
 
 - Take colors, spacing and type sizes from `src/theme`. Do not type values into screens.
-- Expo SDK 57 changed from older versions. Check the [SDK 57 docs](https://docs.expo.dev/versions/v57.0.0/) before using an Expo or React Native API from an older tutorial.
+- Expo SDK 58 changed from older versions. Check the [SDK 58 docs](https://docs.expo.dev/versions/v58.0.0/) before using an Expo or React Native API from an older tutorial.
 - Test on both Android and iOS where you can, and note in the pull request what only works in a development build.
 
 ## Done when

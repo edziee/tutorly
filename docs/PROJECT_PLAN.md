@@ -177,4 +177,4 @@ Week 1 comes first because Members 2, 3 and 4 need Member 1's Firebase setup and
 - **Mock data:** the list of mock data is made in Week 1 ([MOCK_DATA_INVENTORY.md](MOCK_DATA_INVENTORY.md)) and checked again in the Week 3 sweep. Starter records saved in Firestore (for example test accounts) are real database data, not mock data.
 - **Week dates:** weeks are assumed to run Oct 10 to 18, Oct 19 to 25 and Oct 26 to Nov 1.
 - **Open question:** what is the actual submission deadline?
-- **Resolved:** the stack is React Native with Expo (SDK 57), and the GitHub repo is readable, so finished code tasks can be marked Done in the tables above.
+- **Resolved:** the stack is React Native with Expo (SDK 58), and the GitHub repo is readable, so finished code tasks can be marked Done in the tables above.

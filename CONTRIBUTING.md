@@ -5,7 +5,7 @@ This is how the four of us work in this repo. The tasks and owners are in [`docs
 ## Before you code
 
 1. Read your member section in the plan and the tasks in the week tables.
-2. Check the [Expo SDK 57 docs](https://docs.expo.dev/versions/v57.0.0/) before using an Expo or React Native API. Older tutorials often do not match this version.
+2. Check the [Expo SDK 58 docs](https://docs.expo.dev/versions/v58.0.0/) before using an Expo or React Native API. Older tutorials often do not match this version.
 3. Run `npm install` after pulling, since packages change as Firebase and the map are added.
 
 ## Branches and commits

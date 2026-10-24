@@ -1,9 +1,13 @@
-import { View, Text, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import React, { useEffect, useState } from 'react';
 
-import { updateBookingTimer } from '../services/bookingService';
+import AppButton from './AppButton';
+import { BOOKING_STATUS } from '../constants/statuses';
+import { updateBookingStatus, updateBookingTimer } from '../services/bookingService';
+import { colors } from '../theme/colors';
 import {
     formatRecordedDuration,
+    getCompletionTimerError,
     getRecordedSeconds,
     SESSION_TIMER_ACTIONS,
     SESSION_TIMER_STATUS,
@@ -42,6 +46,27 @@ export const SessionStopwatch = ({ session }) => {
         ]);
     };
 
+    const confirmCompletion = () => {
+        const timerError = getCompletionTimerError(session);
+        if (timerError) {
+            setError(timerError);
+            return;
+        }
+        Alert.alert('Confirm session completed?', `Recorded teaching time: ${formatRecordedDuration(elapsedSeconds)}. This transfers the held tokens to your wallet.`, [
+            { text: 'Review again', style: 'cancel' },
+            {
+                text: 'Confirm completion',
+                onPress: async () => {
+                    try {
+                        await updateBookingStatus(session.id, BOOKING_STATUS.COMPLETED);
+                    } catch (completionError) {
+                        setError(completionError.message || 'Could not confirm this session.');
+                    }
+                },
+            },
+        ]);
+    };
+
     const styles = StyleSheet.create({
         container: {
             display: 'flex',
@@ -50,50 +75,43 @@ export const SessionStopwatch = ({ session }) => {
         },
 
         stopWatch: {
-            display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            border: 5,
-            borderRadius: 50,
-            backgroundColor: 'white',
-            padding: 30,
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            borderRadius: 18,
+            borderWidth: 1,
+            padding: 20,
+            width: '100%',
         },
 
         display: {
             fontSize: 30,
             fontFamily: 'monospace',
             fontWeight: 'bold',
-            marginBottom: 25,
+            marginBottom: 10,
+            textAlign: 'center',
         },
 
         controls: {
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-            paddingVertical: 10,
-            paddingHorizontal: 20,
-            minWidth: 125,
-            border: 'none',
-            borderRadius: 10,
-            color: 'white',
+            alignSelf: 'stretch',
+            flexDirection: 'column',
+            gap: 10,
+            marginTop: 18,
+        },
+
+        buttonRow: {
+            alignSelf: 'stretch',
             flexDirection: 'row',
             gap: 10,
         },
 
-        startButton: {
-
+        buttonCell: {
+            flex: 1,
         },
 
-        stopButton: {
-
-        },
-
-        pauseButton: {
-
-        },
-
-        buttons: {
-            flexDirection: 'row',
-            gap: 10,
+        fullButton: {
+            alignSelf: 'stretch',
         },
     });
 
@@ -108,15 +126,28 @@ export const SessionStopwatch = ({ session }) => {
                 <View style={styles.controls}>
                     {error ? <Text accessibilityRole="alert">{error}</Text> : null}
                     {session.status === 'completed' || timerStatus === SESSION_TIMER_STATUS.STOPPED ? (
-                        <Text>{session.status === 'completed' ? 'Session completed.' : 'Timer stopped. Review the recorded time before confirming completion.'}</Text>
+                        <>
+                            <Text>{session.status === 'completed' ? 'Session completed.' : 'Timer stopped. Review the recorded time before confirming completion.'}</Text>
+                        </>
                     ) : timerStatus === SESSION_TIMER_STATUS.RUNNING ? (
-                        <View style={styles.buttons}>
-                            <Button title="Pause Timer" onPress={() => applyAction(SESSION_TIMER_ACTIONS.PAUSE)} />
-                            <Button title="Stop Timer" onPress={stopPopup} />
+                        <View style={styles.buttonRow}>
+                            <View style={styles.buttonCell}>
+                                <AppButton title="Pause timer" variant="secondary" onPress={() => applyAction(SESSION_TIMER_ACTIONS.PAUSE)} />
+                            </View>
+                            <View style={styles.buttonCell}>
+                                <AppButton title="Stop timer" variant="danger" onPress={stopPopup} />
+                            </View>
                         </View>
                     ) : (
-                        <Button title={timerStatus === SESSION_TIMER_STATUS.PAUSED ? 'Resume Timer' : 'Start Timer'} onPress={() => applyAction(timerStatus === SESSION_TIMER_STATUS.PAUSED ? SESSION_TIMER_ACTIONS.RESUME : SESSION_TIMER_ACTIONS.START)} />
+                        <View style={styles.fullButton}>
+                            <AppButton title={timerStatus === SESSION_TIMER_STATUS.PAUSED ? 'Resume timer' : 'Start timer'} onPress={() => applyAction(timerStatus === SESSION_TIMER_STATUS.PAUSED ? SESSION_TIMER_ACTIONS.RESUME : SESSION_TIMER_ACTIONS.START)} />
+                        </View>
                     )}
+                    {session.status !== 'completed' ? (
+                        <View style={styles.fullButton}>
+                            <AppButton title="Confirm session completed" variant="primary" onPress={confirmCompletion} />
+                        </View>
+                    ) : null}
                 </View>
             </View>
         </View>

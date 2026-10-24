@@ -40,15 +40,15 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 
 ## Map library
 
-Nothing is installed for the map yet, because it needs a team decision. Checked in the Expo SDK 57 docs on Oct 11, 2026:
+Nothing is installed for the map yet, because it needs a team decision. Checked in the Expo SDK 58 docs on Oct 11, 2026:
 
-- `expo-maps` is the map package for SDK 57. It is marked **alpha** ("will frequently experience breaking changes") and **does not run in Expo Go**. You need a development build.
+- `expo-maps` is the map package for SDK 58. It is marked **alpha** ("will frequently experience breaking changes") and **does not run in Expo Go**. You need a development build.
 - It uses Google Maps on Android, which needs a **Google Maps API key** (a Google Cloud project with Maps SDK for Android enabled), and Apple Maps on iOS. The docs do not mention web support.
 - Other options exist (the docs list `react-native-maps` only as a third-party library). Whatever the choice, test it in a development build early.
 
 Ask your instructor whether the demo must run in Expo Go. If it must, the map could be a simple list sorted by distance with a "Open in Maps" link, and the nearby sorting still works with `sortByDistance`. Decide before Week 3, and write the choice in `docs/ARCHITECTURE.md`.
 
-Docs: [expo-maps](https://docs.expo.dev/versions/v57.0.0/sdk/maps/), [expo-location](https://docs.expo.dev/versions/v57.0.0/sdk/location/).
+Docs: [expo-maps](https://docs.expo.dev/versions/v58.0.0/sdk/maps/), [expo-location](https://docs.expo.dev/versions/v58.0.0/sdk/location/).
 
 ## Runtime data sources
 
