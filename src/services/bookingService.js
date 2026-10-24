@@ -16,6 +16,7 @@ import {
 import { requireAuth, requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
 import { BOOKING_PAYMENT_STATUS, BOOKING_STATUS } from '../constants/statuses';
+import { assertApprovedTutor } from './tutorService';
 import { getBookingTimeError, parseTimeToMinutes } from '../utils/bookings';
 import { isHttpsUrl } from '../utils/validation';
 
@@ -138,6 +139,9 @@ export async function updateBookingStatus(bookingId, status) {
   const auth = requireAuth();
   const userId = auth.currentUser?.uid;
   if (!userId) throw new Error('Sign in to respond to this booking.');
+  if (status !== BOOKING_STATUS.CANCELLED) {
+    await assertApprovedTutor(userId);
+  }
   const { db } = requireFirebase();
   const bookingRef = doc(db, COLLECTIONS.BOOKINGS, bookingId);
   await runTransaction(db, async (transaction) => {
@@ -228,6 +232,7 @@ export async function confirmBookingPayment(bookingId) {
   const auth = requireAuth();
   const tutorId = auth.currentUser?.uid;
   if (!tutorId) throw new Error('Sign in as the tutor to verify this payment.');
+  await assertApprovedTutor(tutorId);
   const { db } = requireFirebase();
   const bookingRef = doc(db, COLLECTIONS.BOOKINGS, bookingId);
   await runTransaction(db, async (transaction) => {

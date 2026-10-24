@@ -4,6 +4,7 @@ import { useSubscription } from '../../hooks/useSubscription';
 import { getOrCreateConversation, markConversationRead, subscribeToChatTutors, subscribeToConversations } from '../../services/chatService';
 import { ROUTES } from '../../constants/routes';
 import { getUserId } from '../../utils/user';
+import { isStudentWorkspace } from '../../utils/workspace';
 import { timeAgo } from '../../utils/format';
 import EmptyState from '../../components/EmptyState';
 import ErrorState from '../../components/ErrorState';
@@ -98,13 +99,14 @@ function MessageCard({ message, onPress, onAction }) {
 }
 
 export default function ChatScreen({ navigation }) {
-  const { user, role } = useAuth();
+  const { user, role, workspaceMode } = useAuth();
   const uid = getUserId(user);
   const live = isFirebaseConfigured;
+  const showStudentTutorDiscovery = isStudentWorkspace(role, workspaceMode);
   const conversations = useSubscription((onData, onError) => live && uid
     ? subscribeToConversations(uid, onData, onError) : undefined, [uid, live]);
-  const availableTutors = useSubscription((onData, onError) => live && uid && role === 'student'
-    ? subscribeToChatTutors(onData, onError) : undefined, [uid, live, role]);
+  const availableTutors = useSubscription((onData, onError) => live && uid && showStudentTutorDiscovery
+    ? subscribeToChatTutors(onData, onError) : undefined, [uid, live, showStudentTutorDiscovery]);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All Messages');
 
@@ -114,7 +116,7 @@ export default function ChatScreen({ navigation }) {
     time: timeAgo(chat.lastMessageAt), unread: chat.unreadBy?.includes(uid),
     category: chat.tutorTier === 'Professor' ? 'Faculty / Profs' : 'Active Tutors',
   }));
-  const onlineTutors = role === 'student' ? (availableTutors.data || []) : [];
+  const onlineTutors = showStudentTutorDiscovery ? (availableTutors.data || []) : [];
 
   const visibleMessages = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -252,7 +254,7 @@ export default function ChatScreen({ navigation }) {
           })}
         </ScrollView>
 
-        {role === 'student' ? (
+        {showStudentTutorDiscovery ? (
           <>
             {availableTutors.status === 'error' ? (
               <ErrorState

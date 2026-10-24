@@ -15,21 +15,32 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppButton from '../../components/AppButton';
 import AppInput from '../../components/AppInput';
+import EmptyState from '../../components/EmptyState';
+import WorkspaceSwitchCard from '../../components/WorkspaceSwitchCard';
+import { openTutorApplication } from '../../navigation/studentNavigationActions';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import StatusBadge, { BOOKING_STATUS_BADGE } from '../../components/StatusBadge';
+import { ROUTES } from '../../constants/routes';
 import { useAuth } from '../../context/AuthContext';
+import { useSubscription } from '../../hooks/useSubscription';
+import { subscribeToStudentBookings } from '../../services/bookingService';
 import { colors } from '../../theme/colors';
 import { radius } from '../../theme/spacing';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { getNextBooking } from '../../utils/bookings';
 import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
+import { formatDateKey } from '../../utils/format';
+import { getFirstName, getUserId } from '../../utils/user';
 import { isHttpsUrl } from '../../utils/validation';
 
 const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-export default function StudentProfileScreen() {
-  const { user, signOut, updateProfile, loading } = useAuth();
+export default function StudentProfileScreen({ navigation }) {
+  const { user, signOut, updateProfile, loading, setWorkspaceMode, workspaceModeError } = useAuth();
+  const userId = getUserId(user);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
@@ -67,7 +78,13 @@ export default function StudentProfileScreen() {
   const scholarProgress = Math.min(100, Math.max(0, Number(stats.scholarProgress) || 0));
   const leaderboard = Array.isArray(stats.leaderboard) ? stats.leaderboard : [];
   const subjectHonors = Array.isArray(stats.subjectHonors) ? stats.subjectHonors : [];
-  const showProfileMessage = (message) => Alert.alert('Profile', message);
+  const firstName = getFirstName(user);
+  const bookings = useSubscription(
+    (onData, onError) => (userId
+      ? subscribeToStudentBookings(userId, onData, onError)
+      : undefined),
+    [userId],
+  );
   const handleSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
@@ -131,6 +148,13 @@ export default function StudentProfileScreen() {
       setSavingProfile(false);
     }
   };
+  const switchToTutorWorkspace = async () => {
+    try {
+      await setWorkspaceMode('tutor');
+    } catch (error) {
+      Alert.alert('Could not switch workspaces', getErrorMessage(error, 'Please try again.'));
+    }
+  };
 
   if (loading) return <LoadingState message="Loading your profile..." />;
   if (!user?.uid) {
@@ -144,6 +168,12 @@ export default function StudentProfileScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
+        <View>
+          <Text accessibilityRole="header" style={styles.greeting}>
+            {firstName ? `Hi, ${firstName}` : 'Welcome back'}
+          </Text>
+          <Text style={styles.greetingSubtitle}>Here’s your study progress and profile.</Text>
+        </View>
         <View style={styles.profileCard}>
           <View style={styles.avatarFrame}>
             {profile.photoUrl ? (
@@ -164,6 +194,19 @@ export default function StudentProfileScreen() {
             <Ionicons name="pencil" size={17} color={colors.primary} />
           </Pressable>
         </View>
+
+        {workspaceModeError ? (
+          <Text accessibilityRole="alert" style={styles.workspaceError}>
+            Your workspace preference could not be saved or restored on this device. You can still switch while signed in.
+          </Text>
+        ) : null}
+        <WorkspaceSwitchCard
+          accessibilityLabel="Switch to tutor workspace"
+          title="Tutor workspace"
+          description="Switch modes without changing your student account."
+          icon="school-outline"
+          onPress={switchToTutorWorkspace}
+        />
 
         <View style={styles.personalInfoCard}>
           <View style={styles.personalInfoHeader}>
@@ -238,6 +281,15 @@ export default function StudentProfileScreen() {
           <StatTile icon="hourglass" label="Hours" value={Number(stats.studyHours) || 0} detail="Studied" />
           <StatTile icon="calendar" label="Sessions" value={Number(stats.completedSessions) || 0} detail="Completed" />
           <StatTile icon="star" label="Rating" value={Number(stats.rating) || 0} detail="Peer rating" />
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Next session</Text>
+          <NextSession
+            bookings={userId ? bookings : { status: 'ready', data: [] }}
+            onFindTutor={() => navigation.navigate(ROUTES.TUTORS)}
+            onOpenSchedule={() => navigation.navigate(ROUTES.SCHEDULE)}
+          />
         </View>
 
         <View style={styles.sectionCard}>
@@ -347,7 +399,7 @@ export default function StudentProfileScreen() {
           <AppButton
             title="See if you qualify"
             variant="secondary"
-            onPress={() => showProfileMessage('Peer tutor eligibility details are coming soon.')}
+            onPress={() => openTutorApplication(navigation)}
           />
         </View>
 
@@ -447,6 +499,54 @@ export default function StudentProfileScreen() {
   );
 }
 
+function NextSession({ bookings, onFindTutor, onOpenSchedule }) {
+  if (bookings.status === 'loading') {
+    return <LoadingState compact message="Loading your sessions..." />;
+  }
+  if (bookings.status === 'error') {
+    return (
+      <ErrorState
+        compact
+        title="Sessions aren’t available"
+        message={getErrorMessage(bookings.error)}
+        onRetry={bookings.retry}
+      />
+    );
+  }
+
+  const next = getNextBooking(bookings.data);
+  if (!next) {
+    return (
+      <EmptyState
+        compact
+        icon="calendar-outline"
+        title="No sessions coming up"
+        message="Find a tutor to plan your next session."
+        actionLabel="Find a tutor"
+        onAction={onFindTutor}
+      />
+    );
+  }
+
+  const badge = BOOKING_STATUS_BADGE[next.status];
+  return (
+    <View style={styles.nextSession}>
+      <View style={styles.nextSessionTop}>
+        <Text style={styles.nextSessionTutor}>{next.tutorName ?? 'Your tutor'}</Text>
+        {badge ? <StatusBadge label={badge.label} tone={badge.tone} /> : null}
+      </View>
+      {next.subject ? <Text style={styles.nextSessionSubject}>{next.subject}</Text> : null}
+      <Text style={styles.nextSessionDetail}>
+        {formatDateKey(next.dateKey)}
+        {next.startTime ? `, ${next.startTime}` : ''}
+        {next.endTime ? ` – ${next.endTime}` : ''}
+      </Text>
+      {next.location ? <Text style={styles.nextSessionDetail}>{next.location}</Text> : null}
+      <AppButton title="View schedule" variant="outline" onPress={onOpenSchedule} />
+    </View>
+  );
+}
+
 function PersonalDetail({ icon, label, value }) {
   return (
     <View style={styles.personalDetail}>
@@ -493,6 +593,20 @@ const styles = StyleSheet.create({
   content: {
     gap: spacing.md,
     paddingBottom: spacing.xl,
+  },
+  workspaceError: {
+    color: colors.errorText,
+    fontSize: 12,
+  },
+  greeting: {
+    color: colors.heading,
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  greetingSubtitle: {
+    marginTop: 2,
+    color: colors.mutedText,
+    fontSize: 14,
   },
   profileCard: {
     minHeight: 300,
@@ -656,6 +770,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sectionTitle: { ...typography.heading, color: colors.text, fontSize: 18 },
+  nextSession: { marginTop: spacing.md, gap: spacing.sm },
+  nextSessionTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  nextSessionTutor: { flex: 1, color: colors.heading, fontSize: 16, fontWeight: '700' },
+  nextSessionSubject: { color: colors.text, fontSize: 14 },
+  nextSessionDetail: { color: colors.mutedText, fontSize: 13 },
   weekTag: { color: colors.success, backgroundColor: colors.mint, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, fontSize: 10, fontWeight: '700' },
   courseScroller: { marginTop: spacing.md, marginBottom: spacing.md, flexGrow: 0 },
   courseChip: { paddingHorizontal: spacing.md, paddingVertical: 7, marginRight: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.inputBackground },

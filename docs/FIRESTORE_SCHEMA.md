@@ -11,8 +11,8 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | Collection | One document is | Who writes it |
 | --- | --- | --- |
 | `users/{uid}` | An account of any role | The user (never the `role` after sign-up) |
-| `tutors/{uid}` | Public profile fields students need to find and book a tutor, same id as their user | The tutor; admin publishes approval |
-| `tutorApplications/{uid}` | Private application evidence and payment QR details, same id as their user | The tutor; admin reviews verification |
+| `tutors/{uid}` | Public profile fields students need to find and book a tutor, same id as their user | The applicant submits a pending profile; admin publishes approval |
+| `tutorApplications/{uid}` | Private application evidence and payment QR details, same id as their user | The student or tutor applicant; admin reviews verification |
 | `bookings/{id}` | A session between a student and a tutor | Student creates, tutor answers |
 | `conversations/{id}` | A chat between one student and one tutor | Either person in the chat |
 | `conversations/{id}/messages/{id}` | One message | Either person in the chat |
@@ -26,7 +26,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | --- | --- | --- |
 | `uid` | string | Firebase Authentication user id; matches the document id |
 | `email` | string | |
-| `role` | `'student'` \| `'tutor'` \| `'professional'` (legacy) \| `'admin'` | Set once at sign-up. Peer tutors and Professor / Alumni accounts use `'tutor'`; existing `'professional'` accounts remain supported as tutors. Users must not be able to change it, and nobody can sign up as `admin` (admins are created in the Firebase console) |
+| `role` | `'student'` \| `'tutor'` \| `'professional'` (legacy) \| `'admin'` | Set once at sign-up. Peer tutors and Professor / Alumni accounts use `'tutor'`; existing `'professional'` accounts remain supported as tutors. A student applying to tutor keeps `role: 'student'`; application status is stored separately. Users must not be able to change their role, and nobody can sign up as `admin` (admins are created in the Firebase console) |
 | `tutorType` | `'peer'` \| `'professional'` | Tutor accounts only. Saved at sign-up to determine the verification evidence requirements; never user-editable. Existing accounts without it infer the type from their tutor application tier |
 | `name` | string | |
 | `phone`, `age`, `location` (city), `year`, `campus`, `campusAddress` | string | From the student profile screen |
@@ -61,7 +61,9 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 
 ## `tutorApplications/{uid}` (private)
 
-This document is readable only by its tutor and admins. Keep verification proof and payment QR fields here, never in `tutors/{uid}`, because Firestore security rules cannot hide selected fields from clients that can read a document.
+This document is readable only by its applicant and admins. Applicants may have a student, tutor, or legacy professional account role; applying never changes that role. Keep verification proof and payment QR fields here, never in `tutors/{uid}`, because Firestore security rules cannot hide selected fields from clients that can read a document.
+
+Tutor operations are granted only when both this private record and the matching `tutors/{uid}` public profile have `verificationStatus: 'approved'`, and the public profile has `publicProfileVersion: 2`. Pending and rejected applicants may see their own application status and evidence but cannot appear in tutor search, accept bookings, or update tutor booking details. A student applicant who is approved keeps all student access and may switch between student and tutor workspaces.
 
 | Field | Type | Notes |
 |---|---|---|

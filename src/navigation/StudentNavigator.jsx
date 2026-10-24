@@ -8,7 +8,6 @@ import StudentAvatar from '../components/StudentAvatar';
 import { useAuth } from '../context/AuthContext';
 import { ROUTES } from '../constants/routes';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
-import StudentDashboardScreen from '../screens/student/StudentDashboardScreen';
 import { TutorsScreen } from '../screens/student/TutorsScreen';
 import ConversationScreen from '../screens/shared/ConversationScreen';
 import ChatScreen from '../screens/shared/ChatScreen';
@@ -16,7 +15,7 @@ import ScheduleScreen from '../screens/student/ScheduleScreen';
 import StudentProfileScreen from '../screens/student/StudentProfileScreen';
 import BookingScreen from '../screens/student/BookingScreen';
 import PaymentScreen from '../screens/student/PaymentScreen';
-import TutorProfileScreen from '../screens/tutor/TutorProfileScreen';
+import TutorApplicationScreen from '../screens/tutor/TutorProfileScreen';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
@@ -26,7 +25,6 @@ const tabConfig = {
   Tutors: { icon: 'people', inactiveIcon: 'people-outline', title: 'Tutors' },
   Profile: { icon: 'person', inactiveIcon: 'person-outline', title: 'Profile' },
   Schedule: { icon: 'calendar', inactiveIcon: 'calendar-outline', title: 'Schedule' },
-  TutorProfile: { icon: 'school', inactiveIcon: 'school-outline', title: 'Tutor Profile' },
   Chat: { icon: 'chatbubble', inactiveIcon: 'chatbubble-outline', title: 'Messages' },
   [ROUTES.BOOKING]: { icon: 'calendar', inactiveIcon: 'calendar-outline', title: 'Book a session' },
   [ROUTES.PAYMENT]: { icon: 'card', inactiveIcon: 'card-outline', title: 'Payment' },
@@ -42,15 +40,15 @@ function getInitials(name) {
     .join('');
 }
 
-// The five tabs. They sit inside the stack below so that Notifications and the
-// dashboard can open on top of them with a back button.
+// The four student tabs sit inside the stack below so shared screens and the
+// tutor application can open on top of them with a back button.
 function StudentTabs() {
-  const { user } = useAuth();
+  const { user, studentProfileOnModeSwitch } = useAuth();
   const studentInitials = getInitials(user?.name) || 'S';
 
   return (
     <Tab.Navigator
-      initialRouteName="Tutors"
+      initialRouteName={studentProfileOnModeSwitch ? ROUTES.PROFILE : ROUTES.TUTORS}
       tabBar={(props) => (
         <SafeAreaView edges={['bottom']} style={styles.tabBarSafeArea}>
           <BottomTabBar
@@ -109,16 +107,14 @@ function StudentTabs() {
         {() => <TutorsScreen />}
       </Tab.Screen>
 
-      <Tab.Screen name="Profile" options={{ title: 'Profile' }}>
-        {() => <StudentProfileScreen />}
-      </Tab.Screen>
+      <Tab.Screen
+        name="Profile"
+        component={StudentProfileScreen}
+        options={{ title: 'Profile' }}
+      />
 
       <Tab.Screen name="Schedule" options={{ title: 'Schedule' }}>
         {() => <ScheduleScreen />}
-      </Tab.Screen>
-
-      <Tab.Screen name="TutorProfile" options={{ title: 'Tutor Profile' }}>
-        {() => <TutorProfileScreen />}
       </Tab.Screen>
 
       <Tab.Screen name="Chat" component={ChatScreen} />
@@ -143,9 +139,6 @@ function StudentTabs() {
 }
 
 export default function StudentNavigator() {
-  const { user } = useAuth();
-  const studentInitials = getInitials(user?.name) || 'S';
-
   return (
     <Stack.Navigator initialRouteName="StudentTabs">
       <Stack.Screen
@@ -162,12 +155,9 @@ export default function StudentNavigator() {
         }}
       />
       <Stack.Screen
-        name={ROUTES.STUDENT_DASHBOARD}
-        component={StudentDashboardScreen}
-        options={{
-          title: 'Dashboard',
-          header: () => <AppHeader title="Dashboard" initials={studentInitials} />,
-        }}
+        name={ROUTES.TUTOR_APPLICATION}
+        component={TutorApplicationScreen}
+        options={{ title: 'Tutor application' }}
       />
     </Stack.Navigator>
   );

@@ -262,6 +262,9 @@ export async function setVerificationStatus(tutorId, status, review = {}) {
   if (review.reviewerId !== reviewerId) {
     throw new Error('The signed-in admin must be the reviewer.');
   }
+  if (reviewerId === tutorId) {
+    throw new Error('Admins cannot review their own tutor applications.');
+  }
   const reason = typeof review.reason === 'string' ? review.reason.trim() : '';
   if (status === VERIFICATION_STATUS.REJECTED && !reason) {
     throw new Error('A reason is required when rejecting an application.');

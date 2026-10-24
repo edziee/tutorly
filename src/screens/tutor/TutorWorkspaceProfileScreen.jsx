@@ -8,6 +8,8 @@ import AppInput from '../../components/AppInput';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import WorkspaceSwitchCard from '../../components/WorkspaceSwitchCard';
+import { openTutorApplication } from '../../navigation/studentNavigationActions';
 import { ROLES } from '../../constants/roles';
 import {
   BOOKING_PAYMENT_STATUS,
@@ -26,6 +28,7 @@ import {
   updateBookingStatus,
 } from '../../services/bookingService';
 import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
+import { canUseTutorOperations } from '../../utils/workspace';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { isHttpsUrl } from '../../utils/validation';
@@ -67,7 +70,7 @@ function RequestCard({ request, onAccept, onDecline, working }) {
 }
 
 export default function TutorWorkspaceProfileScreen({ navigation }) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, setWorkspaceMode, workspaceModeError } = useAuth();
   const [instantHelp, setInstantHelp] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
@@ -81,9 +84,17 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   const [loadStatus, setLoadStatus] = useState('loading');
   const [loadError, setLoadError] = useState(null);
   const uid = user?.uid;
+  const canPerformTutorOperations = canUseTutorOperations(
+    user?.role,
+    application?.verificationStatus,
+  );
   const bookingResults = useSubscription(
-    (onData, onError) => (uid ? subscribeToTutorBookings(uid, onData, onError) : undefined),
-    [uid],
+    (onData, onError) => (
+      uid && canPerformTutorOperations
+        ? subscribeToTutorBookings(uid, onData, onError)
+        : undefined
+    ),
+    [uid, canPerformTutorOperations],
   );
   const pendingRequests = (bookingResults.data ?? []).filter((booking) => booking.status === 'requested');
   const paymentsToVerify = (bookingResults.data ?? []).filter(
@@ -141,14 +152,48 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     loadApplication();
   }, [loadApplication]));
 
-  if (loadStatus === 'loading') return <LoadingState message="Loading your tutor profile..." />;
+  const switchToStudentProfile = async () => {
+    try {
+      await setWorkspaceMode('student');
+    } catch (error) {
+      Alert.alert('Could not switch workspaces', getErrorMessage(error, 'Please try again.'));
+    }
+  };
+
+  if (loadStatus === 'loading') {
+    return (
+      <ScreenContainer>
+        <LoadingState message="Loading your tutor profile..." />
+        {user?.role === ROLES.STUDENT ? (
+          <WorkspaceSwitchCard
+            accessibilityLabel="Switch to student workspace"
+            title="Student workspace"
+            description="Return to your student profile and learning tools."
+            icon="book-outline"
+            onPress={switchToStudentProfile}
+          />
+        ) : null}
+      </ScreenContainer>
+    );
+  }
   if (loadStatus === 'error') {
     return (
-      <ErrorState
-        title="Tutor profile isn’t available"
-        message={getErrorMessage(loadError)}
-        onRetry={loadApplication}
-      />
+      <ScreenContainer>
+        <ErrorState
+          title="Tutor profile isn’t available"
+          message={getErrorMessage(loadError)}
+          onRetry={loadApplication}
+        />
+        {user?.role === ROLES.STUDENT ? (
+          <WorkspaceSwitchCard
+            accessibilityLabel="Switch to student workspace"
+            title="Student workspace"
+            description="Return to your student profile and learning tools."
+            icon="book-outline"
+            onPress={switchToStudentProfile}
+          />
+        ) : null}
+      </ScreenContainer>
     );
   }
 
@@ -215,6 +260,22 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           <View style={styles.activeDot} />
           <Text style={styles.activeText}>Tutor workspace</Text>
         </View>
+        {user?.role === ROLES.STUDENT ? (
+          <View style={styles.workspaceActions}>
+            <WorkspaceSwitchCard
+              accessibilityLabel="Switch to student workspace"
+              title="Student workspace"
+              description="Return to your student profile and learning tools."
+              icon="book-outline"
+              onPress={switchToStudentProfile}
+            />
+            {workspaceModeError ? (
+              <Text accessibilityRole="alert" style={styles.formError}>
+                Your workspace preference could not be saved or restored on this device. You can still switch while signed in.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.profileCard}>
           <View style={styles.profileRow}>
@@ -278,13 +339,19 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           ) : null}
           <Pressable
             style={styles.addCourse}
-            onPress={() => navigation.navigate('TutorApplication')}
+            onPress={() => openTutorApplication(navigation)}
           >
             <Ionicons name="create-outline" size={15} color={colors.primary} />
-            <Text style={styles.addCourseText}>Edit application and course details</Text>
+            <Text style={styles.addCourseText}>
+              {verificationStatus === 'not_submitted'
+                ? 'Start tutor application'
+                : 'View application and course details'}
+            </Text>
           </Pressable>
         </View>
 
+        {canPerformTutorOperations ? (
+          <>
         <SectionTitle title="Schedule and availability" subtitle="When students can book you" action="Edit times" />
         <View style={styles.availabilityCard}>
           <View style={styles.instantRow}>
@@ -423,6 +490,23 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         {bookingResults.status === 'ready' && !sessions.length ? (
           <Text style={styles.emptyRequests}>Your upcoming and completed sessions will appear here.</Text>
         ) : null}
+          </>
+        ) : (
+          <View style={styles.applicationAccessCard}>
+            <Text style={styles.profileDescription}>
+              {verificationStatus === 'pending'
+                ? 'Tutor tools will be available after your application is approved.'
+                : verificationStatus === 'rejected'
+                  ? 'Update your application for another review. Tutor tools remain unavailable until approval.'
+                  : 'Submit an application to begin tutor verification. Tutor tools are available after approval.'}
+            </Text>
+            <AppButton
+              title={verificationStatus === 'not_submitted' ? 'Apply to tutor' : 'Open tutor application'}
+              variant="secondary"
+              onPress={() => openTutorApplication(navigation)}
+            />
+          </View>
+        )}
 
         {signOutError ? (
           <Text accessibilityRole="alert" style={styles.signOutError}>
@@ -479,6 +563,8 @@ const styles = StyleSheet.create({
   proofDetails: { flexShrink: 1, marginTop: 3, color: colors.mutedText, fontSize: 10, lineHeight: 15 },
   addCourse: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.background },
   addCourseText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  workspaceActions: { marginTop: spacing.sm },
+  applicationAccessCard: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm },
   sectionHeading: { color: colors.heading, fontSize: 17, fontWeight: '700' },
   sectionSubtitle: { marginTop: 2, color: colors.mutedText, fontSize: 11 },
