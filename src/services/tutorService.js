@@ -56,12 +56,16 @@ function toPublicTutor(snapshot) {
     photoUrl: data.photoUrl ?? '',
     rating: Number.isFinite(data.rating) ? data.rating : null,
     reviewCount: Number.isFinite(data.reviewCount) ? data.reviewCount : 0,
+    totalRecordedTeachingSeconds:
+      Number.isSafeInteger(data.totalRecordedTeachingSeconds) && data.totalRecordedTeachingSeconds >= 0
+        ? data.totalRecordedTeachingSeconds
+        : 0,
     hourlyRate: isValidTokenAmount(data.hourlyRate) ? data.hourlyRate : null,
   };
 }
 
 /**
- * Tutors for the list and the map. Only approved tutors are shown to students.
+ * Approved public tutor profiles for discovery and tutor leaderboards.
  * Filtering by tier and subject can be done here (query) or in the screen.
  * @param {{ tier?: string, subject?: string }} [filters]
  * @returns {Promise<object[]>}
@@ -286,6 +290,8 @@ export async function saveTutorApplication(uid, application) {
     'rating',
     'reviewCount',
     'lastRatingBookingId',
+    'totalRecordedTeachingSeconds',
+    'lastTeachingBookingId',
     'hourlyRate',
     'bio',
     'subject',

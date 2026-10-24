@@ -19,9 +19,11 @@ import {
   TUTOR_TYPES,
 } from '../../constants/statuses';
 import { useAuth } from '../../context/AuthContext';
+import { useAsync } from '../../hooks/useAsync';
 import { useSubscription } from '../../hooks/useSubscription';
 import {
   getTutorApplication,
+  getTutors,
   updateTutorBookingDetails,
 } from '../../services/tutorService';
 import {
@@ -32,6 +34,7 @@ import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
 import { canUseTutorOperations, hasDirectTutorAccountStatus } from '../../utils/workspace';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
+import { getTutorLeaderboards, TOP_RATED_MINIMUM_REVIEWS } from '../../utils/leaderboards';
 import { formatTokenUnits } from '../../utils/tokens';
 
 function SectionTitle({ title, subtitle, action }) {
@@ -72,6 +75,29 @@ function RequestCard({ request, onAccept, onDecline, working }) {
   );
 }
 
+function LeaderboardRow({ tutor, rank, mode }) {
+  const isHours = mode === 'hours';
+  const score = isHours
+    ? `${Number(tutor.hoursTaught.toFixed(1))} hrs`
+    : `${tutor.averageRating.toFixed(1)} ★`;
+  const detail = isHours
+    ? 'recorded teaching'
+    : `${tutor.reviewCount} review${tutor.reviewCount === 1 ? '' : 's'}`;
+
+  return (
+    <View style={styles.leaderboardRow}>
+      <View style={styles.leaderboardRank}>
+        <Text style={styles.leaderboardRankText}>{rank}</Text>
+      </View>
+      <View style={styles.leaderboardIdentity}>
+        <Text numberOfLines={1} style={styles.leaderboardName}>{tutor.name}</Text>
+        <Text style={styles.leaderboardDetail}>{detail}</Text>
+      </View>
+      <Text style={styles.leaderboardScore}>{score}</Text>
+    </View>
+  );
+}
+
 export default function TutorWorkspaceProfileScreen({ navigation }) {
   const { user, signOut, setWorkspaceMode, workspaceModeError } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
@@ -93,6 +119,15 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     user?.role,
     application?.verificationStatus,
   );
+  const [leaderboardMode, setLeaderboardMode] = useState('rating');
+  const tutorResults = useAsync(
+    () => (canPerformTutorOperations ? getTutors() : Promise.resolve([])),
+    [canPerformTutorOperations],
+  );
+  const leaderboards = getTutorLeaderboards([], tutorResults.data ?? []);
+  const leaderboardEntries = leaderboardMode === 'rating'
+    ? leaderboards.topRatedTutors.slice(0, 5)
+    : leaderboards.mostHoursTaught.slice(0, 5);
   const bookingResults = useSubscription(
     (onData, onError) => (
       uid && canPerformTutorOperations
@@ -233,6 +268,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     setBookingActionError('');
     try {
       await updateBookingStatus(bookingId, status);
+      if (status === BOOKING_STATUS.COMPLETED) tutorResults.retry();
     } catch (error) {
       setBookingActionError(getErrorMessage(error, 'Couldn’t update this booking.'));
     } finally {
@@ -364,6 +400,76 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
 
         {canPerformTutorOperations ? (
           <>
+        <View style={styles.leaderboardCard}>
+          <View style={styles.leaderboardHeader}>
+            <View style={styles.leaderboardHeadingCopy}>
+              <Text style={styles.sectionHeading}>Tutor leaderboards</Text>
+              <Text style={styles.sectionSubtitle}>
+                Top 5 tutors · Ratings need {TOP_RATED_MINIMUM_REVIEWS}+ reviews
+              </Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Refresh tutor leaderboards"
+              accessibilityRole="button"
+              onPress={tutorResults.retry}
+              style={styles.leaderboardRefresh}
+            >
+              <Ionicons name="refresh-outline" size={18} color={colors.primary} />
+            </Pressable>
+          </View>
+          <View style={styles.leaderboardTabs}>
+            {[
+              ['rating', 'Top rated', 'star-outline'],
+              ['hours', 'Most hours', 'time-outline'],
+            ].map(([mode, label, icon]) => {
+              const selected = leaderboardMode === mode;
+              return (
+                <Pressable
+                  key={mode}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  onPress={() => setLeaderboardMode(mode)}
+                  style={[styles.leaderboardTab, selected && styles.leaderboardTabActive]}
+                >
+                  <Ionicons
+                    name={icon}
+                    size={15}
+                    color={selected ? colors.white : colors.mutedText}
+                  />
+                  <Text style={[styles.leaderboardTabText, selected && styles.leaderboardTabTextActive]}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {tutorResults.status === 'loading' ? (
+            <LoadingState compact message="Loading tutor rankings..." />
+          ) : tutorResults.status === 'error' ? (
+            <ErrorState
+              compact
+              title="Tutor rankings aren’t available"
+              message={getErrorMessage(tutorResults.error)}
+              onRetry={tutorResults.retry}
+            />
+          ) : leaderboardEntries.length ? (
+            leaderboardEntries.map((tutor, index) => (
+              <LeaderboardRow
+                key={tutor.tutorId}
+                tutor={tutor}
+                rank={index + 1}
+                mode={leaderboardMode}
+              />
+            ))
+          ) : (
+            <Text style={styles.leaderboardEmpty}>
+              {leaderboardMode === 'rating'
+                ? `No tutors have ${TOP_RATED_MINIMUM_REVIEWS} or more reviews yet.`
+                : 'Recorded teaching hours will appear here after sessions are completed.'}
+            </Text>
+          )}
+        </View>
+
         <SectionTitle
           title="Schedule and availability"
           subtitle="Availability submitted with your tutor application"
@@ -577,6 +683,23 @@ const styles = StyleSheet.create({
   rate: { color: colors.primary, fontSize: 18, fontWeight: '800' },
   rateUnit: { color: colors.mutedText, fontSize: 11 },
   profileDescription: { marginTop: spacing.sm, color: colors.mutedText, fontSize: 11, lineHeight: 16 },
+  leaderboardCard: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  leaderboardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  leaderboardHeadingCopy: { flex: 1 },
+  leaderboardRefresh: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: colors.background },
+  leaderboardTabs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  leaderboardTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.background },
+  leaderboardTabActive: { backgroundColor: colors.primary },
+  leaderboardTabText: { color: colors.mutedText, fontSize: 11, fontWeight: '700' },
+  leaderboardTabTextActive: { color: colors.white },
+  leaderboardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  leaderboardRank: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.mint },
+  leaderboardRankText: { color: colors.primary, fontSize: 11, fontWeight: '800' },
+  leaderboardIdentity: { flex: 1, marginHorizontal: spacing.sm },
+  leaderboardName: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  leaderboardDetail: { marginTop: 2, color: colors.mutedText, fontSize: 10 },
+  leaderboardScore: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+  leaderboardEmpty: { paddingVertical: spacing.md, color: colors.mutedText, fontSize: 12, lineHeight: 17, textAlign: 'center' },
   courseList: { marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.background },
   courseItem: { paddingVertical: 4 },
   courseRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },

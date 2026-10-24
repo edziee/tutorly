@@ -50,6 +50,8 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `subject` | string | Main subject shown on the card, for example `CS 240: Algorithms` |
 | `rating`, `reviewCount` | number | Public average star rating from completed-session reviews and its count; rating values are 0–5 |
 | `lastRatingBookingId` | string | Internal marker used by Firestore rules to authorize one atomic booking-rating and tutor-aggregate update |
+| `totalRecordedTeachingSeconds` | non-negative integer | Aggregate of positive recorded timer seconds from completed sessions; updated atomically when a tutor confirms completion |
+| `lastTeachingBookingId` | string | Internal marker used by Firestore rules to authorize the matching completion and teaching-time aggregate update |
 | `location` | string | City name shown on the card |
 | `coordinates` | map `{ latitude, longitude }` | New. Used for the map and nearby sorting (Week 3) |
 | `credentials`, `bio`, `teachingPhilosophy` | string | |
@@ -60,9 +62,9 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `online` | boolean | |
 | `photoUrl` | string | Optional instructor-approved external image URL; otherwise use initials |
 | `hourlyRate` | number | The tutor's session price in tokens for one session. One token is nominally ₱1; values are limited to two decimal places. |
-| `verificationStatus` | `'not_submitted'` \| `'pending'` \| `'approved'` \| `'rejected'` | `VERIFICATION_STATUS`. Students only see `approved` tutors |
+| `verificationStatus` | `'not_submitted'` \| `'pending'` \| `'approved'` \| `'rejected'` | `VERIFICATION_STATUS`. Students and tutors only see `approved` tutors |
 | `verificationNote` | string | Public profile field; rejected tutors are not visible to students |
-| `publicProfileVersion` | number | Must be `2` before students can read a profile. This keeps legacy documents containing proof fields private until migrated |
+| `publicProfileVersion` | number | Must be `2` before students or tutors can read a profile. This keeps legacy documents containing proof fields private until migrated |
 
 ## `tutorApplications/{uid}` (private)
 
@@ -186,16 +188,23 @@ The filter tabs on the Messages screen (`All Messages`, `Active Tutors`, `Facult
 ## Tutor leaderboards and recorded time
 
 The "Most hours taught" calculation uses only bookings with `status: 'completed'`,
-`timerStatus: 'stopped'`, and a positive `accumulatedDurationSeconds` value. It
-excludes requested, rejected, cancelled, upcoming, paused, and otherwise
-incomplete bookings. `durationHours` is the scheduled reservation and is never
-used as evidence that teaching occurred.
+`timerStatus: 'stopped'`, and a positive `accumulatedDurationSeconds` value. When
+a tutor confirms completion, the booking and that tutor's public
+`totalRecordedTeachingSeconds` are updated atomically. This avoids exposing other
+tutors' private booking records to calculate the leaderboard. It excludes
+requested, rejected, cancelled, upcoming, paused, and otherwise incomplete
+bookings. `durationHours` is the scheduled reservation and is never used as
+evidence that teaching occurred. Existing tutor profiles without this aggregate
+are treated as having zero recorded hours; historical completed sessions are
+not backfilled by the client.
 
 The "Top-rated tutors" calculation uses the existing transactional `rating` and
 `reviewCount` aggregate on `tutors/{uid}`. The current implementation uses a
 minimum of three reviews before a tutor appears in that ranking; displayed
 entries include both the average rating and review count. This avoids presenting
-a single review as a stable ranking.
+a single review as a stable ranking. Approved tutors may read approved public
+tutor profiles to view these leaderboards; booking and application records
+remain private.
 
 Timer data is persisted directly on the booking because this project is limited
 to Firebase Authentication and Firestore on the Spark plan and intentionally

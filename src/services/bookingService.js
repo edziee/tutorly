@@ -353,6 +353,8 @@ export async function updateBookingStatus(bookingId, status) {
     const booking = snapshot.data();
     const isTutor = booking.tutorId === userId;
     const isStudent = booking.studentId === userId;
+    let tutorRef;
+    let nextTeachingSeconds;
     if (status === BOOKING_STATUS.UPCOMING || status === BOOKING_STATUS.REJECTED) {
       if (!isTutor || booking.status !== BOOKING_STATUS.REQUESTED) {
         throw new Error('Only the assigned tutor can respond to a pending request.');
@@ -365,6 +367,18 @@ export async function updateBookingStatus(bookingId, status) {
           !Number.isSafeInteger(booking.accumulatedDurationSeconds) ||
           booking.accumulatedDurationSeconds <= 0) {
         throw new Error('Stop the timer and review a positive recorded teaching duration before confirming completion.');
+      }
+      tutorRef = doc(db, COLLECTIONS.TUTORS, booking.tutorId);
+      const tutorSnapshot = await transaction.get(tutorRef);
+      if (!tutorSnapshot.exists()) throw new Error('The tutor profile is unavailable.');
+      const currentTeachingSeconds = tutorSnapshot.data().totalRecordedTeachingSeconds ?? 0;
+      nextTeachingSeconds = currentTeachingSeconds + booking.accumulatedDurationSeconds;
+      if (
+        !Number.isSafeInteger(currentTeachingSeconds) ||
+        currentTeachingSeconds < 0 ||
+        !Number.isSafeInteger(nextTeachingSeconds)
+      ) {
+        throw new Error('The tutor teaching-time total is invalid. Contact support.');
       }
     } else if ((!isTutor && !isStudent) || ![BOOKING_STATUS.REQUESTED, BOOKING_STATUS.UPCOMING].includes(booking.status)) {
       throw new Error('Only a participant can cancel an active booking.');
@@ -630,6 +644,13 @@ export async function updateBookingStatus(bookingId, status) {
           bookingId,
           createdAt: timestamp,
         });
+        if (status === BOOKING_STATUS.COMPLETED) {
+          transaction.update(tutorRef, {
+            totalRecordedTeachingSeconds: nextTeachingSeconds,
+            lastTeachingBookingId: bookingId,
+            updatedAt: timestamp,
+          });
+        }
       }
       const tokenUpdates = {
         status,
@@ -661,6 +682,13 @@ export async function updateBookingStatus(bookingId, status) {
         : {}),
       updatedAt: serverTimestamp(),
     });
+    if (status === BOOKING_STATUS.COMPLETED) {
+      transaction.update(tutorRef, {
+        totalRecordedTeachingSeconds: nextTeachingSeconds,
+        lastTeachingBookingId: bookingId,
+        updatedAt: serverTimestamp(),
+      });
+    }
   });
 }
 

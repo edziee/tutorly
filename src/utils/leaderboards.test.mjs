@@ -12,6 +12,17 @@ test('most hours taught uses recorded seconds from eligible completed bookings o
   assert.deepEqual(result.mostHoursTaught, [{ tutorId: 'a', name: 'A', hoursTaught: 1.5 }]);
 });
 
+test('most hours taught uses the public aggregate when booking details are not available', () => {
+  const result = getTutorLeaderboards([], [
+    { uid: 'a', name: 'A', totalRecordedTeachingSeconds: 7200 },
+    { uid: 'b', name: 'B', totalRecordedTeachingSeconds: -30 },
+    { uid: 'c', name: 'C', totalRecordedTeachingSeconds: 0 },
+  ]);
+  assert.deepEqual(result.mostHoursTaught, [
+    { tutorId: 'a', name: 'A', hoursTaught: 2 },
+  ]);
+});
+
 test('top-rated tutors requires the documented minimum review count', () => {
   const result = getTutorLeaderboards([], [
     { uid: 'a', name: 'A', rating: 5, reviewCount: TOP_RATED_MINIMUM_REVIEWS },

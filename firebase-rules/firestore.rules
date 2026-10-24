@@ -461,6 +461,8 @@ service cloud.firestore {
           'rating',
           'reviewCount',
           'lastRatingBookingId',
+          'totalRecordedTeachingSeconds',
+          'lastTeachingBookingId',
           'hourlyRate',
           'bio',
           'subject'
@@ -508,6 +510,11 @@ service cloud.firestore {
           (data.reviewCount is int && data.reviewCount >= 0)) &&
         (!('lastRatingBookingId' in data) ||
           data.lastRatingBookingId is string) &&
+        (!('totalRecordedTeachingSeconds' in data) ||
+          (data.totalRecordedTeachingSeconds is int &&
+            data.totalRecordedTeachingSeconds >= 0)) &&
+        (!('lastTeachingBookingId' in data) ||
+          data.lastTeachingBookingId is string) &&
         (!('online' in data) || data.online is bool) &&
         data.subject is string &&
         !('courses' in data) &&
@@ -729,6 +736,8 @@ service cloud.firestore {
       return isTutorApplicationOwner(uid, request.resource.data.tutorType) &&
         request.resource.data.verificationStatus == 'pending' &&
         request.resource.data.publicProfileVersion == 2 &&
+        request.resource.data.get('totalRecordedTeachingSeconds', 0) == 0 &&
+        request.resource.data.get('lastTeachingBookingId', '') == '' &&
         request.resource.data.createdAt == request.time &&
         request.resource.data.updatedAt == request.time &&
         getAfter(applicationPath(uid)).data.verificationStatus == 'pending' &&
@@ -745,6 +754,10 @@ service cloud.firestore {
         request.resource.data.publicProfileVersion == 2 &&
         request.resource.data.createdAt ==
           resource.data.get('createdAt', request.time) &&
+        request.resource.data.get('totalRecordedTeachingSeconds', 0) ==
+          resource.data.get('totalRecordedTeachingSeconds', 0) &&
+        request.resource.data.get('lastTeachingBookingId', '') ==
+          resource.data.get('lastTeachingBookingId', '') &&
         request.resource.data.updatedAt == request.time &&
         !('verificationReviewedBy' in request.resource.data) &&
         !('verificationReviewedAt' in request.resource.data) &&
@@ -802,6 +815,33 @@ service cloud.firestore {
           'rating',
           'reviewCount',
           'lastRatingBookingId',
+          'updatedAt'
+        ]);
+    }
+
+    function validTutorTeachingHoursAggregate(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      let bookingId = request.resource.data.get('lastTeachingBookingId', '');
+      let bookingBefore = get(bookingPath(bookingId)).data;
+      let bookingAfter = getAfter(bookingPath(bookingId)).data;
+      let oldSeconds = resource.data.get('totalRecordedTeachingSeconds', 0);
+      return isApprovedTutor(uid) &&
+        request.auth.uid == uid &&
+        bookingBefore.tutorId == uid &&
+        bookingBefore.status == 'upcoming' &&
+        bookingBefore.get('timerStatus', '') == 'stopped' &&
+        bookingBefore.get('accumulatedDurationSeconds', 0) is int &&
+        bookingBefore.get('accumulatedDurationSeconds', 0) > 0 &&
+        bookingAfter.status == 'completed' &&
+        oldSeconds is int &&
+        oldSeconds >= 0 &&
+        request.resource.data.totalRecordedTeachingSeconds ==
+          oldSeconds + bookingBefore.accumulatedDurationSeconds &&
+        request.resource.data.lastTeachingBookingId == bookingId &&
+        request.resource.data.updatedAt == request.time &&
+        changes.hasOnly([
+          'totalRecordedTeachingSeconds',
+          'lastTeachingBookingId',
           'updatedAt'
         ]);
     }
@@ -1174,6 +1214,9 @@ service cloud.firestore {
     function validBookingCompletion(bookingId) {
       let data = request.resource.data;
       let tokenBooking = 'tokenStatus' in resource.data;
+      let tutorBefore = get(tutorPath(resource.data.tutorId)).data;
+      let tutorAfter = getAfter(tutorPath(resource.data.tutorId)).data;
+      let oldSeconds = tutorBefore.get('totalRecordedTeachingSeconds', 0);
       return isBookingTutor() &&
         resource.data.status == 'upcoming' &&
         resource.data.get('timerStatus', '') == 'stopped' &&
@@ -1181,6 +1224,12 @@ service cloud.firestore {
         resource.data.get('accumulatedDurationSeconds', 0) > 0 &&
         data.status == 'completed' &&
         data.updatedAt == request.time &&
+        oldSeconds is int &&
+        oldSeconds >= 0 &&
+        tutorAfter.totalRecordedTeachingSeconds ==
+          oldSeconds + resource.data.accumulatedDurationSeconds &&
+        tutorAfter.lastTeachingBookingId == bookingId &&
+        tutorAfter.updatedAt == request.time &&
         (tokenBooking
           ? (data.tokenStatus == 'settled' &&
               data.diff(resource.data).affectedKeys()
@@ -1317,18 +1366,19 @@ service cloud.firestore {
     match /tutors/{uid} {
       allow get: if isAdmin() ||
         (signedIn() && request.auth.uid == uid) ||
-        (isStudent() &&
+        ((isStudent() || isTutor()) &&
           resource.data.get('verificationStatus', '') == 'approved' &&
           validProfileVersion(resource.data));
       allow list: if isAdmin() ||
-        (isStudent() &&
+        ((isStudent() || isTutor()) &&
           resource.data.get('verificationStatus', '') == 'approved' &&
           validProfileVersion(resource.data));
       allow create: if validPublicApplicationCreate(uid);
       allow update: if validAdminTutorReview(uid) ||
         validPublicApplicationUpdate(uid) ||
         validTutorBookingDetailsUpdate(uid) ||
-        validTutorRatingAggregate(uid);
+        validTutorRatingAggregate(uid) ||
+        validTutorTeachingHoursAggregate(uid);
       allow delete: if false;
     }
 

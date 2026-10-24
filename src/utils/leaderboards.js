@@ -20,11 +20,20 @@ export function getTutorLeaderboards(bookings, tutors, minimumReviews = TOP_RATE
 
   const tutorList = Array.isArray(tutors) ? tutors : [];
   const mostHoursTaught = tutorList
-    .map((tutor) => ({
-      tutorId: tutor.uid ?? tutor.id,
-      name: tutor.name ?? 'Tutor',
-      hoursTaught: hoursByTutor.get(tutor.uid ?? tutor.id) ?? 0,
-    }))
+    .map((tutor) => {
+      const tutorId = tutor.uid ?? tutor.id;
+      const recordedSeconds = Number.isSafeInteger(tutor.totalRecordedTeachingSeconds)
+        && tutor.totalRecordedTeachingSeconds >= 0
+        ? tutor.totalRecordedTeachingSeconds
+        : 0;
+      return {
+        tutorId,
+        name: tutor.name ?? 'Tutor',
+        hoursTaught: hoursByTutor.has(tutorId)
+          ? hoursByTutor.get(tutorId)
+          : recordedSeconds / 3600,
+      };
+    })
     .filter((tutor) => tutor.hoursTaught > 0)
     .sort((first, second) => second.hoursTaught - first.hoursTaught);
 
