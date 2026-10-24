@@ -11,8 +11,8 @@
 // admin account can never be created here. Like the login screen, it does not
 // navigate afterwards: AuthContext notices the new account.
 //
-// Choosing "Tutor" shows a second switch: Peer Tutor or Professor / Alumni.
-// Both choices create a 'tutor' account; Professor / Alumni do not need a campus ID.
+// New tutor accounts use the Professor / Alumni application path. Existing peer
+// tutors continue to sign in through the generic Tutor portal.
 //
 // Tutor type is saved at sign-up. Applicants submit Google Drive proof links
 // later through the tutor application; file bytes are not uploaded to Firebase.
@@ -50,11 +50,6 @@ const modeOptions = [
   { value: 'signUp', label: 'Create account' },
 ];
 
-const tutorKindOptions = [
-  { value: TUTOR_TYPES.PEER, label: 'Peer Tutor' },
-  { value: TUTOR_TYPES.PROFESSIONAL, label: 'Professor / Alumni' },
-];
-
 // What each consent covers, from the Figma "Academic Permissions & Privacy Consent" box.
 const disclosures = [
   {
@@ -79,9 +74,6 @@ export default function SignUpScreen({ navigation, route }) {
   const [portal, setPortal] = useState(
     requestedRole && requestedRole !== ROLES.STUDENT ? ROLES.TUTOR : ROLES.STUDENT,
   );
-  const [tutorKind, setTutorKind] = useState(
-    requestedRole === ROLES.PROFESSIONAL ? TUTOR_TYPES.PROFESSIONAL : TUTOR_TYPES.PEER,
-  );
   const [name, setName] = useState('');
   const [campusId, setCampusId] = useState('');
   const [email, setEmail] = useState('');
@@ -95,8 +87,8 @@ export default function SignUpScreen({ navigation, route }) {
 
   const isStudent = portal === ROLES.STUDENT;
   const role = isStudent ? ROLES.STUDENT : ROLES.TUTOR;
-  // Professors and alumni may not have a campus ID number, so it is optional for them.
-  const campusIdRequired = isStudent || tutorKind !== TUTOR_TYPES.PROFESSIONAL;
+  // Tutor applicants use the Professor / Alumni path, where campus ID is optional.
+  const campusIdRequired = isStudent;
 
   const handleSubmit = async () => {
     const nextErrors = {
@@ -120,7 +112,7 @@ export default function SignUpScreen({ navigation, route }) {
         profile: {
           name: name.trim(),
           campusId: campusId.trim(),
-          ...(!isStudent ? { tutorType: tutorKind } : {}),
+          ...(!isStudent ? { tutorType: TUTOR_TYPES.PROFESSIONAL } : {}),
         },
       });
     } catch (error) {
@@ -170,16 +162,6 @@ export default function SignUpScreen({ navigation, route }) {
               onPress={() => setPortal(ROLES.TUTOR)}
             />
           </View>
-          {!isStudent ? (
-            <View style={styles.tutorKind}>
-              <SegmentedControl
-                options={tutorKindOptions}
-                value={tutorKind}
-                onChange={setTutorKind}
-              />
-            </View>
-          ) : null}
-
           <Card style={styles.formCard}>
             <AppInput
               label="University email"
@@ -332,9 +314,6 @@ const styles = StyleSheet.create({
   roleRow: {
     flexDirection: 'row',
     gap: spacing.sm + 2,
-    marginBottom: spacing.md,
-  },
-  tutorKind: {
     marginBottom: spacing.md,
   },
   formCard: {
