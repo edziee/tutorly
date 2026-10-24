@@ -11,11 +11,10 @@ export const ROUTES = {
   TUTORS: 'Tutors',
   PROFILE: 'Profile',
   SCHEDULE: 'Schedule',
-  TUTOR_PROFILE: 'TutorProfile',
   CHAT: 'Chat',
 
   // Student screens that open on top of the tabs
-  STUDENT_DASHBOARD: 'StudentDashboard',
+  TUTOR_APPLICATION: 'TutorApplication',
   BOOKING: 'Booking',
   PAYMENT: 'Payment',
   TUTORS_MAP: 'TutorsMap',

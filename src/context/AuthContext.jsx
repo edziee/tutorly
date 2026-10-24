@@ -1,5 +1,5 @@
-// Who is logged in, and what role they have. The navigators read this to decide
-// which screens to show (see src/navigation/AppNavigator.jsx).
+// Who is logged in, what account role they have, and which student workspace is
+// selected. The navigators read this to decide which screens to show.
 // Owner: Member 1.
 //
 // How it works: AuthProvider listens to Firebase Auth (subscribeToAuthState).
@@ -10,20 +10,34 @@
 //
 // All authenticated state comes from Firebase Authentication and user profiles.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { signOut, subscribeToAuthState } from '../services/authService';
 import { getUserProfile, updateUserProfile } from '../services/userService';
+import { ROLES } from '../constants/roles';
+import {
+  getInitialWorkspaceMode,
+  isWorkspaceMode,
+  withWorkspaceMode,
+  WORKSPACE_MODES,
+} from '../utils/workspace';
+
+const workspaceModeKey = (uid) => `tutorly.workspaceMode.${uid}`;
 
 const signedOut = {
   user: null, // the user's profile document, or null when logged out
   role: null, // one of ROLES in src/constants/roles.js, or null when logged out
   loading: false, // true while the app is still finding out who is logged in
+  workspaceMode: WORKSPACE_MODES.STUDENT,
+  studentProfileOnModeSwitch: false,
+  workspaceModeError: null,
 };
 
 const AuthContext = createContext({
   ...signedOut,
   signOut: async () => {},
   updateProfile: async () => {},
+  setWorkspaceMode: async () => {},
 });
 
 export function AuthProvider({ children }) {
@@ -53,7 +67,25 @@ export function AuthProvider({ children }) {
           signOut().catch(() => {});
           return;
         }
-        setState({ user: profile, role: profile.role ?? null, loading: false });
+        let savedMode = null;
+        let workspaceModeError = null;
+        if (profile.role === ROLES.STUDENT) {
+          try {
+            savedMode = await AsyncStorage.getItem(workspaceModeKey(firebaseUser.uid));
+          } catch (error) {
+            workspaceModeError = error;
+            console.warn('Could not restore the selected workspace:', error);
+          }
+        }
+        if (!isCurrent()) return;
+        setState({
+          user: profile,
+          role: profile.role ?? null,
+          loading: false,
+          workspaceMode: getInitialWorkspaceMode(profile.role, savedMode),
+          studentProfileOnModeSwitch: false,
+          workspaceModeError,
+        });
       } catch (error) {
         if (!isCurrent()) return;
         console.warn('Could not load the user profile:', error);
@@ -82,12 +114,39 @@ export function AuthProvider({ children }) {
     }));
   }, [state.user?.uid]);
 
+  const handleSetWorkspaceMode = useCallback(async (mode) => {
+    const uid = state.user?.uid;
+    if (!uid || state.role !== ROLES.STUDENT) {
+      throw new Error('Only a signed-in student can switch workspaces.');
+    }
+    if (!isWorkspaceMode(mode)) {
+      throw new Error('Choose a valid workspace.');
+    }
+
+    setState((current) => (
+      current.user?.uid === uid
+        ? withWorkspaceMode(current, mode)
+        : current
+    ));
+    try {
+      await AsyncStorage.setItem(workspaceModeKey(uid), mode);
+    } catch (error) {
+      setState((current) => (
+        current.user?.uid === uid
+          ? { ...current, workspaceModeError: error }
+          : current
+      ));
+      throw error;
+    }
+  }, [state.role, state.user?.uid]);
+
   return (
     <AuthContext.Provider
       value={{
         ...state,
         signOut: handleSignOut,
         updateProfile: handleUpdateProfile,
+        setWorkspaceMode: handleSetWorkspaceMode,
       }}
     >
       {children}

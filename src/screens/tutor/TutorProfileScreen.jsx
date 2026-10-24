@@ -289,7 +289,7 @@ function CourseForm({ onAdd, tutorType }) {
   );
 }
 
-export default function TutorProfileScreen() {
+export default function TutorApplicationScreen() {
   const { user } = useAuth();
   const [loadStatus, setLoadStatus] = useState('loading');
   const [loadError, setLoadError] = useState(null);
@@ -727,7 +727,13 @@ export default function TutorProfileScreen() {
           </Pressable>
 
           <View style={styles.submitPanel}>
-            <AppButton title="Submit application" onPress={submitApplication} loading={saving} />
+            {applicationStatus === 'approved' ? (
+              <Text style={styles.approvedNotice}>
+                Your application is approved. Contact support if your tutor details need to change.
+              </Text>
+            ) : (
+              <AppButton title="Submit application" onPress={submitApplication} loading={saving} />
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

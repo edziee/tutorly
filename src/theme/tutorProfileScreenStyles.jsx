@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
   certificationRow: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start' },
   certificationText: { color: colors.text, flex: 1, fontSize: 11, lineHeight: 17 },
   submitPanel: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.sm },
+  approvedNotice: { color: colors.successText, fontSize: 13, lineHeight: 19, textAlign: 'center' },
 });
 
 export default styles;

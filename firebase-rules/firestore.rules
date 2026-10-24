@@ -50,6 +50,31 @@ service cloud.firestore {
       return data.get('publicProfileVersion', 0) == 2;
     }
 
+    function isApprovedTutor(uid) {
+      return signedIn() &&
+        exists(userPath(uid)) &&
+        get(userPath(uid)).data.get('role', '') in ['student', 'tutor', 'professional'] &&
+        exists(tutorPath(uid)) &&
+        exists(applicationPath(uid)) &&
+        get(tutorPath(uid)).data.get('verificationStatus', '') == 'approved' &&
+        get(applicationPath(uid)).data.get('verificationStatus', '') == 'approved' &&
+        validProfileVersion(get(tutorPath(uid)).data);
+    }
+
+    function isTutorApplicationOwner(uid, tutorType) {
+      return signedIn() &&
+        request.auth.uid == uid &&
+        ((isTutor() && isTutorAccountType(tutorType)) ||
+          (isStudent() && tutorType in ['peer', 'professional']));
+    }
+
+    function isTutorTypeForAccount(uid, tutorType) {
+      return (isTutor() && isTutorAccountType(tutorType)) ||
+        (isStudent() &&
+          exists(applicationPath(uid)) &&
+          get(applicationPath(uid)).data.get('tutorType', '') == tutorType);
+    }
+
     function validPublicTutor(data) {
       return data.keys().hasOnly([
           'name',
@@ -244,10 +269,7 @@ service cloud.firestore {
     }
 
     function validTutorApplicationCreate(uid) {
-      return signedIn() &&
-        request.auth.uid == uid &&
-        isTutor() &&
-        isTutorAccountType(request.resource.data.tutorType) &&
+      return isTutorApplicationOwner(uid, request.resource.data.tutorType) &&
         request.resource.data.verificationStatus == 'pending' &&
         !('verificationReviewedBy' in request.resource.data) &&
         !('verificationReviewedAt' in request.resource.data) &&
@@ -259,10 +281,8 @@ service cloud.firestore {
 
     function validTutorApplicationUpdate(uid) {
       let changes = request.resource.data.diff(resource.data).affectedKeys();
-      return signedIn() &&
-        request.auth.uid == uid &&
-        isTutor() &&
-        isTutorAccountType(request.resource.data.tutorType) &&
+      return isTutorApplicationOwner(uid, request.resource.data.tutorType) &&
+        resource.data.verificationStatus in ['pending', 'rejected'] &&
         request.resource.data.verificationStatus == 'pending' &&
         request.resource.data.verificationNote == '' &&
         !('verificationReviewedBy' in request.resource.data) &&
@@ -298,8 +318,8 @@ service cloud.firestore {
       let changes = request.resource.data.diff(resource.data).affectedKeys();
       return signedIn() &&
         request.auth.uid == uid &&
-        isTutor() &&
-        isTutorAccountType(resource.data.tutorType) &&
+        isApprovedTutor(uid) &&
+        isTutorTypeForAccount(uid, resource.data.tutorType) &&
         request.resource.data.verificationStatus == resource.data.verificationStatus &&
         changes.hasOnly(['paymentQrUrl', 'updatedAt']) &&
         request.resource.data.updatedAt == request.time &&
@@ -308,10 +328,7 @@ service cloud.firestore {
     }
 
     function validPublicApplicationCreate(uid) {
-      return signedIn() &&
-        request.auth.uid == uid &&
-        isTutor() &&
-        isTutorAccountType(request.resource.data.tutorType) &&
+      return isTutorApplicationOwner(uid, request.resource.data.tutorType) &&
         request.resource.data.verificationStatus == 'pending' &&
         request.resource.data.publicProfileVersion == 2 &&
         request.resource.data.createdAt == request.time &&
@@ -323,8 +340,8 @@ service cloud.firestore {
     function validPublicApplicationUpdate(uid) {
       return signedIn() &&
         request.auth.uid == uid &&
-        isTutor() &&
-        isTutorAccountType(request.resource.data.tutorType) &&
+        isTutorApplicationOwner(uid, request.resource.data.tutorType) &&
+        resource.data.verificationStatus in ['pending', 'rejected'] &&
         request.resource.data.verificationStatus == 'pending' &&
         request.resource.data.verificationNote == '' &&
         request.resource.data.publicProfileVersion == 2 &&
@@ -340,7 +357,7 @@ service cloud.firestore {
     function validTutorBookingDetailsUpdate(uid) {
       return signedIn() &&
         request.auth.uid == uid &&
-        isTutor() &&
+        isApprovedTutor(uid) &&
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['hourlyRate', 'updatedAt']) &&
         request.resource.data.hourlyRate is number &&
@@ -350,6 +367,7 @@ service cloud.firestore {
 
     function validAdminTutorReview(uid) {
       return isAdmin() &&
+        request.auth.uid != uid &&
         request.resource.data.verificationStatus in ['approved', 'rejected'] &&
         request.resource.data.updatedAt == request.time &&
         getAfter(applicationPath(uid)).data.verificationReviewedBy == request.auth.uid &&
@@ -361,8 +379,9 @@ service cloud.firestore {
 
     function validAdminApplicationCreate(uid) {
       return isAdmin() &&
+        request.auth.uid != uid &&
         exists(userPath(uid)) &&
-        get(userPath(uid)).data.get('role', '') in ['tutor', 'professional'] &&
+        get(userPath(uid)).data.get('role', '') in ['student', 'tutor', 'professional'] &&
         request.resource.data.verificationStatus in ['approved', 'rejected'] &&
         request.resource.data.verificationReviewedBy == request.auth.uid &&
         request.resource.data.verificationReviewedAt == request.time &&
@@ -374,6 +393,7 @@ service cloud.firestore {
     function validAdminApplicationUpdate(uid) {
       let changes = request.resource.data.diff(resource.data).affectedKeys();
       return isAdmin() &&
+        request.auth.uid != uid &&
         resource.data.verificationStatus == 'pending' &&
         request.resource.data.verificationStatus in ['approved', 'rejected'] &&
         request.resource.data.verificationReviewedBy == request.auth.uid &&
@@ -400,6 +420,7 @@ service cloud.firestore {
       return isStudent() &&
         data.studentId == request.auth.uid &&
         exists(tutorPath(data.tutorId)) &&
+        isApprovedTutor(data.tutorId) &&
         publicTutor.verificationStatus == 'approved' &&
         validProfileVersion(publicTutor) &&
         publicTutor.hourlyRate is number &&
@@ -474,7 +495,8 @@ service cloud.firestore {
     }
 
     function isBookingTutor() {
-      return isTutor() && resource.data.tutorId == request.auth.uid;
+      return isApprovedTutor(request.auth.uid) &&
+        resource.data.tutorId == request.auth.uid;
     }
 
     function validTutorResponse() {

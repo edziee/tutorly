@@ -17,6 +17,7 @@ import {
 
 import { requireAuth, requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
+import { isTutorRole, ROLES } from '../constants/roles';
 import { TUTOR_TIERS, TUTOR_TYPES } from '../constants/statuses';
 import { isHttpsUrl, getTutorApplicationEvidenceError } from '../utils/validation';
 
@@ -90,12 +91,35 @@ export async function getTutorById(tutorId) {
   return snapshot.exists() ? toPublicTutor(snapshot) : null;
 }
 
+export async function assertApprovedTutor(uid) {
+  const auth = requireAuth();
+  if (!uid || auth.currentUser?.uid !== uid) {
+    throw new Error('Only the signed-in tutor can perform tutor operations.');
+  }
+
+  const { db } = requireFirebase();
+  const [userSnapshot, tutorSnapshot, applicationSnapshot] = await Promise.all([
+    getDoc(doc(db, COLLECTIONS.USERS, uid)),
+    getDoc(doc(db, COLLECTIONS.TUTORS, uid)),
+    getDoc(doc(db, COLLECTIONS.TUTOR_APPLICATIONS, uid)),
+  ]);
+  const accountRole = userSnapshot.exists() ? userSnapshot.data().role : null;
+  const tutor = tutorSnapshot.exists() ? tutorSnapshot.data() : null;
+  const application = applicationSnapshot.exists() ? applicationSnapshot.data() : null;
+  if (
+    (accountRole !== ROLES.STUDENT && !isTutorRole(accountRole)) ||
+    tutor?.verificationStatus !== 'approved' ||
+    tutor?.publicProfileVersion !== 2 ||
+    application?.verificationStatus !== 'approved'
+  ) {
+    throw new Error('An approved tutor application is required for this action.');
+  }
+  return tutor;
+}
+
 export async function updateTutorBookingDetails(uid, { paymentQrUrl, hourlyRate } = {}) {
   if (!uid) throw new Error('updateTutorBookingDetails needs a tutor id.');
-  const auth = requireAuth();
-  if (auth.currentUser?.uid !== uid) {
-    throw new Error('Only the signed-in tutor can change their payment details.');
-  }
+  await assertApprovedTutor(uid);
   if (typeof paymentQrUrl !== 'string') {
     throw new Error('Enter the public HTTPS link for your payment QR image, or leave it blank.');
   }
@@ -110,10 +134,6 @@ export async function updateTutorBookingDetails(uid, { paymentQrUrl, hourlyRate 
   const { db } = requireFirebase();
   const tutorRef = doc(db, COLLECTIONS.TUTORS, uid);
   const applicationRef = doc(db, COLLECTIONS.TUTOR_APPLICATIONS, uid);
-  const applicationSnapshot = await getDoc(applicationRef);
-  if (!applicationSnapshot.exists()) {
-    throw new Error('Submit your tutor application before saving booking details.');
-  }
 
   const timestamp = serverTimestamp();
   const batch = writeBatch(db);
@@ -131,6 +151,10 @@ export async function updateTutorBookingDetails(uid, { paymentQrUrl, hourlyRate 
 export async function getTutorApplication(uid) {
   if (!uid) throw new Error('getTutorApplication needs a uid.');
 
+  const auth = requireAuth();
+  if (auth.currentUser?.uid !== uid) {
+    throw new Error('Only the signed-in account can read its tutor application.');
+  }
   const { db } = requireFirebase();
   const applicationRef = doc(db, COLLECTIONS.TUTOR_APPLICATIONS, uid);
   const snapshot = await getDoc(applicationRef);
@@ -157,6 +181,10 @@ export async function getTutorApplication(uid) {
  */
 export async function saveTutorApplication(uid, application) {
   if (!uid) throw new Error('saveTutorApplication needs a uid.');
+  const auth = requireAuth();
+  if (auth.currentUser?.uid !== uid) {
+    throw new Error('Only the signed-in account can submit its tutor application.');
+  }
   if (!application || !Array.isArray(application.courses)) {
     throw new Error('saveTutorApplication needs application details and courses.');
   }
@@ -194,6 +222,12 @@ export async function saveTutorApplication(uid, application) {
   const now = serverTimestamp();
   const existingTutorData = existingTutor.data();
   const existingApplicationData = existingApplication.data();
+  if (
+    existingTutorData?.verificationStatus === 'approved' ||
+    existingApplicationData?.verificationStatus === 'approved'
+  ) {
+    throw new Error('Approved tutor applications cannot be resubmitted.');
+  }
   const applicationData = {
     name: (application.name ?? '').trim(),
     tutorType: application.tutorType,
