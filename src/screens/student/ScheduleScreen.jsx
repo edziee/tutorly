@@ -6,7 +6,9 @@ import {
   Pressable,
   Platform,
   ScrollView,
+  Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +32,7 @@ import { useSubscription } from '../../hooks/useSubscription';
 import {
   rescheduleBooking,
   subscribeToStudentBookings,
+  submitBookingRating,
   updateBookingStatus,
 } from '../../services/bookingService';
 import { getTutorById } from '../../services/tutorService';
@@ -145,7 +148,13 @@ function toScheduleBooking(booking) {
     totalLabel: booking.tokenAmountUnits != null ? 'Tokens' : 'Legacy fee',
     paymentStatus: tokenStatus ?? legacyPaymentStatus,
     image: booking.tutorPhotoUrl || null,
-    rating: booking.review || null,
+    rating: Number.isInteger(booking.rating) && booking.rating >= 0 && booking.rating <= 5
+      ? booking.rating
+      : null,
+    hasRating: Number.isInteger(booking.rating) && booking.rating >= 0 && booking.rating <= 5,
+    review: typeof booking.review === 'string' ? booking.review : '',
+    ratingIsAnonymous: booking.ratingIsAnonymous === true,
+    ratingAuthor: typeof booking.ratingAuthor === 'string' ? booking.ratingAuthor : '',
   };
 }
 function parseTime(dateKeyValue, time) {
@@ -264,7 +273,7 @@ function FilterBar({ filter, onChange, sessions }) {
   );
 }
 
-function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onReschedule, onReminder, onTokenDetails }) {
+function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onReschedule, onReminder, onTokenDetails, onRate }) {
   const roleStyle = getRoleStyle(session.role);
   return (
     <Pressable onPress={onPress} style={[styles.sessionCard, session.status === 'completed' ? styles.completedCard : styles.upcomingCard]}>
@@ -295,7 +304,17 @@ function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onRe
       <Text style={styles.sessionTime}><Ionicons name="time-outline" size={14} color={colors.mutedText} /> {session.startTime} - {session.endTime}</Text>
       <View style={styles.sessionMeta}><Ionicons name="location-outline" size={15} color={colors.mutedText} /><Text style={styles.sessionMetaText}>{session.location}</Text></View>
       {session.status === 'upcoming' ? <View style={styles.paymentRow}><Ionicons name="shield-checkmark-outline" size={14} color={colors.success} /><Text style={styles.paymentText}>{session.paymentStatus}</Text></View> : null}
-      {session.rating ? <View style={styles.ratingBox}><Text style={styles.ratingStars}>★★★★★</Text><Text style={styles.ratingText}>{session.rating}</Text></View> : null}
+      {session.hasRating ? (
+        <View style={styles.ratingBox}>
+          <Text style={styles.ratingStars}>{'★'.repeat(session.rating)}{'☆'.repeat(5 - session.rating)}</Text>
+          <Text style={styles.ratingText}>
+            {session.rating}/5 · {session.ratingAuthor || (session.ratingIsAnonymous ? 'Anonymous' : 'You')}
+            {session.review ? `\n${session.review}` : ''}
+          </Text>
+        </View>
+      ) : session.review ? (
+        <View style={styles.ratingBox}><Text style={styles.ratingText}>{session.review}</Text></View>
+      ) : null}
       <View style={styles.sessionActions}>
         {session.tutorId ? (
           <Pressable style={styles.secondaryAction} onPress={(event) => { event.stopPropagation(); onBookAgain(); }}><Ionicons name="refresh-outline" size={15} color={colors.primary} /><Text style={styles.secondaryActionText}>Book Again</Text></Pressable>
@@ -321,12 +340,22 @@ function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onRe
             <Pressable style={styles.primaryAction} disabled><Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.white} /><Text style={styles.primaryActionText}>Message {session.tutorName.split(' ')[0]}</Text></Pressable>
           </>
         ) : null}
+        {session.status === 'completed' && session.bookingId && !session.hasRating ? (
+          <Pressable
+            accessibilityRole="button"
+            style={styles.primaryAction}
+            onPress={(event) => { event.stopPropagation(); onRate(); }}
+          >
+            <Ionicons name="star-outline" size={15} color={colors.white} />
+            <Text style={styles.primaryActionText}>Rate tutor</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
   );
 }
 
-function WeekAgenda({ sessions, onBookAgain, onSelect, onCalendar, onCancel, onReschedule, onReminder, onTokenDetails }) {
+function WeekAgenda({ sessions, onBookAgain, onSelect, onCalendar, onCancel, onReschedule, onReminder, onTokenDetails, onRate }) {
   const groupedSessions = sessions.reduce((groups, session) => {
     if (!groups[session.dateKey]) groups[session.dateKey] = [];
     groups[session.dateKey].push(session);
@@ -336,7 +365,7 @@ function WeekAgenda({ sessions, onBookAgain, onSelect, onCalendar, onCancel, onR
   return Object.entries(groupedSessions).sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate)).map(([key, daySessions]) => (
     <View key={key}>
       <Text style={styles.dayGroupTitle}>{formatSessionDate(daySessions[0].dateKey)}</Text>
-      {daySessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => onSelect(session)} onBookAgain={() => onBookAgain(session)} onCalendar={() => onCalendar(session)} onCancel={() => onCancel(session)} onReschedule={() => onReschedule(session)} onReminder={() => onReminder(session)} onTokenDetails={() => onTokenDetails(session)} />)}
+      {daySessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => onSelect(session)} onBookAgain={() => onBookAgain(session)} onCalendar={() => onCalendar(session)} onCancel={() => onCancel(session)} onReschedule={() => onReschedule(session)} onReminder={() => onReminder(session)} onTokenDetails={() => onTokenDetails(session)} onRate={() => onRate(session)} />)}
     </View>
   ));
 }
@@ -360,6 +389,11 @@ export default function ScheduleScreen() {
   const [draftDate, setDraftDate] = useState(dateKey(initialDate));
   const [draftStartTime, setDraftStartTime] = useState('4:00 PM');
   const [draftEndTime, setDraftEndTime] = useState('7:00 PM');
+  const [ratingValue, setRatingValue] = useState(null);
+  const [ratingReview, setRatingReview] = useState('');
+  const [ratingAnonymous, setRatingAnonymous] = useState(false);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [ratingError, setRatingError] = useState('');
   const [reminderIds, setReminderIds] = useState({});
   const [remindersLoaded, setRemindersLoaded] = useState(false);
   const remoteSessions = (bookingResults.data ?? [])
@@ -488,6 +522,37 @@ export default function ScheduleScreen() {
     setDraftStartTime(session.startTime);
     setDraftEndTime(session.endTime);
     setModalMode(mode);
+  }
+
+  function openRatingModal(session) {
+    setActiveSession(session);
+    setRatingValue(null);
+    setRatingReview('');
+    setRatingAnonymous(false);
+    setRatingError('');
+    setModalMode('rate');
+  }
+
+  async function saveRating() {
+    if (!activeSession?.bookingId || ratingValue === null) {
+      setRatingError('Choose a star rating before submitting.');
+      return;
+    }
+    setRatingSubmitting(true);
+    setRatingError('');
+    try {
+      await submitBookingRating(
+        activeSession.bookingId,
+        ratingValue,
+        ratingReview,
+        ratingAnonymous,
+      );
+      setModalMode(null);
+    } catch (error) {
+      setRatingError(getErrorMessage(error));
+    } finally {
+      setRatingSubmitting(false);
+    }
   }
 
   async function saveBooking() {
@@ -641,7 +706,11 @@ export default function ScheduleScreen() {
               <View style={styles.modalCard}>
                 <View style={styles.modalHeader}>
                   <View style={styles.modalTitleCopy}>
-                    <Text style={styles.modalTitle}>{modalMode === 'details' ? 'Session Details' : 'Reschedule Session'}</Text>
+                    <Text style={styles.modalTitle}>
+                      {modalMode === 'details'
+                        ? 'Session Details'
+                        : modalMode === 'rate' ? 'Rate your tutor' : 'Reschedule Session'}
+                    </Text>
                     <Text style={styles.modalSubtitle}>{activeSession?.subject}</Text>
                   </View>
                   <Pressable onPress={() => setModalMode(null)} hitSlop={10}><Ionicons name="close" size={22} color={colors.text} /></Pressable>
@@ -656,6 +725,102 @@ export default function ScheduleScreen() {
                     {(!activeSession.bookingId || activeSession.approvalStatus === BOOKING_STATUS.UPCOMING) ? (
                       <Pressable style={styles.primaryAction} onPress={() => openScheduleModal(activeSession, 'reschedule')}><Ionicons name="swap-horizontal-outline" size={16} color={colors.white} /><Text style={styles.primaryActionText}>Reschedule Session</Text></Pressable>
                     ) : null}
+                  </>
+                ) : modalMode === 'rate' && activeSession ? (
+                  <>
+                    <View style={styles.detailHero}>
+                      <View style={styles.tutorAvatar}>
+                        {activeSession.image
+                          ? <Image source={{ uri: activeSession.image }} style={styles.tutorImage} />
+                          : <Text style={styles.tutorAvatarText}>{activeSession.tutorName.charAt(0)}</Text>}
+                      </View>
+                      <View style={styles.modalTitleCopy}>
+                        <Text style={styles.detailTutor}>{activeSession.tutorName}</Text>
+                        <Text style={styles.detailRole}>How was your tutoring session?</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.formLabel}>Your rating</Text>
+                    <View style={styles.ratingChoices}>
+                      {[1, 2, 3, 4, 5].map((value) => {
+                        const selected = ratingValue !== null && value <= ratingValue;
+                        return (
+                          <Pressable
+                            key={value}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Rate ${value} out of 5 stars`}
+                            accessibilityState={{ selected: ratingValue === value }}
+                            hitSlop={6}
+                            onPress={() => setRatingValue(value)}
+                            style={styles.ratingStarButton}
+                          >
+                            <Ionicons
+                              name={selected ? 'star' : 'star-outline'}
+                              size={34}
+                              color={colors.warning}
+                            />
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <Text style={styles.ratingSelectionLabel}>
+                      {ratingValue === null
+                        ? 'Choose a rating'
+                        : `${ratingValue} out of 5 stars`}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Rate 0 out of 5 stars"
+                      accessibilityState={{ selected: ratingValue === 0 }}
+                      onPress={() => setRatingValue(0)}
+                      style={styles.zeroRatingButton}
+                    >
+                      <Text style={[
+                        styles.zeroRatingText,
+                        ratingValue === 0 && styles.zeroRatingTextSelected,
+                      ]}>
+                        0 stars
+                      </Text>
+                    </Pressable>
+                    <Text style={styles.formLabel}>Message (optional)</Text>
+                    <TextInput
+                      accessibilityLabel="Optional message for your tutor rating"
+                      maxLength={1000}
+                      multiline
+                      onChangeText={setRatingReview}
+                      placeholder="Share a little about your session"
+                      placeholderTextColor={colors.mutedText}
+                      style={styles.ratingMessageInput}
+                      textAlignVertical="top"
+                      value={ratingReview}
+                    />
+                    <View style={styles.ratingAnonymityRow}>
+                      <View style={styles.ratingAnonymityCopy}>
+                        <Text style={styles.ratingAnonymityTitle}>Rate anonymously</Text>
+                        <Text style={styles.ratingAnonymityHint}>
+                          {ratingAnonymous ? 'Your rating will be shown as Anonymous.' : 'Your name will be attached to your rating.'}
+                        </Text>
+                      </View>
+                      <Switch
+                        accessibilityLabel="Rate anonymously"
+                        onValueChange={setRatingAnonymous}
+                        value={ratingAnonymous}
+                      />
+                    </View>
+                    {ratingError ? <Text accessibilityRole="alert" style={styles.ratingError}>{ratingError}</Text> : null}
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={ratingSubmitting || ratingValue === null}
+                      onPress={saveRating}
+                      style={[
+                        styles.primaryAction,
+                        (ratingSubmitting || ratingValue === null) && styles.ratingSubmitDisabled,
+                      ]}
+                    >
+                      <Ionicons name="star" size={16} color={colors.white} />
+                      <Text style={styles.primaryActionText}>
+                        {ratingSubmitting ? 'Submitting...' : 'Submit rating'}
+                      </Text>
+                    </Pressable>
                   </>
                 ) : (
                   <>
@@ -679,7 +844,13 @@ export default function ScheduleScreen() {
                     <Pressable style={styles.primaryAction} onPress={saveBooking}><Ionicons name="checkmark-circle-outline" size={16} color={colors.white} /><Text style={styles.primaryActionText}>Save New Time</Text></Pressable>
                   </>
                 )}
-                <Pressable style={styles.modalCancelButton} onPress={() => setModalMode(null)}><Text style={styles.modalCancelText}>Close</Text></Pressable>
+                <Pressable
+                  disabled={ratingSubmitting}
+                  style={styles.modalCancelButton}
+                  onPress={() => setModalMode(null)}
+                >
+                  <Text style={styles.modalCancelText}>{modalMode === 'rate' ? 'Not now' : 'Close'}</Text>
+                </Pressable>
               </View>
             </View>
           </Modal>
@@ -693,11 +864,11 @@ export default function ScheduleScreen() {
           <Text style={styles.selectedDateText}>{formatShortDate(selectedDate)} • {view === 'agenda' ? 'Agenda' : `${view.charAt(0).toUpperCase()}${view.slice(1)} view`}</Text>
         </View>
         <FilterBar filter={filter} onChange={changeFilter} sessions={allSessions} />
-        {view === 'week' && displayedSessions.length ? <WeekAgenda sessions={displayedSessions} onSelect={(session) => openScheduleModal(session, 'details')} onBookAgain={bookAgain} onCalendar={addToCalendar} onCancel={cancelSession} onReschedule={(session) => openScheduleModal(session, 'reschedule')} onReminder={toggleReminder} onTokenDetails={(session) => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} /> : null}
+        {view === 'week' && displayedSessions.length ? <WeekAgenda sessions={displayedSessions} onSelect={(session) => openScheduleModal(session, 'details')} onBookAgain={bookAgain} onCalendar={addToCalendar} onCancel={cancelSession} onReschedule={(session) => openScheduleModal(session, 'reschedule')} onReminder={toggleReminder} onTokenDetails={(session) => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} onRate={openRatingModal} /> : null}
         {view !== 'week' && upcomingSessions.length ? (
           <View>
             <View style={styles.sectionHeading}><Ionicons name="calendar-outline" size={20} color={colors.success} /><Text style={styles.sectionHeadingText}>Upcoming sessions</Text><Text style={styles.sessionCount}>{upcomingSessions.length} sessions</Text></View>
-            {upcomingSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => bookAgain(session)} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onTokenDetails={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} />)}
+            {upcomingSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => bookAgain(session)} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onTokenDetails={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} onRate={() => openRatingModal(session)} />)}
           </View>
         ) : null}
         {view !== 'week' && completedSessions.length ? (
@@ -705,7 +876,7 @@ export default function ScheduleScreen() {
             <Pressable style={styles.sectionHeading} onPress={() => setPastExpanded((current) => !current)}>
               <Ionicons name="archive-outline" size={20} color={colors.text} /><Text style={styles.sectionHeadingText}>Past sessions</Text><Text style={styles.sessionCount}>{completedSessions.length} total</Text><Ionicons name={pastExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.text} />
             </Pressable>
-            {pastExpanded ? completedSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => bookAgain(session)} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onTokenDetails={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} />) : null}
+            {pastExpanded ? completedSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => bookAgain(session)} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onTokenDetails={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} onRate={() => openRatingModal(session)} />) : null}
           </View>
         ) : null}
         {!displayedSessions.length ? <View style={styles.emptyState}><Ionicons name="calendar-clear-outline" size={30} color={colors.mutedText} /><Text style={styles.emptyTitle}>No sessions here</Text><Text style={styles.emptyText}>{view === 'agenda' ? 'Try another filter or date range.' : 'No sessions in this date range.'}</Text><Pressable style={styles.browseButton} onPress={() => navigation.navigate('Tutors')}><Ionicons name="people-outline" size={16} color={colors.white} /><Text style={styles.browseButtonText}>Browse tutors</Text></Pressable></View> : null}

@@ -62,7 +62,7 @@ export default function TutorCard({ tutor, handlePress }) {
             {Number.isFinite(tutor.rating) ? (
               <>
                 <AntDesign name="star" size={14} color={colors.warning} />
-                <Text style={styles.ratingValue}>{tutor.rating} stars</Text>
+                <Text style={styles.ratingValue}>{tutor.rating.toFixed(1)} stars</Text>
               </>
             ) : (
               <Text style={styles.newTutor}>New tutor</Text>

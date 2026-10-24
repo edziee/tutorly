@@ -285,6 +285,7 @@ export async function saveTutorApplication(uid, application) {
     'online',
     'rating',
     'reviewCount',
+    'lastRatingBookingId',
     'hourlyRate',
     'bio',
     'subject',

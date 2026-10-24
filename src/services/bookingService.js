@@ -33,6 +33,10 @@ import {
   splitBookingTokens,
   tokenAmountUnitsFromPrice,
 } from '../utils/tokenBookings';
+import {
+  calculateUpdatedTutorRating,
+  getRatingInputError,
+} from '../utils/ratings';
 
 function requireText(value, field) {
   if (typeof value !== 'string' || !value.trim()) {
@@ -135,6 +139,65 @@ export function subscribeToTutorBookings(tutorId, callback, onError) {
     (snapshot) => callback(snapshot.docs.map((item) => ({ ...item.data(), id: item.id }))),
     onError,
   );
+}
+
+export async function submitBookingRating(bookingId, rating, review, isAnonymous) {
+  requireText(bookingId, 'id');
+  const normalizedReview = typeof review === 'string' ? review.trim() : review;
+  const inputError = getRatingInputError(rating, normalizedReview);
+  if (inputError) throw new Error(inputError);
+  if (typeof isAnonymous !== 'boolean') {
+    throw new Error('Choose whether to submit this rating anonymously.');
+  }
+
+  const auth = requireAuth();
+  const userId = auth.currentUser?.uid;
+  if (!userId) throw new Error('Sign in as the student who booked this session.');
+
+  const { db } = requireFirebase();
+  const bookingRef = doc(db, COLLECTIONS.BOOKINGS, bookingId);
+  await runTransaction(db, async (transaction) => {
+    const bookingSnapshot = await transaction.get(bookingRef);
+    if (!bookingSnapshot.exists()) throw new Error('This booking no longer exists.');
+    const booking = bookingSnapshot.data();
+    if (booking.studentId !== userId) {
+      throw new Error('Only the student who booked this session can rate it.');
+    }
+    if (booking.status !== BOOKING_STATUS.COMPLETED) {
+      throw new Error('Only completed sessions can be rated.');
+    }
+    if ('rating' in booking) {
+      throw new Error('This session has already been rated.');
+    }
+    if (typeof booking.studentName !== 'string' || !booking.studentName.trim()) {
+      throw new Error('The student name for this booking is unavailable.');
+    }
+    if (typeof booking.tutorId !== 'string' || !booking.tutorId) {
+      throw new Error('The tutor for this booking is unavailable.');
+    }
+
+    const tutorRef = doc(db, COLLECTIONS.TUTORS, booking.tutorId);
+    const tutorSnapshot = await transaction.get(tutorRef);
+    if (!tutorSnapshot.exists()) throw new Error('This tutor profile is no longer available.');
+    const tutor = tutorSnapshot.data();
+    const reviewCount = tutor.reviewCount ?? 0;
+    const aggregate = calculateUpdatedTutorRating(tutor.rating, reviewCount, rating);
+    const timestamp = serverTimestamp();
+
+    transaction.update(bookingRef, {
+      rating,
+      review: normalizedReview,
+      ratingIsAnonymous: isAnonymous,
+      ratingAuthor: isAnonymous ? 'Anonymous' : booking.studentName,
+      ratingCreatedAt: timestamp,
+      updatedAt: timestamp,
+    });
+    transaction.update(tutorRef, {
+      ...aggregate,
+      lastRatingBookingId: bookingId,
+      updatedAt: timestamp,
+    });
+  });
 }
 
 export function subscribeToBooking(bookingId, callback, onError) {

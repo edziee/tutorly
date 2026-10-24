@@ -114,6 +114,7 @@ function toPublicTutorProfile(tutor, status, reason, reviewedAt) {
     'online',
     'rating',
     'reviewCount',
+    'lastRatingBookingId',
     'hourlyRate',
     'bio',
     'subject',

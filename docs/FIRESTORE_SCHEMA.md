@@ -48,7 +48,8 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `tier` | `'Peer Tutor'` \| `'Alumni'` \| `'Professor'` | `TUTOR_TIERS` in `statuses.js` |
 | `tutorType` | `'peer'` \| `'professional'` | Mirrors the sign-up type and controls evidence validation |
 | `subject` | string | Main subject shown on the card, for example `CS 240: Algorithms` |
-| `rating`, `reviewCount` | number | |
+| `rating`, `reviewCount` | number | Public average star rating from completed-session reviews and its count; rating values are 0–5 |
+| `lastRatingBookingId` | string | Internal marker used by Firestore rules to authorize one atomic booking-rating and tutor-aggregate update |
 | `location` | string | City name shown on the card |
 | `coordinates` | map `{ latitude, longitude }` | New. Used for the map and nearby sorting (Week 3) |
 | `credentials`, `bio`, `teachingPhilosophy` | string | |
@@ -153,7 +154,10 @@ any external fee before processing a request.
 | `tokenStatus` | `'pending'` \| `'not_charged'` \| `'reserved'` \| `'refunded'` \| `'settled'` | New requests do not move tokens; acceptance charges the deposit and holds the remainder, cancellation refunds, and completion pays the full price |
 | `paymentStatus`, `tutorQrUrl`, `paymentReportedAt`, `paymentVerifiedAt` | legacy values | Retained only for historical peso bookings; new booking flow does not write QR payment fields |
 | `tutorPhotoUrl` | string | Optional tutor photo copied to the booking when the tutor accepts; only booking participants and admins can read it |
-| `review`, `rating` | string, number | The mock data's `rating` holds review text; a star rating is optional |
+| `rating` | integer, 0–5 | Optional one-time student rating, submitted only after completion; 0 is a valid score |
+| `review` | string | Optional feedback message, up to 1,000 characters |
+| `ratingIsAnonymous`, `ratingAuthor` | boolean, string | Controls reviewer display; anonymous ratings use `Anonymous`, while booking ownership fields remain private |
+| `ratingCreatedAt` | timestamp | Server timestamp for the rating submission |
 | `checkedInAt`, `checkInCoordinates` | timestamp, map | Week 3 |
 | `createdAt`, `updatedAt` | timestamp | |
 

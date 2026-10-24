@@ -460,6 +460,7 @@ service cloud.firestore {
           'online',
           'rating',
           'reviewCount',
+          'lastRatingBookingId',
           'hourlyRate',
           'bio',
           'subject'
@@ -505,6 +506,8 @@ service cloud.firestore {
           (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
         (!('reviewCount' in data) ||
           (data.reviewCount is int && data.reviewCount >= 0)) &&
+        (!('lastRatingBookingId' in data) ||
+          data.lastRatingBookingId is string) &&
         (!('online' in data) || data.online is bool) &&
         data.subject is string &&
         !('courses' in data) &&
@@ -757,6 +760,50 @@ service cloud.firestore {
           .hasOnly(['hourlyRate', 'updatedAt']) &&
         validTokenPrice(request.resource.data.hourlyRate) &&
         request.resource.data.updatedAt == request.time;
+    }
+
+    function validTutorRatingAggregate(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      let bookingId = request.resource.data.get('lastRatingBookingId', '');
+      let bookingBefore = get(bookingPath(bookingId)).data;
+      let bookingAfter = getAfter(bookingPath(bookingId)).data;
+      let storedCount = resource.data.get('reviewCount', 0);
+      let oldCount = storedCount == null ? 0 : storedCount;
+      return isStudent() &&
+        request.auth.uid == bookingBefore.studentId &&
+        bookingBefore.tutorId == uid &&
+        bookingBefore.status == 'completed' &&
+        !('rating' in bookingBefore) &&
+        bookingAfter.status == 'completed' &&
+        bookingAfter.rating is int &&
+        bookingAfter.rating >= 0 &&
+        bookingAfter.rating <= 5 &&
+        bookingAfter.review is string &&
+        bookingAfter.review.size() <= 1000 &&
+        bookingAfter.ratingIsAnonymous is bool &&
+        bookingAfter.ratingAuthor is string &&
+        (bookingAfter.ratingIsAnonymous
+          ? bookingAfter.ratingAuthor == 'Anonymous'
+          : bookingAfter.ratingAuthor == bookingBefore.studentName) &&
+        bookingAfter.ratingCreatedAt == request.time &&
+        bookingAfter.updatedAt == request.time &&
+        oldCount is int &&
+        oldCount >= 0 &&
+        request.resource.data.reviewCount == oldCount + 1 &&
+        (oldCount == 0
+          ? request.resource.data.rating == bookingAfter.rating
+          : (resource.data.rating is number &&
+              request.resource.data.rating ==
+                ((resource.data.rating * oldCount + bookingAfter.rating) /
+                  (oldCount + 1)))) &&
+        request.resource.data.lastRatingBookingId == bookingId &&
+        request.resource.data.updatedAt == request.time &&
+        changes.hasOnly([
+          'rating',
+          'reviewCount',
+          'lastRatingBookingId',
+          'updatedAt'
+        ]);
     }
 
     function validAdminTutorReview(uid) {
@@ -1096,6 +1143,50 @@ service cloud.firestore {
               .hasOnly(['status', 'updatedAt'])));
     }
 
+    function validStudentBookingRating(bookingId) {
+      let data = request.resource.data;
+      let changes = data.diff(resource.data).affectedKeys();
+      let tutorBefore = get(tutorPath(resource.data.tutorId)).data;
+      let tutorAfter = getAfter(tutorPath(resource.data.tutorId)).data;
+      let storedCount = tutorBefore.get('reviewCount', 0);
+      let oldCount = storedCount == null ? 0 : storedCount;
+      return isBookingStudent() &&
+        resource.data.status == 'completed' &&
+        !('rating' in resource.data) &&
+        data.status == 'completed' &&
+        data.rating is int &&
+        data.rating >= 0 &&
+        data.rating <= 5 &&
+        data.review is string &&
+        data.review.size() <= 1000 &&
+        data.ratingIsAnonymous is bool &&
+        data.ratingAuthor is string &&
+        (data.ratingIsAnonymous
+          ? data.ratingAuthor == 'Anonymous'
+          : data.ratingAuthor == resource.data.studentName) &&
+        data.ratingCreatedAt == request.time &&
+        data.updatedAt == request.time &&
+        oldCount is int &&
+        oldCount >= 0 &&
+        tutorAfter.lastRatingBookingId == bookingId &&
+        tutorAfter.reviewCount == oldCount + 1 &&
+        (oldCount == 0
+          ? tutorAfter.rating == data.rating
+          : (tutorBefore.rating is number &&
+              tutorAfter.rating ==
+                ((tutorBefore.rating * oldCount + data.rating) /
+                  (oldCount + 1)))) &&
+        tutorAfter.updatedAt == request.time &&
+        changes.hasOnly([
+          'rating',
+          'review',
+          'ratingIsAnonymous',
+          'ratingAuthor',
+          'ratingCreatedAt',
+          'updatedAt'
+        ]);
+    }
+
     function validPaymentReport() {
       let data = request.resource.data;
       return isBookingStudent() &&
@@ -1189,7 +1280,8 @@ service cloud.firestore {
       allow create: if validPublicApplicationCreate(uid);
       allow update: if validAdminTutorReview(uid) ||
         validPublicApplicationUpdate(uid) ||
-        validTutorBookingDetailsUpdate(uid);
+        validTutorBookingDetailsUpdate(uid) ||
+        validTutorRatingAggregate(uid);
       allow delete: if false;
     }
 
@@ -1230,7 +1322,8 @@ service cloud.firestore {
         validPaymentReport() ||
         validPaymentVerification() ||
         validReschedule() ||
-        validCheckIn();
+        validCheckIn() ||
+        validStudentBookingRating(bookingId);
       allow delete: if false;
     }
 
