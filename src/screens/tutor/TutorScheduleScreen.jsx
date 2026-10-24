@@ -23,7 +23,11 @@ import Constants from 'expo-constants';
 import ErrorState from '../../components/ErrorState';
 import ScreenContainer from '../../components/ScreenContainer';
 import { ROUTES } from '../../constants/routes';
-import { BOOKING_PAYMENT_STATUS, BOOKING_STATUS } from '../../constants/statuses';
+import {
+  BOOKING_PAYMENT_STATUS,
+  BOOKING_STATUS,
+  TOKEN_BOOKING_STATUS,
+} from '../../constants/statuses';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../hooks/useSubscription';
 import {
@@ -34,6 +38,7 @@ import {
 import { colors } from '../../theme/colors';
 import styles from '../../theme/scheduleScreenStyles';
 import { getErrorMessage } from '../../utils/errors';
+import { formatTokenUnits } from '../../utils/tokens';
 
 const initialDate = new Date();
 const legacySessionsStorageKey = 'tutorly.schedule.sessions.v3';
@@ -99,13 +104,21 @@ function formatDuration(session) {
 
 function toScheduleBooking(booking) {
   const amount = Number(booking.totalAmount);
-  const paymentStatus = {
+  const legacyPaymentStatus = {
     [BOOKING_PAYMENT_STATUS.AWAITING_TUTOR_ACCEPTANCE]: 'Awaiting tutor response',
     [BOOKING_PAYMENT_STATUS.AWAITING_PAYMENT]: 'Tutor accepted · Payment due',
     [BOOKING_PAYMENT_STATUS.PENDING_VERIFICATION]: 'Payment reported · Awaiting verification',
     [BOOKING_PAYMENT_STATUS.SETTLED]: 'Payment confirmed by tutor',
     [BOOKING_PAYMENT_STATUS.NOT_APPLICABLE]: 'No payment due',
   }[booking.paymentStatus] ?? 'Payment status unavailable';
+  const tokenPaymentStatus = {
+    [TOKEN_BOOKING_STATUS.PENDING]: 'Request pending · no tokens deducted',
+    [TOKEN_BOOKING_STATUS.NOT_CHARGED]: 'No tokens charged',
+    [TOKEN_BOOKING_STATUS.RESERVED]: 'Tokens held · paid on completion',
+    [TOKEN_BOOKING_STATUS.SETTLED]: 'Tokens received',
+    [TOKEN_BOOKING_STATUS.REFUNDED]: 'Tokens refunded',
+  }[booking.tokenStatus];
+  const hasTokenAmount = Number.isSafeInteger(booking.tokenAmountUnits);
 
   return {
     ...booking,
@@ -121,8 +134,11 @@ function toScheduleBooking(booking) {
     approvalStatus: booking.status,
     location: booking.location || 'Location not specified',
     role: booking.tutorTier || 'Tutor',
-    total: Number.isFinite(amount) ? `₱${amount.toFixed(2)}` : '',
-    paymentStatus,
+    total: hasTokenAmount
+      ? formatTokenUnits(booking.tokenAmountUnits)
+      : Number.isFinite(amount) ? `₱${amount.toFixed(2)}` : '',
+    totalLabel: hasTokenAmount ? 'Tokens' : 'Session fee',
+    paymentStatus: tokenPaymentStatus ?? legacyPaymentStatus,
     paymentStatusCode: booking.paymentStatus,
     image: booking.tutorPhotoUrl || null,
     rating: booking.review || null,
@@ -266,7 +282,7 @@ function SessionCard({ session, onBookAgain, onPress, onCalendar, onCancel, onRe
           <Text style={styles.sessionSubject}>{session.subject}</Text>
           <Text style={styles.tutorName}>{session.studentName}</Text>
         </View>
-        {session.total ? <View style={styles.totalBox}><Text style={styles.totalAmount}>{session.total}</Text><Text style={styles.totalLabel}>Session fee</Text></View> : null}
+        {session.total ? <View style={styles.totalBox}><Text style={styles.totalAmount}>{session.total}</Text><Text style={styles.totalLabel}>{session.totalLabel}</Text></View> : null}
       </View>
       <Text style={styles.sessionTime}><Ionicons name="time-outline" size={14} color={colors.mutedText} /> {session.startTime} - {session.endTime}</Text>
       <View style={styles.sessionMeta}><Ionicons name="location-outline" size={15} color={colors.mutedText} /><Text style={styles.sessionMetaText}>{session.location}</Text></View>
@@ -357,9 +373,6 @@ export default function ScheduleScreen() {
       remindersLoaded,
     }));
   const allSessions = remoteSessions;
-  const [bookingIdInSession, setBookingIdInSession] = useState("");
-  const [sessionTime, setSessionTime] = useState(0);
-
   useEffect(() => {
     let active = true;
     const loadReminders = async () => {
@@ -626,7 +639,7 @@ export default function ScheduleScreen() {
                   </View>
                   {modalMode === 'details' && activeSession ? (
                     <>
-                      <SessionStopwatch session={activeSession} bookingIdInSession={bookingIdInSession} setBookingIdInSession={setBookingIdInSession} sessionTime={sessionTime} setSessionTime={setSessionTime}/>
+                      <SessionStopwatch session={activeSession} />
                     </>
                   ) : (
                     <>

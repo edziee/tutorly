@@ -1,64 +1,45 @@
-import { View, Text, Button, StyleSheet, Alert } from "react-native";
-import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Button, StyleSheet, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
 
-export const SessionStopwatch = ({ session, bookingIdInSession, setBookingIdInSession, sessionTime, setSessionTime }) => {
-    const [isRunning, setIsRunning] = useState(false);
-    const [elapsedTime, setElapsedTime] = useState(sessionTime);
-    const [sessionEnded, setSessionEnded] = useState(false);
-    const intervalIdRef = useRef(null);
-    const startTimeRef = useRef(0);
+import { updateBookingTimer } from '../services/bookingService';
+import {
+    formatRecordedDuration,
+    getRecordedSeconds,
+    SESSION_TIMER_ACTIONS,
+    SESSION_TIMER_STATUS,
+} from '../utils/sessionTimer';
+
+export const SessionStopwatch = ({ session }) => {
+    const [now, setNow] = useState(Date.now());
+    const [error, setError] = useState('');
+    const timerStatus = session.timerStatus ?? SESSION_TIMER_STATUS.IDLE;
+    const elapsedSeconds = getRecordedSeconds(session, now);
 
     useEffect(() => {
-        if (isRunning) {
-            intervalIdRef.current = setInterval(() => {
-                setElapsedTime(Date.now() - startTimeRef.current);
-            }, 10);
+        if (timerStatus !== SESSION_TIMER_STATUS.RUNNING) return undefined;
+        const intervalId = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(intervalId);
+    }, [timerStatus, session.id]);
+
+    useEffect(() => {
+        setNow(Date.now());
+        setError('');
+    }, [session.id, session.timerStatus, session.accumulatedDurationSeconds, session.timerLastActionAt]);
+
+    const applyAction = async (action) => {
+        setError('');
+        try {
+            await updateBookingTimer(session.id, action);
+        } catch (actionError) {
+            setError(actionError.message || 'Could not update the session timer.');
         }
-        return () => {
-            clearInterval(intervalIdRef.current);
-        };
-    }, [isRunning]);
-
-    const start = () => {
-        setIsRunning(true);
-        setBookingIdInSession(session.id);
-        startTimeRef.current = Date.now() - elapsedTime;
-    };
-
-    const stop = () => {
-        setIsRunning(false);
-        setElapsedTime(0);
-        setSessionTime(0);
-        setBookingIdInSession("");
-        setSessionEnded(true);
-    };
-
-    const pause = () => {
-        const pausedTime = Date.now() - startTimeRef.current;
-        setElapsedTime(pausedTime);
-        setSessionTime(pausedTime);
-        setIsRunning(false);
     };
 
     const stopPopup = () => {
-        Alert.alert('Cancel session?', `Cancel your session with ${session.studentName}?`, [
+        Alert.alert('Stop session timer?', `Record the teaching time for ${session.studentName}? Stopping does not complete the booking or transfer payment.`, [
             { text: 'Continue Session', style: 'cancel' },
-            { text: 'Stop session', style: 'destructive', onPress: stop },
+            { text: 'Stop Timer', style: 'destructive', onPress: () => applyAction(SESSION_TIMER_ACTIONS.STOP) },
         ]);
-    };
-
-    const formatTime = () => {
-        let hours = Math.floor(elapsedTime / (1000 * 60 * 60));
-        let minutes = Math.floor(elapsedTime / (1000 * 60) % 60);
-        let seconds = Math.floor(elapsedTime / (1000) % 60);
-        let milliseconds = Math.floor(elapsedTime % 1000 / 10);
-
-        hours = String(hours).padStart(2, "0");
-        minutes = String(minutes).padStart(2, "0");
-        seconds = String(seconds).padStart(2, "0");
-        milliseconds = String(milliseconds).padStart(2, "0");
-
-        return `${hours}:${minutes}:${seconds}:${milliseconds}`;
     };
 
     const styles = StyleSheet.create({
@@ -94,7 +75,6 @@ export const SessionStopwatch = ({ session, bookingIdInSession, setBookingIdInSe
             border: 'none',
             borderRadius: 10,
             color: 'white',
-            transition: 'backgroundColor 0.5s ease',
             flexDirection: 'row',
             gap: 10,
         },
@@ -120,23 +100,23 @@ export const SessionStopwatch = ({ session, bookingIdInSession, setBookingIdInSe
     return (
         <View style={styles.container}>
             <View style={styles.stopWatch}>
-                <View><Text style={styles.display}>{session.id == bookingIdInSession ? formatTime() : '00:00:00'}</Text></View>
+                <View>
+                    <Text style={styles.display}>{formatRecordedDuration(elapsedSeconds)}</Text>
+                    <Text>Scheduled: {session.durationHours}h ({session.startTime} - {session.endTime})</Text>
+                    <Text>Recorded teaching time</Text>
+                </View>
                 <View style={styles.controls}>
-                    {
-                        sessionEnded ?
-                            (<Text style={styles.sessionEnd}>Session has successfully ended.</Text>) :
-                            session.status == 'completed' ?
-                                (<Text style={styles.sessionEnd}>Session has ended.</Text>) :
-                                (bookingIdInSession != "" && session.id != bookingIdInSession) ?
-                                    (<Text style={styles.sessionEnd}>Another session is ongoing.</Text>) :
-                                    isRunning ?
-                                        (<View style={styles.buttons}>
-                                            <Button title="Pause Session" onPress={pause} style={styles.pauseButton} />
-                                            <Button title="Stop Session" onPress={stopPopup} style={styles.stopButton} />
-                                        </View>) :
-
-                                        (<Button title={elapsedTime == 0 ? "Start Session" : "Resume Session"} onPress={start} style={styles.startButton} />)
-                    }
+                    {error ? <Text accessibilityRole="alert">{error}</Text> : null}
+                    {session.status === 'completed' || timerStatus === SESSION_TIMER_STATUS.STOPPED ? (
+                        <Text>{session.status === 'completed' ? 'Session completed.' : 'Timer stopped. Review the recorded time before confirming completion.'}</Text>
+                    ) : timerStatus === SESSION_TIMER_STATUS.RUNNING ? (
+                        <View style={styles.buttons}>
+                            <Button title="Pause Timer" onPress={() => applyAction(SESSION_TIMER_ACTIONS.PAUSE)} />
+                            <Button title="Stop Timer" onPress={stopPopup} />
+                        </View>
+                    ) : (
+                        <Button title={timerStatus === SESSION_TIMER_STATUS.PAUSED ? 'Resume Timer' : 'Start Timer'} onPress={() => applyAction(timerStatus === SESSION_TIMER_STATUS.PAUSED ? SESSION_TIMER_ACTIONS.RESUME : SESSION_TIMER_ACTIONS.START)} />
+                    )}
                 </View>
             </View>
         </View>

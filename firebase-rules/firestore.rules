@@ -1127,11 +1127,58 @@ service cloud.firestore {
                 .hasOnly(['status', 'paymentStatus', 'updatedAt'])));
     }
 
+    function validBookingTimerUpdate() {
+      let data = request.resource.data;
+      let changes = data.diff(resource.data).affectedKeys();
+      let oldStatus = resource.data.get('timerStatus', 'idle');
+      let newStatus = data.get('timerStatus', '');
+      let action = data.get('timerLastAction', '');
+      return isBookingTutor() &&
+        resource.data.status == 'upcoming' &&
+        data.status == resource.data.status &&
+        data.get('tokenStatus', '') == resource.data.get('tokenStatus', '') &&
+        data.updatedAt == request.time &&
+        data.timerLastActionAt == request.time &&
+        action in ['start', 'pause', 'resume', 'stop'] &&
+        newStatus in ['running', 'paused', 'stopped'] &&
+        data.accumulatedDurationSeconds is int &&
+        data.accumulatedDurationSeconds >= resource.data.get('accumulatedDurationSeconds', 0) &&
+        (oldStatus != 'running' ||
+          (resource.data.timerStartedAt is timestamp &&
+            resource.data.timerStartedAt + duration.value(
+              data.accumulatedDurationSeconds - resource.data.get('accumulatedDurationSeconds', 0),
+              's'
+            ) <= request.time)) &&
+        data.timerActionHistory is list &&
+        data.timerActionHistory.size() <= 50 &&
+        changes.hasOnly([
+          'timerStatus',
+          'accumulatedDurationSeconds',
+          'timerStartedAt',
+          'timerPausedAt',
+          'timerStoppedAt',
+          'timerLastAction',
+          'timerLastActionAt',
+          'timerActionHistory',
+          'updatedAt'
+        ]) &&
+        ((oldStatus == 'idle' && action == 'start' && newStatus == 'running') ||
+          (oldStatus == 'running' && action == 'pause' && newStatus == 'paused') ||
+          (oldStatus == 'paused' && action == 'resume' && newStatus == 'running') ||
+          (oldStatus in ['running', 'paused'] && action == 'stop' && newStatus == 'stopped')) &&
+        ((newStatus == 'running' && data.timerStartedAt == request.time) ||
+          (newStatus == 'paused' && data.timerPausedAt == request.time) ||
+          (newStatus == 'stopped' && data.timerStoppedAt == request.time));
+    }
+
     function validBookingCompletion(bookingId) {
       let data = request.resource.data;
       let tokenBooking = 'tokenStatus' in resource.data;
       return isBookingTutor() &&
         resource.data.status == 'upcoming' &&
+        resource.data.get('timerStatus', '') == 'stopped' &&
+        resource.data.get('accumulatedDurationSeconds', 0) is int &&
+        resource.data.get('accumulatedDurationSeconds', 0) > 0 &&
         data.status == 'completed' &&
         data.updatedAt == request.time &&
         (tokenBooking
@@ -1318,6 +1365,7 @@ service cloud.firestore {
       allow create: if validBookingCreate(bookingId);
       allow update: if validTutorResponse(bookingId) ||
         validBookingCancellation(bookingId) ||
+        validBookingTimerUpdate() ||
         validBookingCompletion(bookingId) ||
         validPaymentReport() ||
         validPaymentVerification() ||

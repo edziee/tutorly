@@ -37,6 +37,12 @@ import {
   calculateUpdatedTutorRating,
   getRatingInputError,
 } from '../utils/ratings';
+import {
+  getRecordedSeconds,
+  SESSION_TIMER_ACTIONS,
+  SESSION_TIMER_STATUS,
+  validateTimerTransition,
+} from '../utils/sessionTimer';
 
 function requireText(value, field) {
   if (typeof value !== 'string' || !value.trim()) {
@@ -238,6 +244,71 @@ export async function getBookingById(bookingId) {
   return { ...booking, id: snapshot.id };
 }
 
+export async function updateBookingTimer(bookingId, action) {
+  requireText(bookingId, 'id');
+  if (!Object.values(SESSION_TIMER_ACTIONS).includes(action)) {
+    throw new Error('Choose a valid session timer action.');
+  }
+  const userId = requireAuth().currentUser?.uid;
+  if (!userId) throw new Error('Sign in as the assigned tutor to use the timer.');
+  await assertApprovedTutor(userId);
+
+  const { db } = requireFirebase();
+  const bookingRef = doc(db, COLLECTIONS.BOOKINGS, bookingId);
+  if (action === SESSION_TIMER_ACTIONS.START || action === SESSION_TIMER_ACTIONS.RESUME) {
+    const activeQuery = query(
+      collection(db, COLLECTIONS.BOOKINGS),
+      where('tutorId', '==', userId),
+      where('timerStatus', '==', SESSION_TIMER_STATUS.RUNNING),
+    );
+    const activeSessions = await getDocs(activeQuery);
+    if (activeSessions.docs.some((snapshot) =>
+      snapshot.id !== bookingId && snapshot.data().timerStatus === SESSION_TIMER_STATUS.RUNNING,
+    )) {
+      throw new Error('Stop or pause the other active session before starting this timer.');
+    }
+  }
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(bookingRef);
+    if (!snapshot.exists()) throw new Error('This booking no longer exists.');
+    const booking = snapshot.data();
+    if (booking.tutorId !== userId) {
+      throw new Error('Only the assigned tutor can use this session timer.');
+    }
+    validateTimerTransition(booking, action);
+    const now = Date.now();
+    const recordedSeconds = getRecordedSeconds(booking, now);
+    const history = Array.isArray(booking.timerActionHistory)
+      ? booking.timerActionHistory.slice(-49)
+      : [];
+    history.push({
+      action,
+      recordedSeconds,
+      clientRecordedAt: new Date(now).toISOString(),
+    });
+    const timestamp = serverTimestamp();
+    const timerUpdate = {
+      timerStatus: action === SESSION_TIMER_ACTIONS.START || action === SESSION_TIMER_ACTIONS.RESUME
+        ? SESSION_TIMER_STATUS.RUNNING
+        : action === SESSION_TIMER_ACTIONS.PAUSE
+          ? SESSION_TIMER_STATUS.PAUSED
+          : SESSION_TIMER_STATUS.STOPPED,
+      accumulatedDurationSeconds: recordedSeconds,
+      timerLastAction: action,
+      timerLastActionAt: timestamp,
+      timerActionHistory: history,
+      updatedAt: timestamp,
+      ...(action === SESSION_TIMER_ACTIONS.START || action === SESSION_TIMER_ACTIONS.RESUME
+        ? { timerStartedAt: timestamp, timerPausedAt: null, timerStoppedAt: null }
+        : action === SESSION_TIMER_ACTIONS.PAUSE
+          ? { timerStartedAt: null, timerPausedAt: timestamp }
+          : { timerStartedAt: null, timerStoppedAt: timestamp }),
+    };
+    transaction.update(bookingRef, timerUpdate);
+  });
+}
+
 export async function updateBookingStatus(bookingId, status) {
   requireText(bookingId, 'id');
   if (![BOOKING_STATUS.UPCOMING, BOOKING_STATUS.REJECTED, BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED].includes(status)) {
@@ -290,6 +361,11 @@ export async function updateBookingStatus(bookingId, status) {
     } else if (status === BOOKING_STATUS.COMPLETED) {
       if (!isTutor || booking.status !== BOOKING_STATUS.UPCOMING) {
         throw new Error('Only the assigned tutor can complete an accepted session.');
+      }
+      if (booking.timerStatus !== SESSION_TIMER_STATUS.STOPPED ||
+          !Number.isSafeInteger(booking.accumulatedDurationSeconds) ||
+          booking.accumulatedDurationSeconds <= 0) {
+        throw new Error('Stop the timer and review a positive recorded teaching duration before confirming completion.');
       }
     } else if ((!isTutor && !isStudent) || ![BOOKING_STATUS.REQUESTED, BOOKING_STATUS.UPCOMING].includes(booking.status)) {
       throw new Error('Only a participant can cancel an active booking.');

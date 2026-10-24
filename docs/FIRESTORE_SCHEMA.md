@@ -152,6 +152,11 @@ any external fee before processing a request.
 | `tokenAmountUnits` | positive integer | Full session price in minor units (100 units = 1 token) |
 | `tokenDepositUnits` | positive integer | 20% of the session price, rounded to the nearest 0.01 token; present on new bookings |
 | `tokenStatus` | `'pending'` \| `'not_charged'` \| `'reserved'` \| `'refunded'` \| `'settled'` | New requests do not move tokens; acceptance charges the deposit and holds the remainder, cancellation refunds, and completion pays the full price |
+| `timerStatus` | `'idle'` \| `'running'` \| `'paused'` \| `'stopped'` | Tutor-owned timer state for the booking. Timer writes never change booking status or payment state |
+| `accumulatedDurationSeconds` | non-negative integer | Actual recorded teaching time accumulated across running intervals; never derived from `durationHours` |
+| `timerStartedAt`, `timerPausedAt`, `timerStoppedAt`, `timerLastActionAt` | timestamp, optional | Server timestamps for timer recovery and audit context |
+| `timerLastAction` | `'start'` \| `'pause'` \| `'resume'` \| `'stop'` | Last explicit tutor timer action |
+| `timerActionHistory` | array of maps, optional | Bounded action history containing action, recorded seconds, and a client display timestamp for auditing accidental stops/corrections |
 | `paymentStatus`, `tutorQrUrl`, `paymentReportedAt`, `paymentVerifiedAt` | legacy values | Retained only for historical peso bookings; new booking flow does not write QR payment fields |
 | `tutorPhotoUrl` | string | Optional tutor photo copied to the booking when the tutor accepts; only booking participants and admins can read it |
 | `rating` | integer, 0–5 | Optional one-time student rating, submitted only after completion; 0 is a valid score |
@@ -177,6 +182,31 @@ any external fee before processing a request.
 `conversations/{id}/messages/{id}`: `senderId` (string), `text` (string), `createdAt` (timestamp).
 
 The filter tabs on the Messages screen (`All Messages`, `Active Tutors`, `Faculty / Profs`) are worked out from `tutorTier` and the bookings, not stored.
+
+## Tutor leaderboards and recorded time
+
+The "Most hours taught" calculation uses only bookings with `status: 'completed'`,
+`timerStatus: 'stopped'`, and a positive `accumulatedDurationSeconds` value. It
+excludes requested, rejected, cancelled, upcoming, paused, and otherwise
+incomplete bookings. `durationHours` is the scheduled reservation and is never
+used as evidence that teaching occurred.
+
+The "Top-rated tutors" calculation uses the existing transactional `rating` and
+`reviewCount` aggregate on `tutors/{uid}`. The current implementation uses a
+minimum of three reviews before a tutor appears in that ranking; displayed
+entries include both the average rating and review count. This avoids presenting
+a single review as a stable ranking.
+
+Timer data is persisted directly on the booking because this project is limited
+to Firebase Authentication and Firestore on the Spark plan and intentionally
+does not use Cloud Functions, scheduled functions, Extensions, or another
+backend. Firestore rules restrict timer updates to the assigned approved tutor,
+validate the action state machine, bound the history, and prevent timer writes
+from changing payment or booking status. A client-only timer cannot prove that a
+tutor was physically teaching or prevent a determined signed-in tutor from
+keeping a timer running; the recorded duration is therefore an auditable product
+signal, not a server-attested fact. A future trusted backend could add stronger
+attestation without changing the booking fields.
 
 ## `notifications/{id}`
 

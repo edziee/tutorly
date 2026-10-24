@@ -1,3 +1,4 @@
+import { formatRecordedDuration, getCompletionTimerError } from '../../utils/sessionTimer';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -469,18 +470,28 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
                       ? ' held for this session'
                       : ''}
               </Text>
+                    <Text style={styles.sessionMeta}>
+                      Scheduled: {session.durationHours}h - Recorded teaching: {formatRecordedDuration(session.accumulatedDurationSeconds)}
+                    </Text>
               {session.status === BOOKING_STATUS.UPCOMING ? (
                 <AppButton
-                  title="Mark session complete"
+                        title="Confirm session completed"
                   variant="secondary"
                   onPress={() => Alert.alert(
                     'Complete this session?',
-                    'Only confirm after the tutoring session has taken place. This transfers the held tokens to your wallet.',
+                          `Recorded teaching time: ${formatRecordedDuration(session.accumulatedDurationSeconds)}. Only confirm after reviewing this timer. This transfers the held tokens to your wallet.`,
                     [
                       { text: 'Keep session upcoming', style: 'cancel' },
                       {
                         text: 'Confirm completion',
-                        onPress: () => respondToBooking(session.id, BOOKING_STATUS.COMPLETED),
+                              onPress: () => {
+                                const timerError = getCompletionTimerError(session);
+                                if (timerError) {
+                                  setBookingActionError(timerError);
+                                  return;
+                                }
+                                respondToBooking(session.id, BOOKING_STATUS.COMPLETED);
+                              },
                       },
                     ],
                   )}
