@@ -516,17 +516,12 @@ service cloud.firestore {
         changes.hasOnly([
           'status',
           'paymentStatus',
-          'tutorQrUrl',
           'tutorPhotoUrl',
           'updatedAt'
         ]) &&
         data.updatedAt == request.time &&
         ((data.status == 'upcoming' &&
-            data.paymentStatus == 'awaiting_payment' &&
-            data.tutorQrUrl is string &&
-            data.tutorQrUrl.matches('^https://.+') &&
-            data.tutorQrUrl ==
-              get(applicationPath(request.auth.uid)).data.get('paymentQrUrl', '')) ||
+            data.paymentStatus == 'awaiting_payment') ||
           (data.status == 'rejected' &&
             data.paymentStatus == 'not_applicable'));
     }

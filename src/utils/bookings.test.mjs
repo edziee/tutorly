@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  bookingsOverlap,
   getBookingTimeError,
   getNextBooking,
   parseTimeToMinutes,
@@ -34,6 +35,15 @@ test('parseTimeToMinutes gives null for text it cannot read', () => {
   assert.equal(parseTimeToMinutes('4:60 PM'), null);
   assert.equal(parseTimeToMinutes(''), null);
   assert.equal(parseTimeToMinutes(undefined), null);
+});
+
+test('bookingsOverlap detects intersecting times but allows adjacent sessions', () => {
+  const existing = booking('existing', '2026-10-30', '4:00 PM', '5:00 PM');
+  assert.equal(bookingsOverlap(existing, booking('overlap', '2026-10-30', '4:30 PM', '5:30 PM')), true);
+  assert.equal(bookingsOverlap(existing, booking('same', '2026-10-30', '4:00 PM', '5:00 PM')), true);
+  assert.equal(bookingsOverlap(existing, booking('adjacent', '2026-10-30', '5:00 PM', '6:00 PM')), false);
+  assert.equal(bookingsOverlap(existing, booking('other-day', '2026-10-31', '4:30 PM', '5:30 PM')), false);
+  assert.equal(bookingsOverlap(existing, booking('invalid', '2026-10-30', '16:00', '17:00')), false);
 });
 
 test('toDateKey writes the local date as YYYY-MM-DD with zero padding', () => {

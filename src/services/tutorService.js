@@ -11,6 +11,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
@@ -117,29 +118,16 @@ export async function assertApprovedTutor(uid) {
   return tutor;
 }
 
-export async function updateTutorBookingDetails(uid, { paymentQrUrl, hourlyRate } = {}) {
+export async function updateTutorBookingDetails(uid, { hourlyRate } = {}) {
   if (!uid) throw new Error('updateTutorBookingDetails needs a tutor id.');
   await assertApprovedTutor(uid);
-  if (typeof paymentQrUrl !== 'string') {
-    throw new Error('Enter the public HTTPS link for your payment QR image, or leave it blank.');
-  }
-  const cleanQrUrl = paymentQrUrl.trim();
-  if (cleanQrUrl && !isHttpsUrl(cleanQrUrl)) {
-    throw new Error('The payment QR must be a valid HTTPS image URL.');
-  }
   if (!Number.isFinite(hourlyRate) || hourlyRate <= 0) {
-    throw new Error('Enter a session price greater than zero.');
+    throw new Error('Enter a session token amount greater than zero.');
   }
 
   const { db } = requireFirebase();
   const tutorRef = doc(db, COLLECTIONS.TUTORS, uid);
-  const applicationRef = doc(db, COLLECTIONS.TUTOR_APPLICATIONS, uid);
-
-  const timestamp = serverTimestamp();
-  const batch = writeBatch(db);
-  batch.update(tutorRef, { hourlyRate, updatedAt: timestamp });
-  batch.update(applicationRef, { paymentQrUrl: cleanQrUrl, updatedAt: timestamp });
-  await batch.commit();
+  await updateDoc(tutorRef, { hourlyRate, updatedAt: serverTimestamp() });
 }
 
 /**

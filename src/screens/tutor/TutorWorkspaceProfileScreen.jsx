@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppButton from '../../components/AppButton';
@@ -31,7 +31,6 @@ import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
 import { canUseTutorOperations } from '../../utils/workspace';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
-import { isHttpsUrl } from '../../utils/validation';
 
 function SectionTitle({ title, subtitle, action }) {
   return (
@@ -75,7 +74,6 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const [application, setApplication] = useState(null);
-  const [paymentQrUrl, setPaymentQrUrl] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
   const [savingBookingDetails, setSavingBookingDetails] = useState(false);
   const [bookingDetailsError, setBookingDetailsError] = useState('');
@@ -137,7 +135,6 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     try {
       const tutorApplication = await getTutorApplication(uid);
       setApplication(tutorApplication);
-      setPaymentQrUrl(tutorApplication?.paymentQrUrl ?? '');
       setHourlyRate(
         Number.isFinite(tutorApplication?.hourlyRate) ? String(tutorApplication.hourlyRate) : '',
       );
@@ -215,10 +212,9 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     setBookingDetailsError('');
     try {
       await updateTutorBookingDetails(uid, {
-        paymentQrUrl: paymentQrUrl.trim(),
         hourlyRate: Number(hourlyRate),
       });
-      Alert.alert('Booking details saved', 'Students can see your price and QR after you accept a request.');
+      Alert.alert('Booking details saved', 'Students can see your session token amount.');
       await loadApplication();
     } catch (error) {
       setBookingDetailsError(getErrorMessage(error, 'Couldn’t save your booking details.'));
@@ -368,25 +364,14 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         </View>
 
         <View style={styles.paymentSetupCard}>
-          <SectionTitle title="Price and payment QR" subtitle="Add the price and QR students use after you accept a request." />
+          <SectionTitle title="Booking rate" subtitle="Set the token amount students need to book a session." />
           <AppInput
-            label="Session price (up to 3 hours)"
+            label="Session tokens"
             value={hourlyRate}
             handleChangeText={setHourlyRate}
             placeholder="e.g. 280"
             keyboardType="decimal-pad"
           />
-          <AppInput
-            label="Secure payment QR image link"
-            value={paymentQrUrl}
-            handleChangeText={setPaymentQrUrl}
-            placeholder="https://example.com/your-payment-qr.png"
-            autoCapitalize="none"
-            keyboardType="url"
-          />
-          {paymentQrUrl && isHttpsUrl(paymentQrUrl) ? (
-            <Image source={{ uri: paymentQrUrl }} style={styles.qrPreview} resizeMode="contain" />
-          ) : null}
           {bookingDetailsError ? (
             <Text accessibilityRole="alert" style={styles.formError}>{bookingDetailsError}</Text>
           ) : null}
@@ -528,7 +513,6 @@ const styles = StyleSheet.create({
   content: { paddingBottom: spacing.xxl },
   signOutError: { marginBottom: spacing.sm, color: colors.error, fontSize: 13 },
   paymentSetupCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
-  qrPreview: { alignSelf: 'center', width: 132, height: 132, marginBottom: spacing.md, borderRadius: radius.sm },
   formError: { marginBottom: spacing.sm, color: colors.errorText, fontSize: 12, lineHeight: 17 },
   requestContainer: { marginBottom: spacing.sm },
   paymentVerificationCard: { gap: spacing.sm, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },

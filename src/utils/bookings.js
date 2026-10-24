@@ -15,6 +15,23 @@ export function parseTimeToMinutes(text) {
   return ((hour % 12) + (isPm ? 12 : 0)) * 60 + minute;
 }
 
+export function bookingsOverlap(first, second) {
+  if (!first || !second || first.dateKey !== second.dateKey) return false;
+  const firstStart = parseTimeToMinutes(first.startTime);
+  const firstEnd = parseTimeToMinutes(first.endTime);
+  const secondStart = parseTimeToMinutes(second.startTime);
+  const secondEnd = parseTimeToMinutes(second.endTime);
+  if (
+    firstStart === null ||
+    firstEnd === null ||
+    secondStart === null ||
+    secondEnd === null
+  ) {
+    return false;
+  }
+  return firstStart < secondEnd && secondStart < firstEnd;
+}
+
 // Today's date in the phone's own time zone, as "YYYY-MM-DD" (the dateKey form).
 export function toDateKey(date = new Date()) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
