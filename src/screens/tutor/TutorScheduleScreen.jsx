@@ -17,6 +17,7 @@ import * as Calendar from 'expo-calendar';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { SessionTimer  } from '../../components/SessionStopwatch';
 import ErrorState from '../../components/ErrorState';
 import ScreenContainer from '../../components/ScreenContainer';
 import { ROUTES } from '../../constants/routes';
@@ -496,7 +497,7 @@ export default function ScheduleScreen() {
       cancel();
       return;
     }
-    Alert.alert('Cancel session?', `Cancel your session with ${session.tutorName}?`, [
+    Alert.alert('Cancel session?', `Cancel your session with ${session.studentName}?`, [
       { text: 'Keep session', style: 'cancel' },
       { text: 'Cancel session', style: 'destructive', onPress: cancel },
     ]);
@@ -535,7 +536,7 @@ export default function ScheduleScreen() {
     const reminderId = await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Upcoming Tutorly session',
-        body: `${session.subject} with ${session.tutorName} starts in one hour.`,
+        body: `${session.subject} with ${session.studentName} starts in one hour.`,
         data: { sessionId: session.id },
       },
       trigger: reminderDate,
@@ -561,7 +562,7 @@ export default function ScheduleScreen() {
       return;
     }
     await Calendar.createEvent(writableCalendar.id, {
-      title: `${session.subject} with ${session.tutorName}`,
+      title: `${session.subject} with ${session.studntName}`,
       startDate: parseTime(session.dateKey, session.startTime),
       endDate: parseTime(session.dateKey, session.endTime),
       location: session.location,
@@ -599,7 +600,7 @@ export default function ScheduleScreen() {
                   </View>
                   {modalMode === 'details' && activeSession ? (
                     <>
-                      <Text>yep</Text>
+                      <SessionTimer />
                     </>
                   ) : (
                     <>
