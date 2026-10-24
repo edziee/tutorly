@@ -1,12 +1,23 @@
 import { View, Text, Button, StyleSheet, Alert } from "react-native";
 import React, { useState, useEffect, useRef } from 'react';
+import { useOnUnmount } from "../hooks/useOnUnmount";
 
-export const SessionStopwatch = ({ bookingId, studentName }) => {
+export const SessionStopwatch = ({ session, bookingIdInSession, setBookingIdInSession, sessionTime, setSessionTime }) => {
     const [isRunning, setIsRunning] = useState(false);
-    const [elapsedTime, setElapsedTime] = useState(0);
+    const [elapsedTime, setElapsedTime] = useState(sessionTime);
     const [sessionEnded, setSessionEnded] = useState(false);
     const intervalIdRef = useRef(null);
     const startTimeRef = useRef(0);
+
+    useOnUnmount(() => {
+        console.log(formatTime())
+        setElapsedTime(Date.now() - startTimeRef.current);
+        setSessionTime(elapsedTime);
+    }, [isRunning]);
+
+    const setSessionTimeHelper = () => {
+        setSessionTime(elapsedTime);
+    };
 
     useEffect(() => {
         if (isRunning) {
@@ -14,29 +25,36 @@ export const SessionStopwatch = ({ bookingId, studentName }) => {
                 setElapsedTime(Date.now() - startTimeRef.current);
             }, 10);
         }
-
         return () => {
+            setSessionTime(elapsedTime);
             clearInterval(intervalIdRef.current);
         };
-
     }, [isRunning]);
 
     const start = () => {
         setIsRunning(true);
+        setBookingIdInSession(session.id);
         startTimeRef.current = Date.now() - elapsedTime;
-    }
+    };
 
     const stop = () => {
         setIsRunning(false);
+        setElapsedTime(0);
+        setSessionTime(0);
+        setBookingIdInSession("");
         setSessionEnded(true);
-    }
+    };
+
+    const pause = () => {
+        setIsRunning(false);
+    };
 
     const stopPopup = () => {
-        Alert.alert('Cancel session?', `Cancel your session with ${studentName}?`, [
+        Alert.alert('Cancel session?', `Cancel your session with ${session.studentName}?`, [
             { text: 'Continue Session', style: 'cancel' },
             { text: 'Stop session', style: 'destructive', onPress: stop },
         ]);
-    }
+    };
 
     const formatTime = () => {
         let hours = Math.floor(elapsedTime / (1000 * 60 * 60));
@@ -50,7 +68,7 @@ export const SessionStopwatch = ({ bookingId, studentName }) => {
         milliseconds = String(milliseconds).padStart(2, "0");
 
         return `${hours}:${minutes}:${seconds}:${milliseconds}`;
-    }
+    };
 
     const styles = StyleSheet.create({
         container: {
@@ -91,24 +109,42 @@ export const SessionStopwatch = ({ bookingId, studentName }) => {
         },
 
         startButton: {
-            backgroundColor: 'hsl(115, 100%, 40%)',
+
         },
 
         stopButton: {
-            backgroundColor: 'hsl(10, 90%, 50%)',
+
+        },
+
+        pauseButton: {
+
+        },
+
+        buttons: {
+            flexDirection: 'row',
+            gap: 10,
         },
     });
 
     return (
         <View style={styles.container}>
             <View style={styles.stopWatch}>
-                <View><Text style={styles.display}>{formatTime()}</Text></View>
+                <View><Text style={styles.display}>{session.id == bookingIdInSession ? formatTime() : '00:00:00'}</Text></View>
                 <View style={styles.controls}>
-                    {sessionEnded ?
-                        <Text style={styles.sessionEnd}>Session has been ended successfully.</Text> :
-                        isRunning ?
-                            (<Button title="Stop Session" onPress={stopPopup} style={styles.stopButton} />) :
-                            (<Button title="Start Session" onPress={start} style={styles.startButton} />)
+                    {
+                        sessionEnded ?
+                            (<Text style={styles.sessionEnd}>Session has successfully ended.</Text>) :
+                            session.status == 'completed' ?
+                                (<Text style={styles.sessionEnd}>Session has ended.</Text>) :
+                                (bookingIdInSession != "" && session.id != bookingIdInSession) ?
+                                    (<Text style={styles.sessionEnd}>Another session is ongoing.</Text>) :
+                                    isRunning ?
+                                        (<View style={styles.buttons}>
+                                            <Button title="Pause Session" onPress={pause} style={styles.pauseButton} />
+                                            <Button title="Stop Session" onPress={stopPopup} style={styles.stopButton} />
+                                        </View>) :
+
+                                        (<Button title={elapsedTime == 0 ? "Start Session" : "Resume Session"} onPress={start} style={styles.startButton} />)
                     }
                 </View>
             </View>

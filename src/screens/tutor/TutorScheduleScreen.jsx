@@ -111,7 +111,7 @@ function toScheduleBooking(booking) {
     ...booking,
     id: booking.id,
     bookingId: booking.id,
-    studentName: booking.studentName || 'Tutor',
+    studentName: booking.studentName || 'Student',
     subject: booking.subject || 'Tutoring session',
     dateKey: booking.dateKey,
     startTime: booking.startTime,
@@ -357,6 +357,8 @@ export default function ScheduleScreen() {
       remindersLoaded,
     }));
   const allSessions = remoteSessions;
+  const [bookingIdInSession, setBookingIdInSession] = useState("");
+  const [sessionTime, setSessionTime] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -624,7 +626,7 @@ export default function ScheduleScreen() {
                   </View>
                   {modalMode === 'details' && activeSession ? (
                     <>
-                      <SessionStopwatch />
+                      <SessionStopwatch session={activeSession} bookingIdInSession={bookingIdInSession} setBookingIdInSession={setBookingIdInSession} sessionTime={sessionTime} setSessionTime={setSessionTime}/>
                     </>
                   ) : (
                     <>
