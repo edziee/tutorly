@@ -1,6 +1,5 @@
 import { View, Text, Button, StyleSheet, Alert } from "react-native";
 import React, { useState, useEffect, useRef } from 'react';
-import { useOnUnmount } from "../hooks/useOnUnmount";
 
 export const SessionStopwatch = ({ session, bookingIdInSession, setBookingIdInSession, sessionTime, setSessionTime }) => {
     const [isRunning, setIsRunning] = useState(false);
@@ -9,16 +8,6 @@ export const SessionStopwatch = ({ session, bookingIdInSession, setBookingIdInSe
     const intervalIdRef = useRef(null);
     const startTimeRef = useRef(0);
 
-    useOnUnmount(() => {
-        console.log(formatTime())
-        setElapsedTime(Date.now() - startTimeRef.current);
-        setSessionTime(elapsedTime);
-    }, [isRunning]);
-
-    const setSessionTimeHelper = () => {
-        setSessionTime(elapsedTime);
-    };
-
     useEffect(() => {
         if (isRunning) {
             intervalIdRef.current = setInterval(() => {
@@ -26,7 +15,6 @@ export const SessionStopwatch = ({ session, bookingIdInSession, setBookingIdInSe
             }, 10);
         }
         return () => {
-            setSessionTime(elapsedTime);
             clearInterval(intervalIdRef.current);
         };
     }, [isRunning]);
@@ -46,6 +34,9 @@ export const SessionStopwatch = ({ session, bookingIdInSession, setBookingIdInSe
     };
 
     const pause = () => {
+        const pausedTime = Date.now() - startTimeRef.current;
+        setElapsedTime(pausedTime);
+        setSessionTime(pausedTime);
         setIsRunning(false);
     };
 
