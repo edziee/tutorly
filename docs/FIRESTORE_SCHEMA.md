@@ -24,6 +24,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 
 | Field | Type | Notes |
 | --- | --- | --- |
+| `uid` | string | Firebase Authentication user id; matches the document id |
 | `email` | string | |
 | `role` | `'student'` \| `'tutor'` \| `'professional'` (legacy) \| `'admin'` | Set once at sign-up. Peer tutors and Professor / Alumni accounts use `'tutor'`; existing `'professional'` accounts remain supported as tutors. Users must not be able to change it, and nobody can sign up as `admin` (admins are created in the Firebase console) |
 | `tutorType` | `'peer'` \| `'professional'` | Tutor accounts only. Saved at sign-up to determine the verification evidence requirements; never user-editable. Existing accounts without it infer the type from their tutor application tier |

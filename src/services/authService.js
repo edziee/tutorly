@@ -15,7 +15,7 @@ import {
 
 import { isFirebaseConfigured, requireAuth, requireFirebase } from '../config/firebase';
 import { isRoleAllowedInPortal, LOGIN_ROLES, ROLES, SIGNUP_ROLES } from '../constants/roles';
-import { createUserProfile, getUserProfile } from './userService';
+import { createUserProfile, ensureUserProfileUid, getUserProfile } from './userService';
 
 // Errors we throw ourselves use Firebase-style codes so src/utils/errors.js can
 // turn them into messages for the screens.
@@ -132,6 +132,12 @@ export async function signIn(email, password, portal) {
       );
     }
 
+    try {
+      await ensureUserProfileUid(user.uid);
+    } catch (error) {
+      await firebaseSignOut(auth);
+      throw error;
+    }
     return { uid: user.uid, role: profile.role };
   });
 }

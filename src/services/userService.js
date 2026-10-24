@@ -14,9 +14,8 @@ const PROTECTED_FIELDS = ['id', 'uid', 'role', 'email', 'createdAt', 'tutorType'
 
 /**
  * @param {string} uid
- * @returns {Promise<object | null>} the user document (with `id` and `uid`
- *   added, because the document id is not a field inside the document), or
- *   null if it does not exist
+ * @returns {Promise<object | null>} the user document with `id` and `uid`,
+ *   or null if it does not exist
  */
 export async function getUserProfile(uid) {
   const { db } = requireFirebase();
@@ -45,6 +44,7 @@ export async function createUserProfile(uid, data) {
 
   const { db } = requireFirebase();
   await setDoc(doc(db, COLLECTIONS.USERS, uid), {
+    uid,
     email: data.email,
     role: data.role,
     name: data.name ?? '',
@@ -52,6 +52,24 @@ export async function createUserProfile(uid, data) {
     ...(data.role === 'tutor' ? { tutorType: data.tutorType } : {}),
     createdAt: serverTimestamp(),
   });
+}
+
+/**
+ * Backfill the UID field on profiles created before it was stored in Firestore.
+ * @param {string} uid
+ * @returns {Promise<void>}
+ */
+export async function ensureUserProfileUid(uid) {
+  const { db } = requireFirebase();
+  const userRef = doc(db, COLLECTIONS.USERS, uid);
+  const snapshot = await getDoc(userRef);
+  if (!snapshot.exists()) throw new Error('Cannot add a uid to a missing user profile.');
+
+  const storedUid = snapshot.data().uid;
+  if (storedUid && storedUid !== uid) {
+    throw new Error('The stored user uid does not match the profile document.');
+  }
+  if (!storedUid) await updateDoc(userRef, { uid });
 }
 
 /**

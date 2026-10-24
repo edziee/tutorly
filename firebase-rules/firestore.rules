@@ -188,7 +188,7 @@ service cloud.firestore {
             data.applicationProofUrl.matches('^https://.+')));
     }
 
-    function validProfileUpdate() {
+    function validProfileUpdate(uid) {
       let changes = request.resource.data.diff(resource.data).affectedKeys();
       return changes.hasOnly([
           'name',
@@ -200,8 +200,13 @@ service cloud.firestore {
           'campusAddress',
           'photoUrl',
           'campusId',
-          'notificationPreferences'
+          'notificationPreferences',
+          'uid'
         ]) &&
+        (!('uid' in resource.data) ||
+          request.resource.data.get('uid', '') == resource.data.uid) &&
+        (!('uid' in request.resource.data) ||
+          request.resource.data.uid == uid) &&
         request.resource.data.get('role', '') == resource.data.get('role', '') &&
         request.resource.data.get('tutorType', '') == resource.data.get('tutorType', '') &&
         (!('name' in request.resource.data) ||
@@ -216,8 +221,9 @@ service cloud.firestore {
           request.resource.data.photoUrl.matches('^https://.+'));
     }
 
-    function validAccountCreate() {
+    function validAccountCreate(uid) {
       return request.resource.data.keys().hasOnly([
+          'uid',
           'email',
           'role',
           'name',
@@ -226,12 +232,14 @@ service cloud.firestore {
           'createdAt'
         ]) &&
         request.resource.data.keys().hasAll([
+          'uid',
           'email',
           'role',
           'name',
           'campusId',
           'createdAt'
         ]) &&
+        request.resource.data.uid == uid &&
         request.resource.data.email == request.auth.token.email &&
         request.resource.data.role in ['student', 'tutor'] &&
         (request.resource.data.role != 'tutor' ||
@@ -590,10 +598,10 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if signedIn() &&
         request.auth.uid == uid &&
-        validAccountCreate();
+        validAccountCreate(uid);
       allow update: if signedIn() &&
         request.auth.uid == uid &&
-        validProfileUpdate();
+        validProfileUpdate(uid);
       allow delete: if false;
     }
 
