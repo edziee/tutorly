@@ -658,7 +658,7 @@ export default function TutorApplicationScreen() {
           <Section>
             <SectionTitle
               title="Session Pricing"
-              subtitle="Set your price and payment QR in your workspace after you submit."
+              subtitle="Set the session token amount in your Tutor Workspace after your application is approved."
             />
           </Section>
 
