@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import LoadingState from '../../components/LoadingState';
 import EmptyState from '../../components/EmptyState';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SessionStopwatch } from '../../components/SessionStopwatch';
 import {
   Alert,
   ActivityIndicator,
@@ -34,7 +36,8 @@ import styles from '../../theme/scheduleScreenStyles';
 import { getErrorMessage } from '../../utils/errors';
 
 const initialDate = new Date();
-const storageKey = 'tutorly.schedule.sessions.v3';
+const legacySessionsStorageKey = 'tutorly.schedule.sessions.v3';
+const reminderStorageKey = 'tutorly.schedule.reminders.v1';
 const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const filters = [
   { key: 'all', label: 'All Sessions' },
@@ -322,8 +325,12 @@ function WeekAgenda({ sessions, onBookAgain, onSelect, onCalendar, onCancel, onR
 export default function ScheduleScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
-  const [sessions, setSessions] = useState([]);
-  const [hydrated, setHydrated] = useState(false);
+  const bookingResults = useSubscription(
+    (onData, onError) => (
+      user?.uid ? subscribeToTutorBookings(user.uid, onData, onError) : undefined
+    ),
+    [user?.uid],
+  );
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [month, setMonth] = useState(initialDate);
   const [view, setView] = useState('agenda');
@@ -335,33 +342,81 @@ export default function ScheduleScreen() {
   const [draftStartTime, setDraftStartTime] = useState('4:00 PM');
   const [draftEndTime, setDraftEndTime] = useState('7:00 PM');
   const [draftNotes, setDraftNotes] = useState('');
-  const visibleStatuses = [
-    BOOKING_STATUS.REQUESTED,
-    BOOKING_STATUS.UPCOMING,
-    BOOKING_STATUS.COMPLETED,
-  ];
-
-
-  const bookings = useSubscription(
-    (onData, onError) => (
-      user?.uid ? subscribeToTutorBookings(user.uid, onData, onError) : undefined
-    ),
-    [user?.uid],
-  );
+  const [reminderIds, setReminderIds] = useState({});
+  const [remindersLoaded, setRemindersLoaded] = useState(false);
+  const remoteSessions = (bookingResults.data ?? [])
+    .filter((booking) => [
+      BOOKING_STATUS.REQUESTED,
+      BOOKING_STATUS.UPCOMING,
+      BOOKING_STATUS.COMPLETED,
+    ].includes(booking.status))
+    .map((booking) => ({
+      ...toScheduleBooking(booking),
+      reminderId: reminderIds[booking.id] || null,
+      reminderEnabled: Boolean(reminderIds[booking.id]),
+      remindersLoaded,
+    }));
+  const allSessions = remoteSessions;
 
   useEffect(() => {
-    const retrievedSessions = (bookings.data ?? [])
-      .filter((booking) => visibleStatuses.includes(booking.status))
-      .sort((first, second) =>
-        `${first.dateKey} ${first.startTime}`.localeCompare(`${second.dateKey} ${second.startTime}`),
-      );
-    setSessions(retrievedSessions);
-    console.log(sessions);
+    let active = true;
+    const loadReminders = async () => {
+      let nextReminderIds = {};
+      try {
+        const storedReminders = await AsyncStorage.getItem(reminderStorageKey);
+        if (storedReminders) {
+          const parsed = JSON.parse(storedReminders);
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('Saved schedule reminders have an invalid format.');
+          }
+          nextReminderIds = Object.fromEntries(
+            Object.entries(parsed).filter(([, id]) => typeof id === 'string'),
+          );
+        }
+
+        const legacySessions = await AsyncStorage.getItem(legacySessionsStorageKey);
+        if (legacySessions) {
+          const parsed = JSON.parse(legacySessions);
+          if (!Array.isArray(parsed)) {
+            throw new Error('Saved schedule sessions have an invalid format.');
+          }
+          const staleReminderIds = [];
+          parsed.forEach((session) => {
+            if (session.bookingId && typeof session.reminderId === 'string') {
+              nextReminderIds[session.bookingId] = session.reminderId;
+            } else if (typeof session.reminderId === 'string') {
+              staleReminderIds.push(session.reminderId);
+            }
+          });
+          const Notifications = staleReminderIds.length ? getNotificationsModule() : null;
+          if (Notifications) {
+            await Promise.all(
+              staleReminderIds.map((id) => Notifications.cancelScheduledNotificationAsync(id)),
+            );
+          }
+          await AsyncStorage.setItem(reminderStorageKey, JSON.stringify(nextReminderIds));
+          await AsyncStorage.removeItem(legacySessionsStorageKey);
+        }
+      } catch (error) {
+        console.warn('Could not migrate schedule reminders:', error);
+      } finally {
+        if (active) {
+          setReminderIds(nextReminderIds);
+          setRemindersLoaded(true);
+        }
+      }
+    };
+    loadReminders();
+    return () => { active = false; };
   }, []);
 
-  const allSessions = [
-    ...sessions.filter((session) => !session.bookingId),
-  ];
+  useEffect(() => {
+    if (!remindersLoaded) return;
+    AsyncStorage.setItem(reminderStorageKey, JSON.stringify(reminderIds)).catch((error) => {
+      console.warn('Could not save schedule reminders:', error);
+    });
+  }, [reminderIds, remindersLoaded]);
+
   const visibleSessions = allSessions.filter((session) => filter === 'all' || session.status === filter);
   const selectedKey = dateKey(selectedDate);
   const weekStart = startOfWeek(selectedDate);
@@ -420,65 +475,38 @@ export default function ScheduleScreen() {
 
   async function saveBooking() {
     if (!draftDate || !draftStartTime || !draftEndTime) {
-      Alert.alert('Incomplete booking', 'Choose a date and time before saving.');
+      Alert.alert('Choose a time', 'Select a date and time before saving.');
       return;
     }
-    if (modalMode === 'reschedule') {
-      if (activeSession.bookingId) {
-        try {
-          await rescheduleBooking(activeSession.bookingId, {
-            dateKey: draftDate,
-            startTime: draftStartTime,
-            endTime: draftEndTime,
-          });
-          setModalMode(null);
-        } catch (error) {
-          Alert.alert('Unable to reschedule', error.message || 'Please try again.');
-        }
-        return;
-      }
-      setSessions((current) => current.map((session) => session.id === activeSession.id ? {
-        ...session,
-        dateKey: draftDate,
-        startTime: draftStartTime,
-        endTime: draftEndTime,
-        notes: draftNotes,
-      } : session));
-      Alert.alert('Session rescheduled', 'The updated session is now on your schedule.');
-    } else {
-      setSessions((current) => [...current, {
-        ...activeSession,
-        id: `session-${Date.now()}`,
-        dateKey: draftDate,
-        startTime: draftStartTime,
-        endTime: draftEndTime,
-        durationHours: 3,
-        status: 'upcoming',
-        notes: draftNotes,
-        reminderEnabled: false,
-      }]);
-      Alert.alert('Session booked', 'The new session has been added to your schedule.');
+    if (!activeSession?.bookingId) {
+      Alert.alert('Can’t reschedule', 'This session is no longer available to change.');
+      return;
     }
-    setModalMode(null);
+    try {
+      await rescheduleBooking(activeSession.bookingId, {
+        dateKey: draftDate,
+        startTime: draftStartTime,
+        endTime: draftEndTime,
+      });
+      setModalMode(null);
+    } catch (error) {
+      Alert.alert('Couldn’t reschedule', error.message || 'Please try again.');
+    }
   }
 
   function cancelSession(session) {
     const cancel = async () => {
-      if (session.bookingId) {
-        try {
-          await updateBookingStatus(session.bookingId, BOOKING_STATUS.CANCELLED);
-        } catch (error) {
-          Alert.alert('Unable to cancel session', error.message || 'Please try again.');
-        }
-        return;
+      try {
+        await updateBookingStatus(session.bookingId, BOOKING_STATUS.CANCELLED);
+      } catch (error) {
+        Alert.alert('Couldn’t cancel your session', error.message || 'Please try again.');
       }
-      setSessions((current) => current.filter((item) => item.id !== session.id));
     };
     if (Platform.OS === 'web') {
       cancel();
       return;
     }
-    Alert.alert('Cancel session?', `Cancel your session with ${session.tutorName}?`, [
+    Alert.alert('Cancel session?', `Cancel your session with ${session.studentName}?`, [
       { text: 'Keep session', style: 'cancel' },
       { text: 'Cancel session', style: 'destructive', onPress: cancel },
     ]);
@@ -487,25 +515,28 @@ export default function ScheduleScreen() {
   async function toggleReminder(session) {
     const Notifications = getNotificationsModule();
     if (!Notifications) {
-      setSessions((current) => current.map((item) => item.id === session.id ? { ...item, reminderEnabled: !item.reminderEnabled, reminderId: null } : item));
-      Alert.alert('In-app reminder enabled', 'Expo Go cannot load native Android notification services. This reminder is saved locally; use a development build for a system notification.');
+      Alert.alert('Reminders unavailable', 'Session reminders are available in the Tutorly app on Android and iOS.');
       return;
     }
     if (session.reminderEnabled && session.reminderId) {
       await Notifications.cancelScheduledNotificationAsync(session.reminderId);
-      setSessions((current) => current.map((item) => item.id === session.id ? { ...item, reminderEnabled: false, reminderId: null } : item));
-      Alert.alert('Reminder disabled', 'You will no longer receive a reminder for this session.');
+      setReminderIds((current) => {
+        const next = { ...current };
+        delete next[session.id];
+        return next;
+      });
+      Alert.alert('Reminder turned off', 'You won’t get a reminder for this session.');
       return;
     }
     const permission = await Notifications.requestPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Notifications permission needed', 'Allow notifications to receive session reminders.');
+      Alert.alert('Allow notifications', 'Turn on notifications to get session reminders.');
       return;
     }
     const reminderDate = parseTime(session.dateKey, session.startTime);
     reminderDate.setHours(reminderDate.getHours() - 1);
     if (reminderDate <= new Date()) {
-      Alert.alert('Reminder unavailable', 'This session starts too soon for a one-hour reminder.');
+      Alert.alert('Reminder unavailable', 'This session starts in less than an hour.');
       return;
     }
     if (Platform.OS === 'android') {
@@ -517,29 +548,29 @@ export default function ScheduleScreen() {
     const reminderId = await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Upcoming Tutorly session',
-        body: `${session.subject} with ${session.tutorName} starts in one hour.`,
+        body: `${session.subject} with ${session.studentName} starts in one hour.`,
         data: { sessionId: session.id },
       },
       trigger: reminderDate,
     });
-    setSessions((current) => current.map((item) => item.id === session.id ? { ...item, reminderEnabled: true, reminderId } : item));
-    Alert.alert('Reminder enabled', 'You will be reminded one hour before this session.');
+    setReminderIds((current) => ({ ...current, [session.id]: reminderId }));
+    Alert.alert('Reminder set', 'We’ll remind you one hour before this session.');
   }
 
   async function addToCalendar(session) {
     if (Platform.OS === 'web') {
-      Alert.alert('Device calendar', 'Calendar export is available on Android and iOS.');
+      Alert.alert('Calendar unavailable', 'Adding sessions to your calendar is available on Android and iOS.');
       return;
     }
     const permission = await Calendar.requestCalendarPermissions();
     if (permission.status !== 'granted') {
-      Alert.alert('Calendar permission needed', 'Allow calendar access to add this session.');
+      Alert.alert('Allow calendar access', 'Give Tutorly calendar access to add this session.');
       return;
     }
     const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
     const writableCalendar = calendars.find((calendar) => calendar.allowsModifications);
     if (!writableCalendar) {
-      Alert.alert('No calendar available', 'Create a device calendar before exporting this session.');
+      Alert.alert('No calendar found', 'Add a calendar to your device before saving this session.');
       return;
     }
     await Calendar.createEvent(writableCalendar.id, {
@@ -549,7 +580,7 @@ export default function ScheduleScreen() {
       location: session.location,
       notes: session.notes,
     });
-    Alert.alert('Added to calendar', 'This session was added to your device calendar.');
+    Alert.alert('Added to calendar', 'This session is now in your device calendar.');
   }
 
   if (!user?.uid) {
@@ -562,8 +593,17 @@ export default function ScheduleScreen() {
     );
   }
 
-  if (bookings.status === 'loading') {
+  if (bookingResults.status === 'loading') {
     return <LoadingState message="Loading your sessions..." />;
+  }
+  if (bookingResults.status === 'error') {
+    return (
+      <ErrorState
+        title="Bookings aren’t available"
+        message={getErrorMessage(bookingResults.error)}
+        onRetry={bookingResults.retry}
+      />
+    );
   }
 
   return (
@@ -584,7 +624,7 @@ export default function ScheduleScreen() {
                   </View>
                   {modalMode === 'details' && activeSession ? (
                     <>
-                      <Text>yep</Text>
+                      <SessionStopwatch />
                     </>
                   ) : (
                     <>
@@ -618,14 +658,7 @@ export default function ScheduleScreen() {
           </View>
           <Pressable style={styles.todayButton} onPress={() => selectDate(new Date())}><Text style={styles.todayButtonText}>Today</Text></Pressable>
         </View>
-        {bookings.status === 'error' ? (
-          <ErrorState
-            compact
-            title="Could not load live bookings"
-            message={getErrorMessage(bookings.error)}
-            onRetry={bookings.retry}
-          />
-        ) : null}
+
         <View style={styles.calendarCard}>
           <CalendarHeader view={view} setView={setView} month={month} onMovePeriod={moveCalendarPeriod} />
           {view === 'month' ? <MonthGrid month={month} selectedDate={selectedDate} onSelectDate={selectDate} sessions={allSessions} /> : <WeekStrip selectedDate={selectedDate} onSelectDate={selectDate} sessions={allSessions} />}
@@ -647,7 +680,7 @@ export default function ScheduleScreen() {
             {pastExpanded ? completedSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session, 'details')} onBookAgain={() => openScheduleModal(session, 'booking')} onCalendar={() => addToCalendar(session)} onCancel={() => cancelSession(session)} onReschedule={() => openScheduleModal(session, 'reschedule')} onReminder={() => toggleReminder(session)} onPay={() => navigation.navigate(ROUTES.PAYMENT, { bookingId: session.bookingId })} />) : null}
           </View>
         ) : null}
-        {!displayedSessions.length ? <View style={styles.emptyState}><Ionicons name="calendar-clear-outline" size={30} color={colors.mutedText} /><Text style={styles.emptyTitle}>No sessions here</Text><Text style={styles.emptyText}>{view === 'agenda' ? 'Try another filter or choose a different calendar view.' : 'There are no sessions in this selected date range.'}</Text><Pressable style={styles.browseButton} onPress={() => navigation.navigate('Tutors')}><Ionicons name="people-outline" size={16} color={colors.white} /><Text style={styles.browseButtonText}>Browse Tutors</Text></Pressable></View> : null}
+        {!displayedSessions.length ? <View style={styles.emptyState}><Ionicons name="calendar-clear-outline" size={30} color={colors.mutedText} /><Text style={styles.emptyTitle}>No sessions here</Text><Text style={styles.emptyText}>{view === 'agenda' ? 'Try another filter or choose a different calendar view.' : 'There are no sessions in this selected date range.'}</Text></View> : null}
       </ScrollView>
     </ScreenContainer>
   );
