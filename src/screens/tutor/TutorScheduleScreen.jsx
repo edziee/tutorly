@@ -373,6 +373,9 @@ export default function ScheduleScreen() {
       remindersLoaded,
     }));
   const allSessions = remoteSessions;
+  const currentActiveSession = modalMode === 'details' && activeSession
+    ? allSessions.find((session) => session.id === activeSession.id) ?? activeSession
+    : activeSession;
   useEffect(() => {
     let active = true;
     const loadReminders = async () => {
@@ -627,19 +630,19 @@ export default function ScheduleScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.pageTitle}>My Schedule</Text>
-            <Modal visible={Boolean(activeSession && modalMode)} transparent animationType="slide" onRequestClose={() => setModalMode(null)}>
+            <Modal visible={Boolean(currentActiveSession && modalMode)} transparent animationType="slide" onRequestClose={() => setModalMode(null)}>
               <View style={styles.modalBackdrop}>
                 <View style={styles.modalCard}>
                   <View style={styles.modalHeader}>
                     <View style={styles.modalTitleCopy}>
                       <Text style={styles.modalTitle}>{modalMode === 'details' ? 'Session Details' : modalMode === 'reschedule' ? 'Reschedule Session' : 'Book Again'}</Text>
-                      <Text style={styles.modalSubtitle}>{activeSession?.subject}</Text>
+                      <Text style={styles.modalSubtitle}>{currentActiveSession?.subject}</Text>
                     </View>
                     <Pressable onPress={() => setModalMode(null)} hitSlop={10}><Ionicons name="close" size={22} color={colors.text} /></Pressable>
                   </View>
-                  {modalMode === 'details' && activeSession ? (
+                  {modalMode === 'details' && currentActiveSession ? (
                     <>
-                      <SessionStopwatch session={activeSession} />
+                      <SessionStopwatch session={currentActiveSession} />
                     </>
                   ) : (
                     <>

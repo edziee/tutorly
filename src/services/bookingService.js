@@ -259,7 +259,6 @@ export async function updateBookingTimer(bookingId, action) {
     const activeQuery = query(
       collection(db, COLLECTIONS.BOOKINGS),
       where('tutorId', '==', userId),
-      where('timerStatus', '==', SESSION_TIMER_STATUS.RUNNING),
     );
     const activeSessions = await getDocs(activeQuery);
     if (activeSessions.docs.some((snapshot) =>

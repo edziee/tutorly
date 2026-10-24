@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, Platform, StyleSheet, Alert } from 'react-native';
 import React, { useEffect, useState } from 'react';
 
 import AppButton from './AppButton';
@@ -40,7 +40,14 @@ export const SessionStopwatch = ({ session }) => {
     };
 
     const stopPopup = () => {
-        Alert.alert('Stop session timer?', `Record the teaching time for ${session.studentName}? Stopping does not complete the booking or transfer payment.`, [
+        const message = `Record the teaching time for ${session.studentName}? Stopping does not complete the booking or transfer payment.`;
+        if (Platform.OS === 'web') {
+            if (globalThis.confirm(`Stop session timer?\n\n${message}`)) {
+                applyAction(SESSION_TIMER_ACTIONS.STOP);
+            }
+            return;
+        }
+        Alert.alert('Stop session timer?', message, [
             { text: 'Continue Session', style: 'cancel' },
             { text: 'Stop Timer', style: 'destructive', onPress: () => applyAction(SESSION_TIMER_ACTIONS.STOP) },
         ]);
