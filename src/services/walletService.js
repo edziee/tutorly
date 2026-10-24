@@ -175,9 +175,11 @@ export async function adjustWalletBalance(
   }
   const amountUnits = toTokenUnits(amountTokens);
   const cleanReason = typeof reason === 'string' ? reason.trim() : '';
-  if (!cleanReason) throw new Error('A reason is required for every wallet adjustment.');
   if (cleanReason.length > 300) throw new Error('The reason must be 300 characters or fewer.');
   const cleanReference = typeof formReference === 'string' ? formReference.trim() : '';
+  if (!cleanReference) {
+    throw new Error('A Google Form or payment reference is required for every wallet adjustment.');
+  }
   if (cleanReference.length > 200) {
     throw new Error('The external reference must be 200 characters or fewer.');
   }

@@ -102,11 +102,21 @@ function formatDuration(session) {
 
 function toScheduleBooking(booking) {
   const amount = Number(booking.totalAmount);
-  const tokenStatus = {
-    [TOKEN_BOOKING_STATUS.RESERVED]: 'Tokens reserved · held until the session is complete',
-    [TOKEN_BOOKING_STATUS.REFUNDED]: 'Tokens returned to your available balance',
-    [TOKEN_BOOKING_STATUS.SETTLED]: 'Tokens transferred to the tutor',
-  }[booking.tokenStatus];
+  const tokenStatus = booking.tokenStatus === TOKEN_BOOKING_STATUS.PENDING
+    ? 'Request sent · no tokens deducted until tutor accepts'
+    : booking.tokenStatus === TOKEN_BOOKING_STATUS.NOT_CHARGED
+      ? 'Request ended before acceptance · no tokens deducted'
+      : booking.tokenStatus === TOKEN_BOOKING_STATUS.RESERVED
+        ? Number.isSafeInteger(booking.tokenDepositUnits)
+          ? '20% deposit charged · remaining 80% held until completion'
+          : 'Tokens reserved · held until the session is complete'
+        : booking.tokenStatus === TOKEN_BOOKING_STATUS.REFUNDED
+          ? Number.isSafeInteger(booking.tokenDepositUnits)
+            ? 'Deposit refunded · remaining tokens released'
+            : 'Tokens returned to your available balance'
+          : booking.tokenStatus === TOKEN_BOOKING_STATUS.SETTLED
+            ? 'Full session price transferred to the tutor'
+            : undefined;
   const legacyPaymentStatus = {
     [BOOKING_PAYMENT_STATUS.AWAITING_TUTOR_ACCEPTANCE]: 'Awaiting tutor response · legacy payment',
     [BOOKING_PAYMENT_STATUS.AWAITING_PAYMENT]: 'Tutor accepted · legacy payment record',

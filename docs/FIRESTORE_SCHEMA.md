@@ -13,7 +13,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `users/{uid}` | An account of any role | The user (never the `role` after sign-up) |
 | `tutors/{uid}` | Public profile fields students need to find and book a tutor, same id as their user | The applicant submits a pending profile; admin publishes approval |
 | `tutorApplications/{uid}` | Private application evidence, same id as their user | The student or tutor applicant; admin reviews verification |
-| `wallets/{uid}` | Private integer token balances for one account | Initialized by the account; adjusted only by atomic booking transitions or an admin |
+| `wallets/{uid}` | Private integer token balances for one account | Initialized by its owner or an admin; adjusted only by atomic booking transitions or an admin |
 | `tokenTransactions/{id}` | Immutable audit record for one token movement | Admin or an atomic booking lifecycle transition |
 | `bookings/{id}` | A session between a student and a tutor, including its token hold state | Student creates, tutor answers |
 | `conversations/{id}` | A chat between one student and one tutor | Either person in the chat |
@@ -86,14 +86,20 @@ Tutor operations are granted only when both this private record and the matching
 Wallets are readable only by their owner and admins. Balances are stored as
 integer minor units to avoid floating-point arithmetic: 100 units equals one
 token. `availableUnits` can be spent; `heldUnits` is reserved for active
-bookings. New accounts create their zero-balance wallet in the same batch as
-their user profile. Existing accounts initialize their own zero wallet when
-opening the wallet; this cannot credit tokens.
+bookings. Wallets are initialized lazily when an account opens its wallet;
+admins can also initialize a target account's zero-balance wallet before an
+adjustment. Signup does not create the wallet.
 
-Only an admin can make manual credits/debits. Booking reservation, refund, and
-settlement update the affected wallets atomically with the booking and
-`tokenTransactions` ledger entries. Firestore rules validate these paired
-changes. Wallet documents are never directly deleted.
+Only an admin can make manual credits/debits. A booking request does not move
+tokens. When the tutor accepts, 20% of the session price is charged to the
+student and held in the tutor's wallet; the remaining 80% is held in the
+student's wallet. The deposit is rounded to the nearest 0.01 token and the
+remainder is the exact difference from the full price. On completion, the
+deposit is released and the full session price becomes available to the tutor.
+If either participant cancels an accepted booking, the deposit is refunded and
+the remaining held tokens are released. These transitions atomically update
+wallets, booking state, and `tokenTransactions`. Wallet documents are never
+directly deleted.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -104,8 +110,9 @@ changes. Wallet documents are never directly deleted.
 ## `tokenTransactions/{id}` (private, append-only)
 
 Entries are readable by the wallet owner and admins. Clients cannot update or
-delete ledger records. Admin credits and debits require a reason and may
-include an external Google Form reference. The admin screen reuses one
+delete ledger records. Admin credits and debits require a Google Form or
+payment reference; a reason is optional. Booking ledger entries keep their
+existing reason and use an empty form reference. The admin screen reuses one
 operation id when retrying an adjustment, preventing duplicate credits after a
 lost response. Top-ups and cash-outs themselves
 remain external requests: an admin verifies them before recording a wallet
@@ -115,12 +122,12 @@ any external fee before processing a request.
 
 | Field | Type | Notes |
 |---|---|---|
-| `type` | string | `admin_credit`, `admin_debit`, `booking_reserve`, `booking_refund`, `booking_settlement_debit`, or `booking_settlement_credit` |
+| `type` | string | Admin adjustments and booking acceptance, deposit hold/refund, cancellation refund, or settlement events |
 | `accountId` | string | Wallet whose balance changed |
 | `amountUnits` | positive integer | Absolute amount moved |
 | `availableDelta`, `heldDelta` | integers | Exact change to the corresponding wallet balance |
 | `actorUid` | string | Signed-in account that initiated the event |
-| `reason`, `formReference` | string | Audit context; reference is empty for booking events |
+| `reason`, `formReference` | string | Optional reason and required Google Form/payment reference on admin adjustments; booking events have a reason and empty reference |
 | `bookingId` | string, optional | Present for booking lifecycle events |
 | `createdAt` | timestamp | |
 
@@ -139,8 +146,9 @@ any external fee before processing a request.
 | `sessionMode` | string | The session format selected by the student, copied from the tutor's listed formats |
 | `notes` | string | |
 | `totalAmount` | number | Token amount for new bookings; legacy records retain their historical peso amount |
-| `tokenAmountUnits` | positive integer | Exact token amount in minor units (100 units = 1 token) |
-| `tokenStatus` | `'reserved'` \| `'refunded'` \| `'settled'` | New bookings reserve tokens at request time, refund on rejection/cancellation, and transfer to the tutor when completed |
+| `tokenAmountUnits` | positive integer | Full session price in minor units (100 units = 1 token) |
+| `tokenDepositUnits` | positive integer | 20% of the session price, rounded to the nearest 0.01 token; present on new bookings |
+| `tokenStatus` | `'pending'` \| `'not_charged'` \| `'reserved'` \| `'refunded'` \| `'settled'` | New requests do not move tokens; acceptance charges the deposit and holds the remainder, cancellation refunds, and completion pays the full price |
 | `paymentStatus`, `tutorQrUrl`, `paymentReportedAt`, `paymentVerifiedAt` | legacy values | Retained only for historical peso bookings; new booking flow does not write QR payment fields |
 | `tutorPhotoUrl` | string | Optional tutor photo copied to the booking when the tutor accepts; only booking participants and admins can read it |
 | `review`, `rating` | string, number | The mock data's `rating` holds review text; a star rating is optional |

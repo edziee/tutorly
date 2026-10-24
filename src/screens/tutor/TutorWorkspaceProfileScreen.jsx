@@ -461,9 +461,13 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
                 {formatTokenUnits(session.tokenAmountUnits)} tokens
                 {session.tokenStatus === 'settled'
                   ? ' received'
-                  : session.tokenStatus === 'reserved'
-                    ? ' held for this session'
-                    : ''}
+                  : Number.isSafeInteger(session.tokenDepositUnits)
+                    ? session.tokenStatus === 'reserved'
+                      ? ` · ${formatTokenUnits(session.tokenDepositUnits)} deposit held; full payment on completion`
+                      : ''
+                    : session.tokenStatus === 'reserved'
+                      ? ' held for this session'
+                      : ''}
               </Text>
               {session.status === BOOKING_STATUS.UPCOMING ? (
                 <AppButton

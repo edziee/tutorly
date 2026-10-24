@@ -9,6 +9,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -24,9 +25,12 @@ import {
 import { assertApprovedTutor } from './tutorService';
 import { bookingsOverlap, getBookingTimeError, parseTimeToMinutes } from '../utils/bookings';
 import {
+  acceptBookingTokens,
+  refundAcceptedBookingTokens,
   refundReservedTokens,
-  reserveTokens,
+  settleAcceptedBookingTokens,
   settleReservedTokens,
+  splitBookingTokens,
   tokenAmountUnitsFromPrice,
 } from '../utils/tokenBookings';
 
@@ -55,14 +59,9 @@ export async function createBooking(booking) {
     throw new Error('Sign in as the student requesting this session.');
   }
   const tokenAmountUnits = tokenAmountUnitsFromPrice(booking.totalAmount);
+  const { depositUnits } = splitBookingTokens(tokenAmountUnits);
   const { db } = requireFirebase();
   const bookingRef = doc(collection(db, COLLECTIONS.BOOKINGS));
-  const walletRef = doc(db, COLLECTIONS.WALLETS, booking.studentId);
-  const ledgerRef = doc(
-    db,
-    COLLECTIONS.TOKEN_TRANSACTIONS,
-    `${bookingRef.id}_reserve`,
-  );
   const studentBookingsQuery = query(
     collection(db, COLLECTIONS.BOOKINGS),
     where('studentId', '==', booking.studentId),
@@ -80,47 +79,16 @@ export async function createBooking(booking) {
     throw new Error('You already have a request or booking at an overlapping time.');
   }
 
-  await runTransaction(db, async (transaction) => {
-    const [wallet, existingBooking, existingLedger] = await Promise.all([
-      transaction.get(walletRef),
-      transaction.get(bookingRef),
-      transaction.get(ledgerRef),
-    ]);
-    if (existingBooking.exists() || existingLedger.exists()) {
-      throw new Error('Could not create a unique booking request. Please try again.');
-    }
-    if (!wallet.exists()) {
-      throw new Error('Your token wallet is still being initialized. Please retry shortly.');
-    }
-    const walletData = wallet.data();
-    const reservedWallet = reserveTokens(walletData, tokenAmountUnits);
-    const timestamp = serverTimestamp();
-    transaction.update(walletRef, {
-      ...reservedWallet,
-      updatedAt: timestamp,
-      lastTransactionId: ledgerRef.id,
-    });
-    transaction.set(bookingRef, {
-      ...booking,
-      totalAmount: tokenAmountUnits / 100,
-      tokenAmountUnits,
-      tokenStatus: TOKEN_BOOKING_STATUS.RESERVED,
-      status: BOOKING_STATUS.REQUESTED,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    });
-    transaction.set(ledgerRef, {
-      type: TOKEN_TRANSACTION_TYPES.BOOKING_RESERVE,
-      accountId: booking.studentId,
-      amountUnits: tokenAmountUnits,
-      availableDelta: -tokenAmountUnits,
-      heldDelta: tokenAmountUnits,
-      actorUid: booking.studentId,
-      reason: 'Tokens reserved for booking request.',
-      formReference: '',
-      bookingId: bookingRef.id,
-      createdAt: timestamp,
-    });
+  const timestamp = serverTimestamp();
+  await setDoc(bookingRef, {
+    ...booking,
+    totalAmount: tokenAmountUnits / 100,
+    tokenAmountUnits,
+    tokenDepositUnits: depositUnits,
+    tokenStatus: TOKEN_BOOKING_STATUS.PENDING,
+    status: BOOKING_STATUS.REQUESTED,
+    createdAt: timestamp,
+    updatedAt: timestamp,
   });
   return bookingRef.id;
 }
@@ -256,6 +224,93 @@ export async function updateBookingStatus(bookingId, status) {
       throw new Error('Only a participant can cancel an active booking.');
     }
 
+    if (booking.tokenStatus === TOKEN_BOOKING_STATUS.PENDING) {
+      if (status === BOOKING_STATUS.UPCOMING) {
+        const studentWalletRef = doc(db, COLLECTIONS.WALLETS, booking.studentId);
+        const tutorWalletRef = doc(db, COLLECTIONS.WALLETS, booking.tutorId);
+        const acceptanceRef = doc(
+          db,
+          COLLECTIONS.TOKEN_TRANSACTIONS,
+          `${bookingId}_acceptance`,
+        );
+        const depositHoldRef = doc(
+          db,
+          COLLECTIONS.TOKEN_TRANSACTIONS,
+          `${bookingId}_deposit_hold`,
+        );
+        const [studentWallet, tutorWallet, oldAcceptance, oldDepositHold] = await Promise.all([
+          transaction.get(studentWalletRef),
+          transaction.get(tutorWalletRef),
+          transaction.get(acceptanceRef),
+          transaction.get(depositHoldRef),
+        ]);
+        if (!studentWallet.exists() || !tutorWallet.exists()) {
+          throw new Error('A booking wallet is unavailable. Contact support.');
+        }
+        if (oldAcceptance.exists() || oldDepositHold.exists()) {
+          throw new Error('This booking acceptance has already been recorded.');
+        }
+        const accepted = acceptBookingTokens(
+          studentWallet.data(),
+          tutorWallet.data(),
+          booking.tokenAmountUnits,
+        );
+        if (accepted.depositUnits !== booking.tokenDepositUnits) {
+          throw new Error('The booking deposit is inconsistent. Contact support.');
+        }
+        const timestamp = serverTimestamp();
+        transaction.update(studentWalletRef, {
+          ...accepted.student,
+          updatedAt: timestamp,
+          lastTransactionId: acceptanceRef.id,
+        });
+        transaction.update(tutorWalletRef, {
+          ...accepted.tutor,
+          updatedAt: timestamp,
+          lastTransactionId: depositHoldRef.id,
+        });
+        transaction.set(acceptanceRef, {
+          type: TOKEN_TRANSACTION_TYPES.BOOKING_ACCEPTANCE,
+          accountId: booking.studentId,
+          amountUnits: booking.tokenAmountUnits,
+          availableDelta: -booking.tokenAmountUnits,
+          heldDelta: accepted.remainingUnits,
+          actorUid: userId,
+          reason: '20% session deposit charged; remaining tokens reserved until completion.',
+          formReference: '',
+          bookingId,
+          createdAt: timestamp,
+        });
+        transaction.set(depositHoldRef, {
+          type: TOKEN_TRANSACTION_TYPES.BOOKING_DEPOSIT_HOLD,
+          accountId: booking.tutorId,
+          amountUnits: accepted.depositUnits,
+          availableDelta: 0,
+          heldDelta: accepted.depositUnits,
+          actorUid: userId,
+          reason: '20% session deposit held until completion or cancellation.',
+          formReference: '',
+          bookingId,
+          createdAt: timestamp,
+        });
+        transaction.update(bookingRef, {
+          status,
+          tokenStatus: TOKEN_BOOKING_STATUS.RESERVED,
+          updatedAt: timestamp,
+        });
+        return;
+      }
+      if (status === BOOKING_STATUS.REJECTED || status === BOOKING_STATUS.CANCELLED) {
+        transaction.update(bookingRef, {
+          status,
+          tokenStatus: TOKEN_BOOKING_STATUS.NOT_CHARGED,
+          updatedAt: serverTimestamp(),
+        });
+        return;
+      }
+      throw new Error('This booking has no accepted token reservation to move.');
+    }
+
     if (booking.tokenStatus) {
       if (booking.tokenStatus !== TOKEN_BOOKING_STATUS.RESERVED) {
         throw new Error('This booking no longer has reserved tokens to move.');
@@ -267,34 +322,95 @@ export async function updateBookingStatus(bookingId, status) {
         `${bookingId}_refund`,
       );
       if (status === BOOKING_STATUS.REJECTED || status === BOOKING_STATUS.CANCELLED) {
-        const [wallet, existingRefund] = await Promise.all([
-          transaction.get(studentWalletRef),
-          transaction.get(refundRef),
-        ]);
-        if (!wallet.exists()) throw new Error('The student wallet is unavailable.');
-        if (existingRefund.exists()) throw new Error('This booking refund has already been recorded.');
-        const walletData = wallet.data();
-        const refundedWallet = refundReservedTokens(walletData, booking.tokenAmountUnits);
-        const timestamp = serverTimestamp();
-        transaction.update(studentWalletRef, {
-          ...refundedWallet,
-          updatedAt: timestamp,
-          lastTransactionId: refundRef.id,
-        });
-        transaction.set(refundRef, {
-          type: TOKEN_TRANSACTION_TYPES.BOOKING_REFUND,
-          accountId: booking.studentId,
-          amountUnits: booking.tokenAmountUnits,
-          availableDelta: booking.tokenAmountUnits,
-          heldDelta: -booking.tokenAmountUnits,
-          actorUid: userId,
-          reason: status === BOOKING_STATUS.REJECTED
-            ? 'Tutor rejected the booking request.'
-            : 'Booking cancelled; reserved tokens returned.',
-          formReference: '',
-          bookingId,
-          createdAt: timestamp,
-        });
+        if (Number.isSafeInteger(booking.tokenDepositUnits)) {
+          const tutorWalletRef = doc(db, COLLECTIONS.WALLETS, booking.tutorId);
+          const depositRefundRef = doc(
+            db,
+            COLLECTIONS.TOKEN_TRANSACTIONS,
+            `${bookingId}_deposit_refund`,
+          );
+          const [wallet, tutorWallet, existingRefund, existingDepositRefund] = await Promise.all([
+            transaction.get(studentWalletRef),
+            transaction.get(tutorWalletRef),
+            transaction.get(refundRef),
+            transaction.get(depositRefundRef),
+          ]);
+          if (!wallet.exists() || !tutorWallet.exists()) {
+            throw new Error('A booking wallet is unavailable. Contact support.');
+          }
+          if (existingRefund.exists() || existingDepositRefund.exists()) {
+            throw new Error('This booking refund has already been recorded.');
+          }
+          const refunded = refundAcceptedBookingTokens(
+            wallet.data(),
+            tutorWallet.data(),
+            booking.tokenAmountUnits,
+            booking.tokenDepositUnits,
+          );
+          const timestamp = serverTimestamp();
+          transaction.update(studentWalletRef, {
+            ...refunded.student,
+            updatedAt: timestamp,
+            lastTransactionId: refundRef.id,
+          });
+          transaction.update(tutorWalletRef, {
+            ...refunded.tutor,
+            updatedAt: timestamp,
+            lastTransactionId: depositRefundRef.id,
+          });
+          transaction.set(refundRef, {
+            type: TOKEN_TRANSACTION_TYPES.BOOKING_REFUND,
+            accountId: booking.studentId,
+            amountUnits: booking.tokenAmountUnits,
+            availableDelta: booking.tokenAmountUnits,
+            heldDelta: -refunded.remainingUnits,
+            actorUid: userId,
+            reason: 'Cancelled session deposit refunded and remaining reservation released.',
+            formReference: '',
+            bookingId,
+            createdAt: timestamp,
+          });
+          transaction.set(depositRefundRef, {
+            type: TOKEN_TRANSACTION_TYPES.BOOKING_DEPOSIT_REFUND,
+            accountId: booking.tutorId,
+            amountUnits: booking.tokenDepositUnits,
+            availableDelta: 0,
+            heldDelta: -booking.tokenDepositUnits,
+            actorUid: userId,
+            reason: 'Held session deposit returned to the student after cancellation.',
+            formReference: '',
+            bookingId,
+            createdAt: timestamp,
+          });
+        } else {
+          const [wallet, existingRefund] = await Promise.all([
+            transaction.get(studentWalletRef),
+            transaction.get(refundRef),
+          ]);
+          if (!wallet.exists()) throw new Error('The student wallet is unavailable.');
+          if (existingRefund.exists()) throw new Error('This booking refund has already been recorded.');
+          const refundedWallet = refundReservedTokens(wallet.data(), booking.tokenAmountUnits);
+          const timestamp = serverTimestamp();
+          transaction.update(studentWalletRef, {
+            ...refundedWallet,
+            updatedAt: timestamp,
+            lastTransactionId: refundRef.id,
+          });
+          transaction.set(refundRef, {
+            type: TOKEN_TRANSACTION_TYPES.BOOKING_REFUND,
+            accountId: booking.studentId,
+            amountUnits: booking.tokenAmountUnits,
+            availableDelta: booking.tokenAmountUnits,
+            heldDelta: -booking.tokenAmountUnits,
+            actorUid: userId,
+            reason: status === BOOKING_STATUS.REJECTED
+              ? 'Tutor rejected the booking request.'
+              : 'Booking cancelled; reserved tokens returned.',
+            formReference: '',
+            bookingId,
+            createdAt: timestamp,
+          });
+        }
       } else if (status === BOOKING_STATUS.COMPLETED) {
         const tutorWalletRef = doc(db, COLLECTIONS.WALLETS, booking.tutorId);
         const debitRef = doc(
@@ -321,11 +437,18 @@ export async function updateBookingStatus(bookingId, status) {
         }
         const studentData = studentWallet.data();
         const tutorData = tutorWallet.data();
-        const settledWallets = settleReservedTokens(
-          studentData,
-          tutorData,
-          booking.tokenAmountUnits,
-        );
+        const isSplitBooking = Number.isSafeInteger(booking.tokenDepositUnits);
+        const settledWallets = isSplitBooking
+          ? settleAcceptedBookingTokens(
+              studentData,
+              tutorData,
+              booking.tokenAmountUnits,
+              booking.tokenDepositUnits,
+            )
+          : {
+              ...settleReservedTokens(studentData, tutorData, booking.tokenAmountUnits),
+              remainingUnits: booking.tokenAmountUnits,
+            };
         const timestamp = serverTimestamp();
         transaction.update(studentWalletRef, {
           ...settledWallets.student,
@@ -340,9 +463,9 @@ export async function updateBookingStatus(bookingId, status) {
         transaction.set(debitRef, {
           type: TOKEN_TRANSACTION_TYPES.BOOKING_SETTLEMENT_DEBIT,
           accountId: booking.studentId,
-          amountUnits: booking.tokenAmountUnits,
+          amountUnits: settledWallets.remainingUnits,
           availableDelta: 0,
-          heldDelta: -booking.tokenAmountUnits,
+          heldDelta: -settledWallets.remainingUnits,
           actorUid: userId,
           reason: 'Tokens transferred to tutor after session completion.',
           formReference: '',
@@ -354,7 +477,7 @@ export async function updateBookingStatus(bookingId, status) {
           accountId: booking.tutorId,
           amountUnits: booking.tokenAmountUnits,
           availableDelta: booking.tokenAmountUnits,
-          heldDelta: 0,
+          heldDelta: isSplitBooking ? -booking.tokenDepositUnits : 0,
           actorUid: userId,
           reason: 'Tokens received after session completion.',
           formReference: '',

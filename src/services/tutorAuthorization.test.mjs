@@ -87,8 +87,10 @@ test('token ledger is append-only and owner/admin-readable', () => {
     rules,
     /match \/tokenTransactions\/\{transactionId\} \{\s+allow get, list: if isAdmin\(\) \|\|\s*\(signedIn\(\) && resource\.data\.accountId == request\.auth\.uid\);\s+allow create: if validTokenTransactionCreate\(transactionId\);\s+allow update, delete: if false;/,
   );
-  assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingReserveEntry/);
+  assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingAcceptanceEntry/);
+  assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingDepositHoldEntry/);
   assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingRefundEntry/);
+  assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingDepositRefundEntry/);
   assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingSettlementDebit/);
   assert.match(ruleFunction('validTokenTransactionCreate'), /validBookingSettlementCredit/);
 });
@@ -97,7 +99,33 @@ test('booking prices are validated in whole minor units without direct float equ
   assert.match(ruleFunction('validTokenPrice'), /% 1/);
   assert.match(ruleFunction('tokenPriceMatchesUnits'), /scaledPrice >= units - 0\.000001/);
   assert.match(ruleFunction('validBookingCreate'), /tokenPriceMatchesUnits\(data\.totalAmount, data\.tokenAmountUnits\)/);
+  assert.match(ruleFunction('validBookingCreate'), /data\.tokenStatus == 'pending'/);
+  assert.match(ruleFunction('validBookingCreate'), /validBookingTokenSplit\(data\)/);
+  assert.doesNotMatch(ruleFunction('validBookingCreate'), /validBookingReserveApplied/);
   assert.doesNotMatch(ruleFunction('validBookingCreate'), /data\.totalAmount \* 100 == data\.tokenAmountUnits/);
+});
+
+test('booking tokens move on acceptance, refund on cancellation, and settle on completion', async () => {
+  const acceptance = ruleFunction('validBookingAcceptanceApplied');
+  assert.match(acceptance, /studentBefore\.availableUnits - booking\.tokenAmountUnits/);
+  assert.match(acceptance, /studentBefore\.heldUnits \+ remainingUnits/);
+  assert.match(acceptance, /tutorBefore\.heldUnits \+ booking\.tokenDepositUnits/);
+  assert.match(ruleFunction('validTutorResponse'), /validBookingAcceptanceApplied\(bookingId, data\)/);
+  assert.match(ruleFunction('validBookingCancellation'), /data\.tokenStatus == 'not_charged'/);
+  assert.match(ruleFunction('validBookingRefundApplied'), /booking\.tokenDepositUnits/);
+  assert.match(ruleFunction('validBookingSettlementApplied'), /booking\.tokenDepositUnits/);
+
+  const bookingService = await readFile(
+    new URL('./bookingService.js', import.meta.url),
+    'utf8',
+  );
+  const createBooking = bookingService.match(
+    /export async function createBooking\([\s\S]*?export function subscribeToStudentBookings/,
+  )?.[0];
+  assert.ok(createBooking, 'Expected createBooking implementation');
+  assert.match(createBooking, /TOKEN_BOOKING_STATUS\.PENDING/);
+  assert.doesNotMatch(createBooking, /transaction\.get\(walletRef\)/);
+  assert.doesNotMatch(createBooking, /TOKEN_TRANSACTION_TYPES\.BOOKING_RESERVE/);
 });
 
 test('manual wallet adjustments require an admin and reuse the same id on retries', async () => {
@@ -105,6 +133,7 @@ test('manual wallet adjustments require an admin and reuse the same id on retrie
   assert.match(adminEntry, /isAdmin\(\)/);
   assert.match(adminEntry, /entry\.type in \['admin_credit', 'admin_debit'\]/);
   assert.match(adminEntry, /entry\.availableDelta == entry\.amountUnits/);
+  assert.match(adminEntry, /entry\.formReference\.size\(\) > 0/);
   const walletService = await readFile(
     new URL('./walletService.js', import.meta.url),
     'utf8',
@@ -116,7 +145,11 @@ test('manual wallet adjustments require an admin and reuse the same id on retrie
   assert.match(walletService, /operationId/);
   assert.match(walletService, /prior\.accountId === targetUid/);
   assert.match(walletService, /prior\.formReference === cleanReference/);
+  assert.match(walletService, /A Google Form or payment reference is required/);
+  assert.doesNotMatch(walletService, /A reason is required for every wallet adjustment/);
   assert.match(adminScreen, /adjustmentOperation\?\.signature === signature/);
+  assert.match(adminScreen, /label="Reason \(optional\)"/);
+  assert.match(adminScreen, /label="Google Form \/ payment reference \(required\)"/);
 });
 
 test('wallet initialization preserves the signed-up role and never starts with value', async () => {

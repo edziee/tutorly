@@ -27,21 +27,32 @@ function entryDescription(entry) {
   const type = {
     admin_credit: 'Admin credit',
     admin_debit: 'Admin debit',
+    booking_acceptance: 'Booking accepted · deposit charged; balance held',
+    booking_deposit_hold: 'Booking deposit held',
+    booking_deposit_refund: 'Held deposit refunded',
     booking_reserve: 'Booking hold',
     booking_refund: 'Booking refund',
     booking_settlement_debit: 'Booking payment',
     booking_settlement_credit: 'Session earnings',
   }[entry.type] ?? 'Token adjustment';
-  const amount = formatTokenUnits(entry.amountUnits);
-  const direction = [
-    'admin_credit',
-    'booking_refund',
-    'booking_settlement_credit',
-  ].includes(entry.type) ? '+' : '−';
-  return `${type} · ${direction}${amount} tokens`;
+  return type;
+}
+
+function entryAmount(entry) {
+  if (entry.type === 'booking_acceptance') {
+    const depositUnits = entry.amountUnits - entry.heldDelta;
+    return `−${formatTokenUnits(depositUnits)} tokens`;
+  }
+  if (entry.availableDelta !== 0) {
+    const sign = entry.availableDelta > 0 ? '+' : '−';
+    return `${sign}${formatTokenUnits(Math.abs(entry.availableDelta))}`;
+  }
+  const sign = entry.heldDelta > 0 ? '+' : '−';
+  return `${sign}${formatTokenUnits(Math.abs(entry.heldDelta))} held`;
 }
 
 export default function AdminWalletsScreen() {
+  const [accountRole, setAccountRole] = useState(ROLES.STUDENT);
   const [search, setSearch] = useState('');
   const [selectedUid, setSelectedUid] = useState('');
   const [direction, setDirection] = useState('credit');
@@ -72,13 +83,17 @@ export default function AdminWalletsScreen() {
   );
   const matchingUsers = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const accounts = data.data ?? [];
+    const accounts = (data.data ?? []).filter((user) => (
+      accountRole === ROLES.STUDENT
+        ? user.role === ROLES.STUDENT
+        : isTutorRole(user.role)
+    ));
     if (!term) return accounts;
     return accounts.filter((user) =>
       [user.name, user.email, user.id]
         .some((value) => String(value ?? '').toLowerCase().includes(term)),
     );
-  }, [data.data, search]);
+  }, [accountRole, data.data, search]);
 
   const submitAdjustment = async () => {
     if (!selectedAccount) {
@@ -138,7 +153,7 @@ export default function AdminWalletsScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.intro}>
           Verify top-ups and tutor cash-outs outside the app before recording a balance change.
-          Every adjustment requires a reason and is saved to the read-only ledger.
+          Every adjustment requires a Google Form or payment reference and is saved to the read-only ledger.
         </Text>
         <AppInput
           label="Find an account"
@@ -149,12 +164,45 @@ export default function AdminWalletsScreen() {
           autoCapitalize="none"
           autoCorrect={false}
         />
+        <View style={styles.roleTabs}>
+          {[
+            { role: ROLES.STUDENT, label: 'Students' },
+            { role: ROLES.TUTOR, label: 'Tutors' },
+          ].map(({ role, label }) => {
+            const count = (data.data ?? []).filter((user) => (
+              role === ROLES.STUDENT
+                ? user.role === ROLES.STUDENT
+                : isTutorRole(user.role)
+            )).length;
+            const selected = accountRole === role;
+            return (
+              <Pressable
+                key={role}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => {
+                  setAccountRole(role);
+                  setSelectedUid('');
+                  setErrorMessage('');
+                  setSuccessMessage('');
+                }}
+                style={[styles.roleTab, selected && styles.roleTabSelected]}
+              >
+                <Text style={[styles.roleTabText, selected && styles.roleTabTextSelected]}>
+                  {label} ({count})
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
         {matchingUsers.length === 0 ? (
           <EmptyState
             compact
             icon="people-outline"
-            title="No accounts found"
-            message="Search for a student or tutor by name, email, or ID."
+            title={search.trim() ? 'No accounts found' : `No ${accountRole === ROLES.STUDENT ? 'students' : 'tutors'} yet`}
+            message={search.trim()
+              ? `No ${accountRole === ROLES.STUDENT ? 'students' : 'tutors'} match your search.`
+              : `There are no ${accountRole === ROLES.STUDENT ? 'student' : 'tutor'} wallets to show.`}
           />
         ) : (
           matchingUsers.map((item) => (
@@ -219,14 +267,14 @@ export default function AdminWalletsScreen() {
               keyboardType="decimal-pad"
             />
             <AppInput
-              label="Reason (required)"
+              label="Reason (optional)"
               value={reason}
               handleChangeText={setReason}
               placeholder="Verified top-up, cash-out, correction..."
               multiline
             />
             <AppInput
-              label="Google Form / payment reference (optional)"
+              label="Google Form / payment reference (required)"
               value={formReference}
               handleChangeText={setFormReference}
               placeholder="Reference or response ID"
@@ -237,7 +285,7 @@ export default function AdminWalletsScreen() {
               <Text accessibilityRole="alert" style={styles.error}>{errorMessage}</Text>
             ) : null}
             {successMessage ? (
-              <Text accessibilityRole="status" style={styles.success}>{successMessage}</Text>
+              <Text accessibilityLiveRegion="polite" style={styles.success}>{successMessage}</Text>
             ) : null}
             <AppButton
               title={direction === 'credit' ? 'Record token credit' : 'Record token debit'}
@@ -267,7 +315,7 @@ export default function AdminWalletsScreen() {
                     ) : null}
                   </View>
                   <Text style={styles.ledgerAmount}>
-                    {formatTokenUnits(entry.amountUnits)}
+                    {entryAmount(entry)}
                   </Text>
                 </View>
               ))
@@ -294,6 +342,20 @@ export default function AdminWalletsScreen() {
 const styles = StyleSheet.create({
   content: { paddingBottom: spacing.xxl },
   intro: { marginBottom: spacing.md, color: colors.mutedText, fontSize: 12, lineHeight: 18 },
+  roleTabs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  roleTab: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  roleTabSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  roleTabText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  roleTabTextSelected: { color: colors.white },
   account: {
     flexDirection: 'row',
     alignItems: 'center',

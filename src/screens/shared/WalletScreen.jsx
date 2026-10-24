@@ -20,20 +20,31 @@ import { formatTokenUnits } from '../../utils/tokens';
 const entryLabels = {
   admin_credit: 'Tokens added by admin',
   admin_debit: 'Tokens collected by admin',
+  booking_acceptance: 'Booking accepted · deposit charged; balance held',
+  booking_deposit_hold: 'Booking deposit held',
+  booking_deposit_refund: 'Held deposit refunded',
   booking_reserve: 'Booking tokens reserved',
   booking_refund: 'Booking tokens refunded',
-  booking_settlement_debit: 'Booking tokens paid',
+  booking_settlement_debit: 'Remaining booking balance paid',
   booking_settlement_credit: 'Session earnings',
 };
-const creditTypes = new Set([
-  'admin_credit',
-  'booking_refund',
-  'booking_settlement_credit',
-]);
 
 function formatDate(value) {
   if (!value || typeof value.toDate !== 'function') return 'Recently';
   return value.toDate().toLocaleString();
+}
+
+function entryAmount(entry) {
+  if (entry.type === 'booking_acceptance') {
+    const depositUnits = entry.amountUnits - entry.heldDelta;
+    return `−${formatTokenUnits(depositUnits)} tokens`;
+  }
+  if (entry.availableDelta !== 0) {
+    const sign = entry.availableDelta > 0 ? '+' : '−';
+    return `${sign}${formatTokenUnits(Math.abs(entry.availableDelta))}`;
+  }
+  const sign = entry.heldDelta > 0 ? '+' : '−';
+  return `${sign}${formatTokenUnits(Math.abs(entry.heldDelta))} held`;
 }
 
 export default function WalletScreen() {
@@ -132,9 +143,7 @@ export default function WalletScreen() {
             onRetry={history.retry}
           />
         ) : history.data?.length ? (
-          history.data.map((entry) => {
-            const isCredit = creditTypes.has(entry.type);
-            return (
+          history.data.map((entry) => (
               <View key={entry.id} style={styles.entry}>
                 <View style={styles.entryCopy}>
                   <Text style={styles.entryTitle}>
@@ -143,12 +152,16 @@ export default function WalletScreen() {
                   <Text style={styles.entryMeta}>{formatDate(entry.createdAt)}</Text>
                   {entry.reason ? <Text style={styles.entryMeta}>{entry.reason}</Text> : null}
                 </View>
-                <Text style={[styles.entryAmount, isCredit ? styles.credit : styles.debit]}>
-                  {isCredit ? '+' : '−'}{formatTokenUnits(entry.amountUnits)}
+                <Text style={[
+                  styles.entryAmount,
+                  entry.availableDelta > 0 || (!entry.availableDelta && entry.heldDelta > 0)
+                    ? styles.credit
+                    : styles.debit,
+                ]}>
+                  {entryAmount(entry)}
                 </Text>
               </View>
-            );
-          })
+          ))
         ) : (
           <Text style={styles.empty}>No token activity recorded yet.</Text>
         )}

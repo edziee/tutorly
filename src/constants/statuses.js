@@ -38,6 +38,10 @@ export const BOOKING_PAYMENT_STATUS = {
 };
 
 export const TOKEN_BOOKING_STATUS = {
+  // Request is pending with no wallet changes. Acceptance charges the deposit
+  // and holds the remainder; pre-acceptance closure is marked not_charged.
+  PENDING: 'pending',
+  NOT_CHARGED: 'not_charged',
   RESERVED: 'reserved',
   REFUNDED: 'refunded',
   SETTLED: 'settled',
@@ -46,6 +50,9 @@ export const TOKEN_BOOKING_STATUS = {
 export const TOKEN_TRANSACTION_TYPES = {
   ADMIN_CREDIT: 'admin_credit',
   ADMIN_DEBIT: 'admin_debit',
+  BOOKING_ACCEPTANCE: 'booking_acceptance',
+  BOOKING_DEPOSIT_HOLD: 'booking_deposit_hold',
+  BOOKING_DEPOSIT_REFUND: 'booking_deposit_refund',
   BOOKING_RESERVE: 'booking_reserve',
   BOOKING_REFUND: 'booking_refund',
   BOOKING_SETTLEMENT_DEBIT: 'booking_settlement_debit',

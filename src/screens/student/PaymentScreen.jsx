@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
-import { BOOKING_STATUS, TOKEN_BOOKING_STATUS } from '../../constants/statuses';
+import { TOKEN_BOOKING_STATUS } from '../../constants/statuses';
 import { ROUTES } from '../../constants/routes';
 import { useAuth } from '../../context/AuthContext';
 import { subscribeToBooking } from '../../services/bookingService';
@@ -15,16 +15,27 @@ import { getErrorMessage } from '../../utils/errors';
 import { formatTokenUnits } from '../../utils/tokens';
 
 function tokenStatus(booking) {
+  if (booking.tokenStatus === TOKEN_BOOKING_STATUS.PENDING) {
+    return 'The request is pending. No tokens are deducted unless the tutor accepts it.';
+  }
+  if (booking.tokenStatus === TOKEN_BOOKING_STATUS.NOT_CHARGED) {
+    return 'The request ended before acceptance, so no tokens were deducted.';
+  }
   if (booking.tokenStatus === TOKEN_BOOKING_STATUS.RESERVED) {
-    return booking.status === BOOKING_STATUS.REQUESTED
-      ? 'Tokens are held while the tutor reviews your request.'
-      : 'Tokens are held for this session and will transfer to the tutor when it is marked complete.';
+    if (Number.isSafeInteger(booking.tokenDepositUnits)) {
+      const remainingUnits = booking.tokenAmountUnits - booking.tokenDepositUnits;
+      return `The 20% deposit (${formatTokenUnits(booking.tokenDepositUnits)} tokens) is held for the tutor. The remaining ${formatTokenUnits(remainingUnits)} tokens are held until the tutor marks the session complete.`;
+    }
+    return 'Tokens are held for this session and will transfer to the tutor when it is marked complete.';
   }
   if (booking.tokenStatus === TOKEN_BOOKING_STATUS.REFUNDED) {
-    return 'The booking ended, and the reserved tokens were returned to your available balance.';
+    if (!Number.isSafeInteger(booking.tokenDepositUnits)) {
+      return 'The booking ended, and its reserved tokens were returned to your available balance.';
+    }
+    return 'The booking was cancelled. The deposit was refunded and the remaining held tokens were returned to your available balance.';
   }
   if (booking.tokenStatus === TOKEN_BOOKING_STATUS.SETTLED) {
-    return 'The session is complete, and the reserved tokens were transferred to the tutor.';
+    return 'The session is complete, and the full session price was transferred to the tutor.';
   }
   return 'This is a historic peso booking. It did not move tokens in the wallet.';
 }
@@ -113,6 +124,24 @@ export default function PaymentScreen({ navigation, route }) {
                 : legacyAmountText}
             </Text>
           </View>
+          {Number.isSafeInteger(booking.tokenDepositUnits) ? (
+            <>
+              <View style={styles.amountRow}>
+                <Text style={styles.amountLabel}>20% deposit</Text>
+                <Text style={styles.amount}>
+                  {formatTokenUnits(booking.tokenDepositUnits)} tokens
+                </Text>
+              </View>
+              <View style={styles.amountRow}>
+                <Text style={styles.amountLabel}>Remaining 80%</Text>
+                <Text style={styles.amount}>
+                  {formatTokenUnits(
+                    booking.tokenAmountUnits - booking.tokenDepositUnits,
+                  )} tokens
+                </Text>
+              </View>
+            </>
+          ) : null}
           <View style={styles.statusCard}>
             <Ionicons
               name={booking.tokenStatus === TOKEN_BOOKING_STATUS.SETTLED

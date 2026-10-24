@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +20,11 @@ import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { getErrorMessage } from '../../utils/errors';
 import { createBooking } from '../../services/bookingService';
+import {
+  splitBookingTokens,
+  tokenAmountUnitsFromPrice,
+} from '../../utils/tokenBookings';
+import { formatTokenUnits } from '../../utils/tokens';
 
 const SESSION_HOURS = [1, 2, 3];
 
@@ -145,6 +151,7 @@ export default function BookingScreen({ navigation, route }) {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [tokenNotice, setTokenNotice] = useState(null);
 
   if (!tutor) {
     return (
@@ -191,7 +198,7 @@ export default function BookingScreen({ navigation, route }) {
     setDurationHours(3);
   };
 
-  const handleBook = async () => {
+  const handleBook = () => {
     if (!user?.uid) {
       setSubmitError('Sign in again before requesting a session.');
       return;
@@ -204,6 +211,19 @@ export default function BookingScreen({ navigation, route }) {
       setSubmitError('This tutor hasn’t set a price yet. Choose another tutor.');
       return;
     }
+
+    try {
+      const amountUnits = tokenAmountUnitsFromPrice(price);
+      const { depositUnits, remainingUnits } = splitBookingTokens(amountUnits);
+      setTokenNotice({ amountUnits, depositUnits, remainingUnits });
+      setSubmitError('');
+    } catch (error) {
+      setSubmitError(getErrorMessage(error, 'This session price cannot be split into token amounts.'));
+    }
+  };
+
+  const submitBooking = async () => {
+    if (!tokenNotice || submitting) return;
 
     setSubmitting(true);
     setSubmitError('');
@@ -226,9 +246,11 @@ export default function BookingScreen({ navigation, route }) {
         totalAmount: price,
         tutorPhotoUrl: tutor.photoUrl || '',
       });
+      setTokenNotice(null);
       navigation.navigate(ROUTES.SCHEDULE);
     } catch (error) {
       setSubmitError(getErrorMessage(error, 'Couldn’t request this session. Please try again.'));
+      setTokenNotice(null);
     } finally {
       setSubmitting(false);
     }
@@ -433,11 +455,11 @@ export default function BookingScreen({ navigation, route }) {
             </View>
             <View style={styles.priceDivider} />
             <View style={styles.priceRow}>
-              <Text style={styles.totalLabel}>Total due to tutor</Text>
+              <Text style={styles.totalLabel}>Session total</Text>
               <Text style={styles.totalValue}>{displayPrice}</Text>
             </View>
             <Text style={styles.helperText}>
-              Tokens are reserved when you send this request and returned if it is declined or cancelled.
+              No tokens are deducted when you send a request. If the tutor accepts, the full session price is deducted from your available balance.
             </Text>
           </View>
 
@@ -485,6 +507,69 @@ export default function BookingScreen({ navigation, route }) {
             disabled={!activeDate || !activeSlot || !safeDuration || !sessionMode || !hasPrice}
           />
         </View>
+
+        <Modal
+          visible={Boolean(tokenNotice)}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (!submitting) setTokenNotice(null);
+          }}
+        >
+          <View style={styles.noticeBackdrop}>
+            <ScrollView
+              accessibilityViewIsModal
+              style={styles.noticeScroll}
+              contentContainerStyle={styles.noticeCard}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.noticeIcon}>
+                <Ionicons name="wallet-outline" size={22} color={colors.primary} />
+              </View>
+              <Text style={styles.noticeTitle}>Review token breakdown</Text>
+              <Text style={styles.noticeIntro}>
+                Sending this request does not deduct tokens. Here’s what happens if the tutor accepts:
+              </Text>
+              {tokenNotice ? (
+                <View style={styles.noticeBreakdown}>
+                  <View style={styles.noticeRow}>
+                    <Text style={styles.noticeLabel}>Full session price</Text>
+                    <Text style={styles.noticeAmount}>
+                      {formatTokenUnits(tokenNotice.amountUnits)} tokens
+                    </Text>
+                  </View>
+                  <View style={styles.noticeRow}>
+                    <Text style={styles.noticeLabel}>20% deposit held for tutor</Text>
+                    <Text style={styles.noticeAmount}>
+                      {formatTokenUnits(tokenNotice.depositUnits)} tokens
+                    </Text>
+                  </View>
+                  <View style={styles.noticeRow}>
+                    <Text style={styles.noticeLabel}>Remaining 80% held until completion</Text>
+                    <Text style={styles.noticeAmount}>
+                      {formatTokenUnits(tokenNotice.remainingUnits)} tokens
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+              <Text style={styles.noticeExplanation}>
+                Once accepted, your available balance decreases by the full session price. When the tutor marks the session complete, they receive the full price. If the booking is cancelled after acceptance, the full amount is refunded; if it is declined or cancelled before acceptance, no tokens are deducted.
+              </Text>
+              <AppButton
+                title="Confirm and send request"
+                onPress={submitBooking}
+                loading={submitting}
+                disabled={!tokenNotice}
+              />
+              <AppButton
+                title="Go back"
+                variant="outline"
+                onPress={() => setTokenNotice(null)}
+                disabled={submitting}
+              />
+            </ScrollView>
+          </View>
+        </Modal>
       </View>
     </ScreenContainer>
   );
@@ -575,4 +660,37 @@ const styles = StyleSheet.create({
   footerSummary: { minWidth: 78 },
   footerPrice: { color: colors.primary, fontSize: 14, fontWeight: '800' },
   footerCaption: { marginTop: 2, color: colors.mutedText, fontSize: 9 },
+  noticeBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: spacing.md,
+    backgroundColor: '#00000080',
+  },
+  noticeScroll: { flexGrow: 0, maxHeight: '90%' },
+  noticeCard: {
+    gap: spacing.sm,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+  },
+  noticeIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 21,
+    backgroundColor: colors.lavender,
+  },
+  noticeTitle: { color: colors.heading, fontSize: 18, fontWeight: '800' },
+  noticeIntro: { color: colors.mutedText, fontSize: 12, lineHeight: 18 },
+  noticeBreakdown: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+  },
+  noticeRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  noticeLabel: { flex: 1, color: colors.text, fontSize: 11, lineHeight: 16 },
+  noticeAmount: { color: colors.heading, fontSize: 11, fontWeight: '700' },
+  noticeExplanation: { marginBottom: spacing.xs, color: colors.mutedText, fontSize: 11, lineHeight: 16 },
 });
