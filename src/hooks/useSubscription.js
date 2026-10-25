@@ -4,6 +4,7 @@ export function useSubscription(subscribe, deps = []) {
   const [state, setState] = useState({
     status: 'loading',
     data: null,
+    metadata: null,
     error: null,
   });
   const [attempt, setAttempt] = useState(0);
@@ -11,21 +12,21 @@ export function useSubscription(subscribe, deps = []) {
   subscribeRef.current = subscribe;
 
   useEffect(() => {
-    setState({ status: 'loading', data: null, error: null });
+    setState({ status: 'loading', data: null, metadata: null, error: null });
 
     let stop;
     let active = true;
 
     const onError = (error) => {
       if (active) {
-        setState({ status: 'error', data: null, error });
+        setState({ status: 'error', data: null, metadata: null, error });
       }
     };
 
     try {
-      stop = subscribeRef.current((data) => {
+      stop = subscribeRef.current((data, metadata) => {
         if (active) {
-          setState({ status: 'ready', data, error: null });
+          setState({ status: 'ready', data, metadata: metadata ?? null, error: null });
         }
       }, onError);
     } catch (error) {

@@ -22,7 +22,15 @@
           "locationWhenInUsePermission": "Allow Tutorly to use your location to show tutors near you and to check you in at campus."
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true

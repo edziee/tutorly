@@ -276,4 +276,8 @@ from the successful message save. Opening the chat marks its alerts read.
 Only recipients can list their alerts or change `read` to true. The sender can
 get their own generated message alert by ID for retry deduplication. Chat
 notification creation must reference a real message sent by the caller to the
-other conversation participant. Client alerts remain best effort on Spark.
+other conversation participant. While the app is open, the shared notification
+feed plays a short local sound for newly synced notifications; initial feed
+loads and read-state changes are silent. This is not an OS push alert and does
+not sound while the app is closed or backgrounded. Client alerts remain best
+effort on Spark.

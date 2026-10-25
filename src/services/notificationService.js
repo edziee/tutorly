@@ -60,7 +60,10 @@ export function subscribeToNotifications(userId, callback, onError = console.err
   if (uid !== userId) throw new Error('You can only load your own notifications.');
   return onSnapshot(query(collection(db, 'notifications'), where('recipientId', '==', uid),
     orderBy('createdAt', 'desc')),
-  (snapshot) => callback(snapshot.docs.map((item) => ({ ...item.data(), id: item.id }))), onError);
+  (snapshot) => callback(
+    snapshot.docs.map((item) => ({ ...item.data(), id: item.id })),
+    { fromCache: snapshot.metadata.fromCache },
+  ), onError);
 }
 
 export async function markNotificationRead(notificationId) {
