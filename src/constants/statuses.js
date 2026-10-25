@@ -72,6 +72,7 @@ export const NOTIFICATION_TYPES = {
   BOOKING_REQUESTED: 'booking_requested',
   BOOKING_ACCEPTED: 'booking_accepted',
   BOOKING_REJECTED: 'booking_rejected',
+  BOOKING_CANCELLED: 'booking_cancelled',
   SESSION_REMINDER: 'session_reminder',
   NEW_MESSAGE: 'new_message',
   VERIFICATION_APPROVED: 'verification_approved',

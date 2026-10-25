@@ -158,6 +158,13 @@ test('booking tokens move on acceptance, refund on cancellation, and settle on c
   assert.match(createBooking, /assertBookingBalance\(walletSnapshot\.data\(\), tokenAmountUnits\)/);
   assert.doesNotMatch(createBooking, /transaction\.update\(walletRef/);
   assert.doesNotMatch(createBooking, /TOKEN_TRANSACTION_TYPES\.BOOKING_RESERVE/);
+
+  const respondToBooking = bookingService.match(
+    /export async function updateBookingStatus\([\s\S]*?export async function rescheduleBooking/,
+  )?.[0];
+  assert.ok(respondToBooking, 'Expected updateBookingStatus implementation');
+  assert.match(respondToBooking, /requestedBooking\.tokenStatus !== TOKEN_BOOKING_STATUS\.PENDING/);
+  assert.match(respondToBooking, /booking\.tokenStatus !== TOKEN_BOOKING_STATUS\.PENDING/);
 });
 
 test('manual wallet adjustments require an admin and reuse the same id on retries', async () => {

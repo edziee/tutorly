@@ -21,15 +21,28 @@ export async function createNotification({ recipientId, type, title, message, da
   }
   // One message has one stable notification, including after retries. An
   // existing alert is left intact so retries never reset the recipient's read state.
-  const id = type === 'new_message' && data.conversationId && data.messageId
-    ? encodeURIComponent(JSON.stringify([data.conversationId, data.messageId])) : null;
+  const id = type === NOTIFICATION_TYPES.NEW_MESSAGE && data.conversationId && data.messageId
+    ? encodeURIComponent(JSON.stringify([data.conversationId, data.messageId]))
+    : type === NOTIFICATION_TYPES.BOOKING_CANCELLED && data.bookingId && data.cancelledBy
+      ? encodeURIComponent(JSON.stringify([type, data.bookingId, data.cancelledBy]))
+      : null;
   const ref = id ? doc(db, 'notifications', id) : doc(collection(db, 'notifications'));
   await runTransaction(db, async (transaction) => {
     const existing = await transaction.get(ref);
     if (existing.exists()) {
       const saved = existing.data();
-      if (saved.recipientId !== recipientId || saved.type !== type || saved.message !== message.trim() ||
-          saved.data?.conversationId !== data.conversationId || saved.data?.messageId !== data.messageId) {
+      if (
+        saved.recipientId !== recipientId ||
+        saved.type !== type ||
+        saved.title !== title.trim() ||
+        saved.message !== message.trim() ||
+        (type === NOTIFICATION_TYPES.NEW_MESSAGE &&
+          (saved.data?.conversationId !== data.conversationId ||
+            saved.data?.messageId !== data.messageId)) ||
+        (type === NOTIFICATION_TYPES.BOOKING_CANCELLED &&
+          (saved.data?.bookingId !== data.bookingId ||
+            saved.data?.cancelledBy !== data.cancelledBy))
+      ) {
         throw new Error('This notification ID belongs to a different event.');
       }
       return;

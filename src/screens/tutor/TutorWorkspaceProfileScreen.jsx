@@ -16,6 +16,7 @@ import { ROLES } from '../../constants/roles';
 import { ROUTES } from '../../constants/routes';
 import {
   BOOKING_STATUS,
+  TOKEN_BOOKING_STATUS,
   TUTOR_TYPES,
 } from '../../constants/statuses';
 import { useAuth } from '../../context/AuthContext';
@@ -55,6 +56,7 @@ function Badge({ children }) {
 }
 
 function RequestCard({ request, onAccept, onDecline, working }) {
+  const canAccept = request.tokenStatus === TOKEN_BOOKING_STATUS.PENDING;
   return (
     <View>
       <View style={styles.requestCard}>
@@ -68,8 +70,15 @@ function RequestCard({ request, onAccept, onDecline, working }) {
           {formatTokenUnits(request.tokenAmountUnits)} tokens
         </Text>
       </View>
+      {!canAccept ? (
+        <Text style={styles.formError}>
+          This older payment request can’t be accepted. Ask the student to submit a new token booking, then decline this request.
+        </Text>
+      ) : null}
       <View style={styles.requestActions}>
-        <AppButton title="Accept" variant="secondary" onPress={onAccept} loading={working} />
+        {canAccept ? (
+          <AppButton title="Accept" variant="secondary" onPress={onAccept} loading={working} />
+        ) : null}
         <AppButton title="Decline" variant="outline" onPress={onDecline} disabled={working} />
       </View>
     </View>
@@ -564,23 +573,27 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
                     </Text>
               {session.status === BOOKING_STATUS.UPCOMING ? (
                 <AppButton
-                        title="Confirm session completed"
+                  title="Confirm session completed"
                   variant="secondary"
                   onPress={() => Alert.alert(
                     'Complete this session?',
-                          `Recorded teaching time: ${formatRecordedDuration(session.accumulatedDurationSeconds)}. Only confirm after reviewing this timer. This transfers the held tokens to your wallet.`,
+                    `Recorded teaching time: ${formatRecordedDuration(session.accumulatedDurationSeconds)}. Only confirm after reviewing this timer. ${
+                      session.tokenStatus === TOKEN_BOOKING_STATUS.RESERVED
+                        ? 'This transfers the held tokens to your wallet.'
+                        : 'This older manual-payment booking will not transfer tokens. Resolve any payment separately.'
+                    }`,
                     [
                       { text: 'Keep session upcoming', style: 'cancel' },
                       {
                         text: 'Confirm completion',
-                              onPress: () => {
-                                const timerError = getCompletionTimerError(session);
-                                if (timerError) {
-                                  setBookingActionError(timerError);
-                                  return;
-                                }
-                                respondToBooking(session.id, BOOKING_STATUS.COMPLETED);
-                              },
+                        onPress: () => {
+                          const timerError = getCompletionTimerError(session);
+                          if (timerError) {
+                            setBookingActionError(timerError);
+                            return;
+                          }
+                          respondToBooking(session.id, BOOKING_STATUS.COMPLETED);
+                        },
                       },
                     ],
                   )}

@@ -88,9 +88,12 @@ export async function sendMessage(conversationId, { senderId, text, messageId })
     return chat.data();
   });
   const recipientId = conversation.participantIds.find((id) => id !== uid);
+  const senderName = uid === conversation.studentId
+    ? conversation.studentName || 'Student'
+    : conversation.tutorName || 'Tutor';
   try {
     await createNotification({
-      recipientId, type: 'new_message', title: 'New message', message: content,
+      recipientId, type: 'new_message', title: `New message from ${senderName || 'a participant'}`, message: content,
       data: { conversationId, messageId: messageRef.id },
     });
     return { messageId: messageRef.id, notificationError: null };

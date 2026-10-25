@@ -13,11 +13,11 @@
 
 Your teammate's authentication implementation supplies `useAuth()` with `user.uid` (or `user.id`) and `role`. That UID must equal `requireFirebase().auth.currentUser.uid`. Existing `users/{uid}` and approved `tutors/{uid}` documents follow the repository's schema.
 
-This package leaves `AuthContext.jsx`, `authService.js`, login screens, `src/config/firebase.js`, `.env.example`, and the team's `firebase-rules/firestore.rules` unchanged. The current repository still has demo login placeholders; connecting real sign-in belongs to the authentication owner. The chat services require a real authenticated Firebase user.
+This work leaves `AuthContext.jsx`, `authService.js`, login screens, `src/config/firebase.js`, and `.env.example` unchanged. It adds narrowly scoped cancellation-notification permissions to the draft `firebase-rules/firestore.rules` and the isolated chat test rules. The current repository still has demo login placeholders; connecting real sign-in belongs to the authentication owner. The chat services require a real authenticated Firebase user.
 
-Give `firebase-rules/chat-notifications.rules` and `firebase-rules/firestore.indexes.json` to the Firebase owner to merge into the team's rules and indexes. The proposal includes minimal user/tutor reads for isolated tests. `firebase.chat-test.json` is only for local tests and is not the project's deployment configuration.
+Give the rule changes in `firebase-rules/firestore.rules`, `firebase-rules/chat-notifications.rules`, and `firebase-rules/firestore.indexes.json` to the Firebase owner to review and merge into the deployed rules and indexes. The main `firebase.json` intentionally does not select a rules file because the team's rules are still under review. The proposal includes minimal user/tutor reads for isolated tests. `firebase.chat-test.json` is only for local tests and is not the project's deployment configuration.
 
-Booking alerts, admin verification alerts, account creation, Firebase setup, and notification preferences are separate work.
+Session-cancellation alerts are included; booking request/acceptance/rejection alerts, admin verification alerts, account creation, Firebase setup, and notification preferences are separate work.
 
 ## Apply locally
 
@@ -45,4 +45,4 @@ Terminal 2:
 npm run test:chat
 ```
 
-These tests create synthetic local identities without implementing the app's login. They cover message alerts, deduplication, unread/read state, 405-notification pagination, alert failure without losing the saved message, and rejection of unauthorized access. The narrowed package passed this integration test and an Expo production web export. The existing 43 utility-test pass is reused because utility inputs are unchanged.
+These tests create synthetic local identities without implementing the app's login. They cover message alerts, cancellation alerts, deduplication, unread/read state, 405-notification pagination, alert failure without losing the saved message, and rejection of unauthorized access. The narrowed package passed this integration test and an Expo production web export. The existing 43 utility-test pass is reused because utility inputs are unchanged.

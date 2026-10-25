@@ -9,6 +9,20 @@ service cloud.firestore {
         && data.data.conversationId is string && data.data.messageId is string
         && get(/databases/$(database)/documents/conversations/$(data.data.conversationId)/messages/$(data.data.messageId)).data.senderId == request.auth.uid;
     }
+    function sentCancellationNotification(data) {
+      let bookingId = data.data.get('bookingId', 'invalid');
+      let booking = get(/databases/$(database)/documents/bookings/$(bookingId)).data;
+      return signedIn() && data.type == 'booking_cancelled'
+        && data.data.keys().hasOnly(['bookingId', 'cancelledBy'])
+        && data.data.cancelledBy == request.auth.uid
+        && booking.status == 'cancelled'
+        && booking.cancelledBy == request.auth.uid
+        && request.auth.uid in [booking.studentId, booking.tutorId]
+        && data.recipientId in [booking.studentId, booking.tutorId]
+        && data.recipientId != request.auth.uid
+        && data.title == 'Session cancelled'
+        && data.message is string && data.message.size() > 0 && data.message.size() <= 1000;
+    }
     match /users/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       // Account provisioning and profile updates remain under Member 1's rules.
@@ -53,16 +67,26 @@ service cloud.firestore {
       // Senders can get only their own generated message alerts for retry
       // deduplication; listing is restricted to the recipient.
       allow get: if signedIn() && (!exists(/databases/$(database)/documents/notifications/$(id))
-        || resource.data.recipientId == request.auth.uid || sentNotification(resource.data));
+        || resource.data.recipientId == request.auth.uid
+        || sentNotification(resource.data)
+        || sentCancellationNotification(resource.data));
       allow list: if signedIn() && resource.data.recipientId == request.auth.uid;
-      allow create: if sentNotification(request.resource.data)
+      allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['recipientId', 'type', 'title', 'message', 'data', 'read', 'createdAt'])
-        && request.resource.data.data.keys().hasOnly(['conversationId', 'messageId'])
-        && request.resource.data.recipientId != request.auth.uid
-        && request.resource.data.recipientId in conversation(request.resource.data.data.conversationId).participantIds
-        && request.resource.data.title == 'New message'
-        && request.resource.data.message == get(/databases/$(database)/documents/conversations/$(request.resource.data.data.conversationId)/messages/$(request.resource.data.data.messageId)).data.text
-        && request.resource.data.read == false && request.resource.data.createdAt == request.time;
+        && (
+          (sentNotification(request.resource.data)
+            && request.resource.data.data.keys().hasOnly(['conversationId', 'messageId'])
+            && request.resource.data.recipientId != request.auth.uid
+            && request.resource.data.recipientId in conversation(request.resource.data.data.conversationId).participantIds
+            && request.resource.data.title == 'New message from '
+              + (request.auth.uid == conversation(request.resource.data.data.conversationId).studentId
+                ? conversation(request.resource.data.data.conversationId).get('studentName', 'Student')
+                : conversation(request.resource.data.data.conversationId).get('tutorName', 'Tutor'))
+            && request.resource.data.message == get(/databases/$(database)/documents/conversations/$(request.resource.data.data.conversationId)/messages/$(request.resource.data.data.messageId)).data.text
+            && request.resource.data.read == false && request.resource.data.createdAt == request.time)
+          || (sentCancellationNotification(request.resource.data)
+            && request.resource.data.read == false && request.resource.data.createdAt == request.time)
+        );
       allow update: if signedIn() && resource.data.recipientId == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
         && request.resource.data.read == true;

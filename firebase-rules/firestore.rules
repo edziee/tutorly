@@ -1180,7 +1180,8 @@ service cloud.firestore {
         data.updatedAt == request.time &&
         (tokenBooking
           ? (data.diff(resource.data).affectedKeys()
-              .hasOnly(['status', 'tokenStatus', 'updatedAt']) &&
+              .hasOnly(['status', 'tokenStatus', 'cancelledBy', 'updatedAt']) &&
+              data.cancelledBy == request.auth.uid &&
               (resource.data.tokenStatus == 'pending'
                 ? data.tokenStatus == 'not_charged'
                 : (data.tokenStatus == 'refunded' &&
@@ -1188,7 +1189,35 @@ service cloud.firestore {
           : (!(resource.data.paymentStatus in ['pending_verification', 'settled']) &&
               data.paymentStatus == 'not_applicable' &&
               data.diff(resource.data).affectedKeys()
-                .hasOnly(['status', 'paymentStatus', 'updatedAt'])));
+                .hasOnly(['status', 'paymentStatus', 'cancelledBy', 'updatedAt']) &&
+              data.cancelledBy == request.auth.uid));
+    }
+
+    function bookingCancellationNotificationFromCaller(data) {
+      let bookingId = data.data.get('bookingId', 'invalid');
+      let booking = get(bookingPath(bookingId)).data;
+      return signedIn() &&
+        data.type == 'booking_cancelled' &&
+        data.keys().hasOnly([
+          'recipientId', 'type', 'title', 'message', 'data', 'read', 'createdAt'
+        ]) &&
+        data.data.keys().hasOnly(['bookingId', 'cancelledBy']) &&
+        data.data.cancelledBy == request.auth.uid &&
+        booking.status == 'cancelled' &&
+        booking.cancelledBy == request.auth.uid &&
+        request.auth.uid in [booking.studentId, booking.tutorId] &&
+        data.recipientId in [booking.studentId, booking.tutorId] &&
+        data.recipientId != request.auth.uid &&
+        data.title == 'Session cancelled' &&
+        data.message is string &&
+        data.message.size() > 0 &&
+        data.message.size() <= 1000;
+    }
+
+    function validBookingCancellationNotification(data) {
+      return bookingCancellationNotificationFromCaller(data) &&
+        data.read == false &&
+        data.createdAt == request.time;
     }
 
     function validBookingTimerUpdate() {
@@ -1449,8 +1478,8 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Chat and in-app notification services are not implemented yet. Keep
-    // these collections closed until their ownership rules are verified.
+    // Chat remains closed in the main application rules until its ownership
+    // rules are deployed. Booking cancellation alerts are recipient-scoped.
     match /conversations/{conversationId} {
       allow read, write: if false;
 
@@ -1460,7 +1489,18 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read, write: if false;
+      allow get: if signedIn() &&
+        (!exists(/databases/$(database)/documents/notifications/$(notificationId)) ||
+          resource.data.recipientId == request.auth.uid ||
+          bookingCancellationNotificationFromCaller(resource.data));
+      allow list: if signedIn() &&
+        resource.data.recipientId == request.auth.uid;
+      allow create: if validBookingCancellationNotification(request.resource.data);
+      allow update: if signedIn() &&
+        resource.data.recipientId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']) &&
+        request.resource.data.read == true;
+      allow delete: if false;
     }
 
     match /{document=**} {

@@ -5,7 +5,7 @@ import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, doc, getDoc, getDocs, collection, setDoc, updateDoc, serverTimestamp, terminate, query, where } from 'firebase/firestore';
 import { getOrCreateConversation, sendMessage, markConversationRead, subscribeToMessages } from '../src/services/chatService.js';
-import { subscribeToNotifications, markNotificationRead, markAllNotificationsRead } from '../src/services/notificationService.js';
+import { createNotification, subscribeToNotifications, markNotificationRead, markAllNotificationsRead } from '../src/services/notificationService.js';
 
 const projectId = 'demo-tutorly';
 const restRoot = `http://127.0.0.1:8080/v1/projects/${projectId}/databases/(default)/documents`;
@@ -58,6 +58,7 @@ test('chat alerts integrate with Firestore, read state, retries, and security ru
   const alert = alerts.find((item) => item.data?.conversationId === conversationId);
   assert.equal(alert.type, 'new_message');
   assert.equal(alert.recipientId, tutor.uid);
+  assert.equal(alert.title, 'New message from Test student');
   assert.equal(alert.message, 'Hello tutor');
   assert.equal(alert.read, false);
   await markConversationRead(conversationId, tutor.uid);
@@ -79,8 +80,51 @@ test('chat alerts integrate with Firestore, read state, retries, and security ru
   choose(student);
   const studentAlerts = await firstSnapshot((next, error) => subscribeToNotifications(student.uid, next, error), (items) => items.length > 0);
   assert.equal(studentAlerts.at(0).data.conversationId, conversationId);
+  assert.equal(studentAlerts.at(0).title, 'New message from Test Tutor');
   await markAllNotificationsRead(student.uid);
   assert.equal((await getDoc(doc(student.db, 'notifications', studentAlerts.at(0).id))).data().read, true);
+
+  await seed('bookings/cancelled-session', {
+    studentId: student.uid,
+    tutorId: tutor.uid,
+    status: 'cancelled',
+    cancelledBy: student.uid,
+  });
+  choose(student);
+  const cancellationAlertId = await createNotification({
+    recipientId: tutor.uid,
+    type: 'booking_cancelled',
+    title: 'Session cancelled',
+    message: 'The student cancelled the session. No tokens were deducted.',
+    data: { bookingId: 'cancelled-session', cancelledBy: student.uid },
+  });
+  choose(tutor);
+  await firstSnapshot(
+    (next, error) => subscribeToNotifications(tutor.uid, next, error),
+    (items) => items.some((item) => item.id === cancellationAlertId),
+  );
+  await markNotificationRead(cancellationAlertId);
+  choose(student);
+  await createNotification({
+    recipientId: tutor.uid,
+    type: 'booking_cancelled',
+    title: 'Session cancelled',
+    message: 'The student cancelled the session. No tokens were deducted.',
+    data: { bookingId: 'cancelled-session', cancelledBy: student.uid },
+  });
+  choose(tutor);
+  assert.equal((await getDoc(doc(tutor.db, 'notifications', cancellationAlertId))).data().read, true);
+  choose(student);
+  await assert.rejects(setDoc(doc(student.db, 'notifications', 'forged-cancellation'), {
+    recipientId: outsider.uid,
+    type: 'booking_cancelled',
+    title: 'Session cancelled',
+    message: 'Fake cancellation',
+    data: { bookingId: 'cancelled-session', cancelledBy: student.uid },
+    read: false,
+    createdAt: serverTimestamp(),
+  }), /permission/i);
+
   await assert.rejects(sendMessage(conversationId, { senderId: tutor.uid, text: 'spoofed' }), /sender/);
   await assert.rejects(sendMessage(conversationId, { senderId: student.uid, text: '   ' }), /Write a message/);
 
@@ -113,8 +157,18 @@ test('chat alerts integrate with Firestore, read state, retries, and security ru
   await assert.rejects(firstSnapshot((next, error) => subscribeToMessages(conversationId, next, error), () => true), /permission/i);
   await assert.rejects(markNotificationRead(alert.id), /permission/i);
   await assert.rejects(setDoc(doc(outsider.db, 'notifications', 'forged'), {
-    recipientId: tutor.uid, type: 'new_message', title: 'New message', message: 'Fake',
+    recipientId: tutor.uid, type: 'new_message', title: 'New message from Test student', message: 'Fake',
     data: { conversationId, messageId: 'first-message' }, read: false, createdAt: serverTimestamp(),
+  }), /permission/i);
+  choose(student);
+  await assert.rejects(setDoc(doc(student.db, 'notifications', 'spoofed-sender'), {
+    recipientId: tutor.uid,
+    type: 'new_message',
+    title: 'New message from Someone else',
+    message: 'Hello tutor',
+    data: { conversationId, messageId: 'first-message' },
+    read: false,
+    createdAt: serverTimestamp(),
   }), /permission/i);
   await assert.rejects(updateDoc(doc(outsider.db, 'users', outsider.uid), { role: 'admin' }), /permission/i);
 

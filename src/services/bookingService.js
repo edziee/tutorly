@@ -18,10 +18,13 @@ import { COLLECTIONS } from '../constants/collections';
 import {
   BOOKING_PAYMENT_STATUS,
   BOOKING_STATUS,
+  NOTIFICATION_TYPES,
   TOKEN_BOOKING_STATUS,
   TOKEN_TRANSACTION_TYPES,
 } from '../constants/statuses';
+import { formatTokenUnits } from '../utils/tokens';
 import { assertApprovedTutor } from './tutorService';
+import { createNotification } from './notificationService';
 import { bookingsOverlap, getBookingTimeError, parseTimeToMinutes } from '../utils/bookings';
 import {
   acceptBookingTokens,
@@ -48,6 +51,31 @@ function requireText(value, field) {
   if (typeof value !== 'string' || !value.trim()) {
     throw new Error(`Booking ${field} is required.`);
   }
+}
+
+function getCancellationTokenSummary(booking) {
+  if (booking.tokenStatus === TOKEN_BOOKING_STATUS.PENDING) {
+    return 'No tokens were deducted for this request.';
+  }
+  if (
+    booking.tokenStatus === TOKEN_BOOKING_STATUS.RESERVED &&
+    Number.isSafeInteger(booking.tokenAmountUnits) &&
+    Number.isSafeInteger(booking.tokenDepositUnits) &&
+    booking.tokenDepositUnits <= booking.tokenAmountUnits
+  ) {
+    const remainingUnits = booking.tokenAmountUnits - booking.tokenDepositUnits;
+    return `${formatTokenUnits(booking.tokenAmountUnits)} tokens were returned to your available balance, including the ${formatTokenUnits(booking.tokenDepositUnits)}-token deposit and ${formatTokenUnits(remainingUnits)} remaining held tokens.`;
+  }
+  if (
+    booking.tokenStatus === TOKEN_BOOKING_STATUS.RESERVED &&
+    Number.isSafeInteger(booking.tokenAmountUnits)
+  ) {
+    return `${formatTokenUnits(booking.tokenAmountUnits)} reserved tokens were returned to your available balance.`;
+  }
+  if (!booking.tokenStatus) {
+    return 'This older booking did not use tokens. Contact the other participant about any manual payment.';
+  }
+  return 'No token refund details are available for this booking.';
 }
 
 export async function createBooking(booking) {
@@ -321,6 +349,7 @@ export async function updateBookingStatus(bookingId, status) {
   }
   const { db } = requireFirebase();
   const bookingRef = doc(db, COLLECTIONS.BOOKINGS, bookingId);
+  let cancellationBooking;
   if (status === BOOKING_STATUS.UPCOMING) {
     const bookingSnapshot = await getDoc(bookingRef);
     if (!bookingSnapshot.exists()) throw new Error('This booking no longer exists.');
@@ -330,6 +359,9 @@ export async function updateBookingStatus(bookingId, status) {
       requestedBooking.status !== BOOKING_STATUS.REQUESTED
     ) {
       throw new Error('Only the assigned tutor can respond to a pending request.');
+    }
+    if (requestedBooking.tokenStatus !== TOKEN_BOOKING_STATUS.PENDING) {
+      throw new Error('Legacy payment bookings can no longer be accepted. Ask the student to create a new token booking.');
     }
     const tutorBookingsQuery = query(
       collection(db, COLLECTIONS.BOOKINGS),
@@ -359,6 +391,9 @@ export async function updateBookingStatus(bookingId, status) {
       if (!isTutor || booking.status !== BOOKING_STATUS.REQUESTED) {
         throw new Error('Only the assigned tutor can respond to a pending request.');
       }
+      if (status === BOOKING_STATUS.UPCOMING && booking.tokenStatus !== TOKEN_BOOKING_STATUS.PENDING) {
+        throw new Error('Legacy payment bookings can no longer be accepted. Ask the student to create a new token booking.');
+      }
     } else if (status === BOOKING_STATUS.COMPLETED) {
       if (!isTutor || booking.status !== BOOKING_STATUS.UPCOMING) {
         throw new Error('Only the assigned tutor can complete an accepted session.');
@@ -382,6 +417,9 @@ export async function updateBookingStatus(bookingId, status) {
       }
     } else if ((!isTutor && !isStudent) || ![BOOKING_STATUS.REQUESTED, BOOKING_STATUS.UPCOMING].includes(booking.status)) {
       throw new Error('Only a participant can cancel an active booking.');
+    }
+    if (status === BOOKING_STATUS.CANCELLED) {
+      cancellationBooking = booking;
     }
 
     if (booking.tokenStatus === TOKEN_BOOKING_STATUS.PENDING) {
@@ -464,6 +502,7 @@ export async function updateBookingStatus(bookingId, status) {
         transaction.update(bookingRef, {
           status,
           tokenStatus: TOKEN_BOOKING_STATUS.NOT_CHARGED,
+          cancelledBy: userId,
           updatedAt: serverTimestamp(),
         });
         return;
@@ -655,6 +694,7 @@ export async function updateBookingStatus(bookingId, status) {
       const tokenUpdates = {
         status,
         updatedAt: serverTimestamp(),
+        ...(status === BOOKING_STATUS.CANCELLED ? { cancelledBy: userId } : {}),
         ...(status === BOOKING_STATUS.REJECTED || status === BOOKING_STATUS.CANCELLED
           ? { tokenStatus: TOKEN_BOOKING_STATUS.REFUNDED }
           : {}),
@@ -680,6 +720,7 @@ export async function updateBookingStatus(bookingId, status) {
       ...(status === BOOKING_STATUS.REJECTED || status === BOOKING_STATUS.CANCELLED
         ? { paymentStatus: BOOKING_PAYMENT_STATUS.NOT_APPLICABLE }
         : {}),
+      ...(status === BOOKING_STATUS.CANCELLED ? { cancelledBy: userId } : {}),
       updatedAt: serverTimestamp(),
     });
     if (status === BOOKING_STATUS.COMPLETED) {
@@ -690,6 +731,29 @@ export async function updateBookingStatus(bookingId, status) {
       });
     }
   });
+
+  if (status === BOOKING_STATUS.CANCELLED && cancellationBooking) {
+    const actorIsStudent = cancellationBooking.studentId === userId;
+    const recipientId = actorIsStudent
+      ? cancellationBooking.tutorId
+      : cancellationBooking.studentId;
+    const actorName = actorIsStudent
+      ? cancellationBooking.studentName || auth.currentUser.displayName || 'The student'
+      : cancellationBooking.tutorName || auth.currentUser.displayName || 'The tutor';
+    const tokenSummary = getCancellationTokenSummary(cancellationBooking);
+    try {
+      await createNotification({
+        recipientId,
+        type: NOTIFICATION_TYPES.BOOKING_CANCELLED,
+        title: 'Session cancelled',
+        message: `${actorName} cancelled ${cancellationBooking.subject || 'your session'} scheduled for ${cancellationBooking.dateKey}. ${tokenSummary}`,
+        data: { bookingId, cancelledBy: userId },
+      });
+      return { notificationError: null };
+    } catch (notificationError) {
+      return { notificationError };
+    }
+  }
 }
 
 export async function rescheduleBooking(bookingId, newTime) {

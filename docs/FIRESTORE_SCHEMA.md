@@ -154,6 +154,7 @@ any external fee before processing a request.
 | `tokenAmountUnits` | positive integer | Full session price in minor units (100 units = 1 token) |
 | `tokenDepositUnits` | positive integer | 20% of the session price, rounded to the nearest 0.01 token; present on new bookings |
 | `tokenStatus` | `'pending'` \| `'not_charged'` \| `'reserved'` \| `'refunded'` \| `'settled'` | New requests do not move tokens; acceptance charges the deposit and holds the remainder, cancellation refunds, and completion pays the full price |
+| `cancelledBy` | string, optional | UID of the student or tutor who cancelled; used to validate the cancellation alert sent to the other participant |
 | `timerStatus` | `'idle'` \| `'running'` \| `'paused'` \| `'stopped'` | Tutor-owned timer state for the booking. Timer writes never change booking status or payment state |
 | `accumulatedDurationSeconds` | non-negative integer | Actual recorded teaching time accumulated across running intervals; never derived from `durationHours` |
 | `timerStartedAt`, `timerPausedAt`, `timerStoppedAt`, `timerLastActionAt` | timestamp, optional | Server timestamps for timer recovery and audit context |
@@ -224,7 +225,7 @@ attestation without changing the booking fields.
 | `recipientId` | string | Who sees it |
 | `type` | string | `NOTIFICATION_TYPES` in `statuses.js` |
 | `title`, `message` | string | |
-| `data` | map | Where to go on tap, for example `{ bookingId }` or `{ conversationId, messageId }` for chat alerts |
+| `data` | map | Where to go on tap, for example `{ bookingId, cancelledBy }` for cancellation alerts or `{ conversationId, messageId }` for chat alerts |
 | `read` | boolean | |
 | `createdAt` | timestamp | |
 
@@ -257,7 +258,7 @@ Before publishing role-based rules, migrate existing tutor documents. Reviewing 
 
 1. **Leaderboard:** the profile screen shows other students' names and points. Showing them needs rules that let one student read others' stats. Either keep a small public stats document per student, or drop the leaderboard from the real data.
 2. **Real timestamps:** bookings keep `dateKey` and time text because the schedule screen is built on them. Reminders and sorting are easier with a real `startAt` timestamp. Member 2 decides whether to add it.
-3. **Who creates notifications:** the app creates the notification document after a booking, message or verification write succeeds. Cloud Functions and scheduled functions are intentionally not used on the Spark plan. These alerts are best effort and are not a trusted audit log.
+3. **Who creates notifications:** the app creates in-app cancellation and message notification documents after the underlying write succeeds. Session reminders are opt-in local notifications on the device, scheduled one hour before the session; they are cleared when that device syncs a cancellation or rejection. Cloud Functions and scheduled functions are intentionally not used on the Spark plan. These alerts are best effort and are not a trusted audit log.
 4. **Tier names:** some mock data says `Faculty` or `Faculty Tier`. The real data uses `Professor` only.
 5. **Drive sharing policy:** confirm the admin reviewer's Google account and whether tutors must share only with that account or whether "Anyone with the link" is acceptable for the demo.
 6. **Token request forms:** set the student top-up and tutor cash-out Google Form URLs using the public Expo environment variables in `.env.example`. Admins must verify the external request and manually record any adjustment.
@@ -266,7 +267,9 @@ Before publishing role-based rules, migrate existing tutor documents. Reviewing 
 
 `sendMessage` commits the message and conversation preview together, then creates
 one deterministic `new_message` notification using `data.conversationId` and
-`data.messageId`. Retrying the same message ID does not duplicate the message or
+`data.messageId`. The title includes the sender name stored in the conversation,
+and the Firestore rule checks that title against the message sender and that
+conversation. Retrying the same message ID does not duplicate the message or
 reset an already-read alert. A notification failure is returned separately
 from the successful message save. Opening the chat marks its alerts read.
 

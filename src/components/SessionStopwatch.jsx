@@ -2,7 +2,7 @@ import { View, Text, Platform, StyleSheet, Alert } from 'react-native';
 import React, { useEffect, useState } from 'react';
 
 import AppButton from './AppButton';
-import { BOOKING_STATUS } from '../constants/statuses';
+import { BOOKING_STATUS, TOKEN_BOOKING_STATUS } from '../constants/statuses';
 import { updateBookingStatus, updateBookingTimer } from '../services/bookingService';
 import { colors } from '../theme/colors';
 import {
@@ -59,7 +59,10 @@ export const SessionStopwatch = ({ session }) => {
             setError(timerError);
             return;
         }
-        Alert.alert('Confirm session completed?', `Recorded teaching time: ${formatRecordedDuration(elapsedSeconds)}. This transfers the held tokens to your wallet.`, [
+        const paymentMessage = session.tokenStatus === TOKEN_BOOKING_STATUS.RESERVED
+            ? 'This transfers the held tokens to your wallet.'
+            : 'This older manual-payment booking will not transfer tokens. Resolve any payment separately.';
+        Alert.alert('Confirm session completed?', `Recorded teaching time: ${formatRecordedDuration(elapsedSeconds)}. ${paymentMessage}`, [
             { text: 'Review again', style: 'cancel' },
             {
                 text: 'Confirm completion',
