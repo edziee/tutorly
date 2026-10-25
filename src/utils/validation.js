@@ -96,8 +96,9 @@ export function getTutorApplicationEvidenceError(application) {
 }
 
 export function isGoogleDriveUrl(value) {
+  if (typeof value !== 'string') return false;
   try {
-    const url = new URL((value ?? '').trim());
+    const url = new URL(value.trim());
     return (
       url.protocol === 'https:' &&
       ['drive.google.com', 'docs.google.com'].includes(url.hostname.toLowerCase()) &&
@@ -109,8 +110,9 @@ export function isGoogleDriveUrl(value) {
 }
 
 export function isHttpsUrl(value) {
+  if (typeof value !== 'string') return false;
   try {
-    const url = new URL((value ?? '').trim());
+    const url = new URL(value.trim());
     return url.protocol === 'https:' && Boolean(url.hostname);
   } catch {
     return false;

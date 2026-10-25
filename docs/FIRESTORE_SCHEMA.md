@@ -78,6 +78,8 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 
 ## `tutorApplications/{uid}` (private)
 
+Admins can open peer-tutor course proof links and Alumni/Professor application proof links from the Awaiting review screen. The screen only opens validated HTTPS links hosted on Google Drive or Google Docs.
+
 This document is readable only by its applicant and admins. Applicants may have a student, tutor, or legacy professional account role; applying never changes that role. Keep verification proof here, never in `tutors/{uid}`, because Firestore security rules cannot hide selected fields from clients that can read a document. A legacy payment QR value may remain in older private application records, but new records do not use the QR payment flow.
 
 Tutor operations are granted only when both this private record and the matching `tutors/{uid}` public profile have `verificationStatus: 'approved'`, and the public profile has `publicProfileVersion: 2`. Pending and rejected applicants may see their own application status and evidence but cannot appear in tutor search, accept bookings, or update tutor booking details. A student applicant who is approved keeps all student access and may switch between student and tutor workspaces. Direct tutor sign-ups are tracked separately using `users/{uid}.tutorVerificationStatus`; account approval alone does not publish a public tutor profile or authorize tutor-only operations.

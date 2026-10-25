@@ -117,6 +117,8 @@ test('isGoogleDriveUrl accepts HTTPS links on Google Drive and Docs hosts only',
   assert.equal(isGoogleDriveUrl('https://example.com/file/d/abc'), false);
   assert.equal(isGoogleDriveUrl('not a url'), false);
   assert.equal(isGoogleDriveUrl('https://drive.google.com'), false);
+  assert.equal(isGoogleDriveUrl(42), false);
+  assert.equal(isGoogleDriveUrl({}), false);
 });
 
 test('isHttpsUrl accepts HTTPS URLs and rejects non-HTTPS or malformed values', () => {
@@ -124,4 +126,6 @@ test('isHttpsUrl accepts HTTPS URLs and rejects non-HTTPS or malformed values', 
   assert.equal(isHttpsUrl('http://images.example.com/photo.jpg'), false);
   assert.equal(isHttpsUrl('file:///photo.jpg'), false);
   assert.equal(isHttpsUrl(''), false);
+  assert.equal(isHttpsUrl(42), false);
+  assert.equal(isHttpsUrl({}), false);
 });

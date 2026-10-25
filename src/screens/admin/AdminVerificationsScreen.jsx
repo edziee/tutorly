@@ -12,10 +12,9 @@
 // Rejecting asks for a reason first, because the tutor is told why. Approving
 // calls setVerificationStatus(id, 'approved', { reviewerId }).
 //
-// Not built yet: opening the proof files (`courses[].proofPath`). That needs file
-// storage, which the team has not decided (see docs/FIRESTORE_SCHEMA.md).
 import { useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import AppButton from '../../components/AppButton';
 import AppInput from '../../components/AppInput';
@@ -35,7 +34,7 @@ import {
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { getErrorMessage } from '../../utils/errors';
-import { validateRequired } from '../../utils/validation';
+import { isGoogleDriveUrl, validateRequired } from '../../utils/validation';
 import { getUserId } from '../../utils/user';
 
 export default function AdminVerificationsScreen() {
@@ -152,9 +151,22 @@ export default function AdminVerificationsScreen() {
 
 function PendingCard({ tutor, busy, disabled, onApprove, onReject }) {
   const [rejecting, setRejecting] = useState(false);
+  const [openingEvidence, setOpeningEvidence] = useState(null);
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState('');
   const courses = Array.isArray(tutor.courses) ? tutor.courses : [];
+
+  const openEvidence = async (key, url) => {
+    if (!isGoogleDriveUrl(url) || openingEvidence) return;
+    setOpeningEvidence(key);
+    try {
+      await Linking.openURL(url.trim());
+    } catch (error) {
+      Alert.alert('Couldn’t open verification link', getErrorMessage(error, 'Please try again.'));
+    } finally {
+      setOpeningEvidence(null);
+    }
+  };
 
   const confirmReject = async () => {
     const problem = validateRequired(reason, 'A reason');
@@ -186,15 +198,61 @@ function PendingCard({ tutor, busy, disabled, onApprove, onReject }) {
         <View style={styles.courses}>
           <Text style={styles.coursesLabel}>Courses submitted</Text>
           {courses.map((course, index) => (
-            <Text key={`${course.code}-${index}`} style={styles.course}>
-              {[course.code, course.title].filter(Boolean).join(' · ')}
-              {course.grade ? `  (grade ${course.grade})` : ''}
-            </Text>
+            <View key={course.id || `${course.code}-${index}`} style={styles.courseBlock}>
+              <Text style={styles.course}>
+                {[course.code, course.title].filter(Boolean).join(' · ')}
+                {course.grade ? `  (grade ${course.grade})` : ''}
+              </Text>
+              {course.proofName ? (
+                <Text style={styles.evidenceName}>{course.proofName}</Text>
+              ) : null}
+              {isGoogleDriveUrl(course.proofUrl) ? (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open ${course.proofName || 'verification proof'} for ${course.code || 'this course'}`}
+                  disabled={openingEvidence !== null}
+                  onPress={() => openEvidence(`course-${index}`, course.proofUrl)}
+                  style={styles.evidenceLink}
+                >
+                  <Ionicons name="open-outline" size={16} color={colors.primary} />
+                  <Text style={styles.evidenceLinkText}>
+                    {openingEvidence === `course-${index}` ? 'Opening proof…' : 'Open course proof'}
+                  </Text>
+                </Pressable>
+              ) : tutor.tutorType === 'peer' ? (
+                <Text style={styles.missingEvidence}>No valid Drive link submitted.</Text>
+              ) : null}
+            </View>
           ))}
         </View>
       ) : (
         <Text style={styles.noCourses}>No courses added.</Text>
       )}
+
+      {tutor.applicationProofName || tutor.applicationProofUrl ? (
+        <View style={styles.applicationEvidence}>
+          <Text style={styles.coursesLabel}>Application proof</Text>
+          {tutor.applicationProofName ? (
+            <Text style={styles.course}>{tutor.applicationProofName}</Text>
+          ) : null}
+          {isGoogleDriveUrl(tutor.applicationProofUrl) ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={`Open ${tutor.applicationProofName || 'application verification proof'}`}
+              disabled={openingEvidence !== null}
+              onPress={() => openEvidence('application', tutor.applicationProofUrl)}
+              style={styles.evidenceLink}
+            >
+              <Ionicons name="open-outline" size={16} color={colors.primary} />
+              <Text style={styles.evidenceLinkText}>
+                {openingEvidence === 'application' ? 'Opening proof…' : 'Open application proof'}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.missingEvidence}>No valid Drive link submitted.</Text>
+          )}
+        </View>
+      ) : null}
 
       {rejecting ? (
         <View style={styles.rejectBox}>
@@ -319,9 +377,38 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   course: {
-    marginTop: 2,
     color: colors.text,
     fontSize: 13,
+  },
+  courseBlock: {
+    marginTop: spacing.xs,
+  },
+  evidenceName: {
+    marginTop: spacing.xs,
+    color: colors.mutedText,
+    fontSize: 12,
+  },
+  evidenceLink: {
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  evidenceLinkText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  missingEvidence: {
+    marginTop: spacing.xs,
+    color: colors.mutedText,
+    fontSize: 12,
+  },
+  applicationEvidence: {
+    marginTop: spacing.md,
   },
   noCourses: {
     marginTop: spacing.md,
