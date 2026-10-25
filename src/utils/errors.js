@@ -17,6 +17,7 @@ const AUTH_MESSAGES = {
   'auth/network-request-failed': 'Check your internet connection and try again.',
   'auth/user-disabled': 'This account is unavailable. Contact support.',
   'auth/profile-missing': 'We couldn’t find your account details. Try signing up again or contact support.',
+  'auth/account-suspended': 'This account is suspended. Contact an administrator for help.',
   'auth/not-admin': 'This account can’t access the admin area.',
   'auth/role-mismatch': 'This account is registered for another role. Choose the right role and try again.',
   'auth/invalid-portal': 'Choose Student or Tutor to sign in.',

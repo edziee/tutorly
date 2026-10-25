@@ -7,13 +7,14 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  updateDoc,
   where,
 } from 'firebase/firestore';
 
 import { requireAuth, requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
 import { ROLES } from '../constants/roles';
-import { VERIFICATION_STATUS } from '../constants/statuses';
+import { USER_ACCOUNT_STATUS, VERIFICATION_STATUS } from '../constants/statuses';
 import { isHttpsUrl } from '../utils/validation';
 
 function requireSignedInAdmin() {
@@ -149,6 +150,25 @@ export async function getUsers(filters = {}) {
       id: user.id,
       ...(verificationStatus ? { verificationStatus } : {}),
     };
+  });
+}
+
+/** Suspend or reactivate a non-admin account. */
+export async function setUserAccountStatus(userId, status) {
+  const adminId = requireSignedInAdmin();
+  if (!userId) throw new Error('Choose a user account to update.');
+  if (!Object.values(USER_ACCOUNT_STATUS).includes(status)) {
+    throw new Error('Choose a valid account status.');
+  }
+  if (adminId === userId) {
+    throw new Error('Admins cannot change their own account status.');
+  }
+
+  const { db } = requireFirebase();
+  await updateDoc(doc(db, COLLECTIONS.USERS, userId), {
+    accountStatus: status,
+    accountStatusUpdatedAt: serverTimestamp(),
+    accountStatusUpdatedBy: adminId,
   });
 }
 

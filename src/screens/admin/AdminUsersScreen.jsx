@@ -7,8 +7,17 @@
 // The search box filters the loaded list on the phone by name or email, so it
 // does not cost extra Firestore reads. Pull down to refresh.
 import { useMemo, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
+import AppButton from '../../components/AppButton';
 import AppInput from '../../components/AppInput';
 import EmptyState from '../../components/EmptyState';
 import ErrorState from '../../components/ErrorState';
@@ -17,12 +26,15 @@ import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
 import StatusBadge from '../../components/StatusBadge';
 import { VERIFICATION_STATUS_BADGE } from '../../components/StatusBadge';
+import { USER_ACCOUNT_STATUS } from '../../constants/statuses';
 import { isTutorRole, ROLES, ROLE_LABELS } from '../../constants/roles';
+import { useAuth } from '../../context/AuthContext';
 import { useAsync } from '../../hooks/useAsync';
-import { getUsers } from '../../services/adminService';
+import { getUsers, setUserAccountStatus } from '../../services/adminService';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { getErrorMessage } from '../../utils/errors';
+import { getUserId } from '../../utils/user';
 
 const roleFilters = [
   { value: 'all', label: 'All' },
@@ -39,13 +51,43 @@ const roleTone = {
 };
 
 export default function AdminUsersScreen() {
+  const { user: currentUser } = useAuth();
   const [role, setRole] = useState('all');
   const [search, setSearch] = useState('');
+  const [selectedAction, setSelectedAction] = useState(null);
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const currentUserId = getUserId(currentUser);
 
   const { status, data, error, refreshing, retry } = useAsync(
     () => getUsers(role === 'all' || role === ROLES.TUTOR ? {} : { role }),
     [role],
   );
+
+  const requestStatusChange = (user, accountStatus) => {
+    setActionError('');
+    setSelectedAction({ user, accountStatus });
+  };
+
+  const confirmStatusChange = async () => {
+    if (!selectedAction || savingStatus) return;
+    setSavingStatus(true);
+    setActionError('');
+    try {
+      await setUserAccountStatus(
+        getUserId(selectedAction.user),
+        selectedAction.accountStatus,
+      );
+      setSelectedAction(null);
+      retry();
+    } catch (failure) {
+      setActionError(
+        getErrorMessage(failure, 'Could not update the account. Please try again.'),
+      );
+    } finally {
+      setSavingStatus(false);
+    }
+  };
 
   const users = useMemo(() => {
     const list = Array.isArray(data) ? data : [];
@@ -113,16 +155,71 @@ export default function AdminUsersScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={retry} />}
-          renderItem={({ item }) => <UserRow user={item} />}
+          renderItem={({ item }) => (
+            <UserRow
+              user={item}
+              canManage={item.role !== ROLES.ADMIN && getUserId(item) !== currentUserId}
+              onStatusChange={requestStatusChange}
+            />
+          )}
         />
       )}
+      <Modal
+        visible={Boolean(selectedAction)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!savingStatus) setSelectedAction(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View accessibilityViewIsModal style={styles.confirmation}>
+            <Text style={styles.confirmationTitle}>
+              {selectedAction?.accountStatus === USER_ACCOUNT_STATUS.SUSPENDED
+                ? 'Suspend this account?'
+                : 'Reactivate this account?'}
+            </Text>
+            <Text style={styles.confirmationMessage}>
+              {selectedAction?.accountStatus === USER_ACCOUNT_STATUS.SUSPENDED
+                ? `Suspending ${selectedAction?.user.name || 'this user'} will block their access to Tutorly. Their bookings, chats, and account history will remain saved. An admin can reactivate the account later.`
+                : `Reactivating ${selectedAction?.user.name || 'this user'} will restore their access to Tutorly. Their bookings, chats, and account history remain unchanged.`}
+            </Text>
+            {actionError ? (
+              <Text accessibilityRole="alert" style={styles.actionError}>
+                {actionError}
+              </Text>
+            ) : null}
+            <AppButton
+              title={
+                selectedAction?.accountStatus === USER_ACCOUNT_STATUS.SUSPENDED
+                  ? 'Suspend account'
+                  : 'Reactivate account'
+              }
+              variant={
+                selectedAction?.accountStatus === USER_ACCOUNT_STATUS.SUSPENDED
+                  ? 'danger'
+                  : 'primary'
+              }
+              onPress={confirmStatusChange}
+              loading={savingStatus}
+            />
+            <AppButton
+              title="Cancel"
+              variant="outline"
+              onPress={() => setSelectedAction(null)}
+              disabled={savingStatus}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
 
-function UserRow({ user }) {
+function UserRow({ user, canManage, onStatusChange }) {
   const verification = VERIFICATION_STATUS_BADGE[user.verificationStatus];
   const isTutor = isTutorRole(user.role);
+  const isSuspended = user.accountStatus === USER_ACCOUNT_STATUS.SUSPENDED;
   const name = user.name || 'No name';
 
   return (
@@ -139,11 +236,30 @@ function UserRow({ user }) {
         </Text>
         <View style={styles.badges}>
           <StatusBadge label={ROLE_LABELS[user.role] ?? 'Unknown role'} tone={roleTone[user.role]} />
+          <StatusBadge
+            label={isSuspended ? 'Suspended' : 'Active'}
+            tone={isSuspended ? 'error' : 'success'}
+          />
           {isTutor && verification ? (
             <StatusBadge label={verification.label} tone={verification.tone} />
           ) : null}
         </View>
       </View>
+      {canManage ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${isSuspended ? 'Reactivate' : 'Suspend'} ${name}`}
+          onPress={() => onStatusChange(
+            user,
+            isSuspended ? USER_ACCOUNT_STATUS.ACTIVE : USER_ACCOUNT_STATUS.SUSPENDED,
+          )}
+          style={[styles.actionButton, isSuspended && styles.reactivateButton]}
+        >
+          <Text style={[styles.actionText, isSuspended && styles.reactivateText]}>
+            {isSuspended ? 'Reactivate' : 'Suspend'}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -166,6 +282,54 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  actionButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.errorBackground,
+  },
+  actionText: {
+    color: colors.errorText,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  reactivateButton: {
+    backgroundColor: colors.mint,
+  },
+  reactivateText: {
+    color: colors.successText,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  confirmation: {
+    width: '100%',
+    maxWidth: 420,
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+  },
+  confirmationTitle: {
+    color: colors.heading,
+    fontSize: 19,
+    fontWeight: '700',
+  },
+  confirmationMessage: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  actionError: {
+    color: colors.errorText,
+    fontSize: 13,
   },
   avatar: {
     width: 40,

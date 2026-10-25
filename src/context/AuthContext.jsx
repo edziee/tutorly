@@ -13,7 +13,11 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { signOut, subscribeToAuthState } from '../services/authService';
-import { getUserProfile, updateUserProfile } from '../services/userService';
+import {
+  getUserProfile,
+  subscribeToUserProfile,
+  updateUserProfile,
+} from '../services/userService';
 import { ROLES } from '../constants/roles';
 import {
   getInitialWorkspaceMode,
@@ -45,11 +49,14 @@ export function AuthProvider({ children }) {
   // Counts auth events, so a slow profile load from an old event cannot
   // overwrite the result of a newer one.
   const latestEvent = useRef(0);
+  const profileUnsubscribe = useRef(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
       const eventId = ++latestEvent.current;
       const isCurrent = () => eventId === latestEvent.current;
+      profileUnsubscribe.current?.();
+      profileUnsubscribe.current = null;
 
       if (!firebaseUser) {
         setState(signedOut);
@@ -64,7 +71,9 @@ export function AuthProvider({ children }) {
           // Logged in with Firebase but no users/{uid} document, so there is no
           // role to route by. Log out instead of leaving the person stuck.
           setState(signedOut);
-          signOut().catch(() => {});
+          signOut().catch((error) => {
+            console.warn('Could not sign out an account with no profile:', error);
+          });
           return;
         }
         let savedMode = null;
@@ -86,6 +95,28 @@ export function AuthProvider({ children }) {
           studentProfileOnModeSwitch: false,
           workspaceModeError,
         });
+        profileUnsubscribe.current = subscribeToUserProfile(
+          firebaseUser.uid,
+          (updatedProfile) => {
+            if (!isCurrent()) return;
+            if (!updatedProfile) {
+              setState(signedOut);
+              signOut().catch((error) => {
+                console.warn('Could not sign out an account with no profile:', error);
+              });
+              return;
+            }
+            setState((current) => (
+              current.user?.uid === firebaseUser.uid
+                ? { ...current, user: updatedProfile, role: updatedProfile.role ?? null }
+                : current
+            ));
+          },
+          (error) => {
+            if (!isCurrent()) return;
+            console.warn('Could not listen for user profile changes:', error);
+          },
+        );
       } catch (error) {
         if (!isCurrent()) return;
         console.warn('Could not load the user profile:', error);
@@ -93,7 +124,11 @@ export function AuthProvider({ children }) {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      latestEvent.current += 1;
+      profileUnsubscribe.current?.();
+      unsubscribe();
+    };
   }, []);
 
   const handleSignOut = useCallback(async () => {
@@ -107,7 +142,17 @@ export function AuthProvider({ children }) {
     if (!uid) throw new Error('A signed-in Firebase account is required.');
     await updateUserProfile(uid, changes);
     const safeChanges = { ...changes };
-    ['id', 'uid', 'role', 'email', 'createdAt', 'tutorType'].forEach((field) => delete safeChanges[field]);
+    [
+      'id',
+      'uid',
+      'role',
+      'email',
+      'createdAt',
+      'tutorType',
+      'accountStatus',
+      'accountStatusUpdatedAt',
+      'accountStatusUpdatedBy',
+    ].forEach((field) => delete safeChanges[field]);
     setState((current) => ({
       ...current,
       user: { ...current.user, ...safeChanges },

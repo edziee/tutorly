@@ -67,6 +67,11 @@ export const VERIFICATION_STATUS = {
   REJECTED: 'rejected',
 };
 
+export const USER_ACCOUNT_STATUS = {
+  ACTIVE: 'active',
+  SUSPENDED: 'suspended',
+};
+
 // What caused an in-app notification. Member 4 owns this list.
 export const NOTIFICATION_TYPES = {
   BOOKING_REQUESTED: 'booking_requested',

@@ -1,7 +1,15 @@
 // Reads and writes the user document (users/{uid}): name, role, contact info,
 // private home address, campus, streak and so on. See docs/FIRESTORE_SCHEMA.md.
 // Owner: Member 1. Stores user profiles in Firestore.
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  writeBatch,
+} from 'firebase/firestore';
 
 import { requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
@@ -21,6 +29,9 @@ const PROTECTED_FIELDS = [
   'tutorVerificationNote',
   'tutorVerificationReviewedBy',
   'tutorVerificationReviewedAt',
+  'accountStatus',
+  'accountStatusUpdatedAt',
+  'accountStatusUpdatedBy',
 ];
 
 /**
@@ -33,6 +44,18 @@ export async function getUserProfile(uid) {
   const snapshot = await getDoc(doc(db, COLLECTIONS.USERS, uid));
   if (!snapshot.exists()) return null;
   return { ...snapshot.data(), id: snapshot.id, uid: snapshot.id };
+}
+
+/** Listen for changes to one user's profile, including admin account actions. */
+export function subscribeToUserProfile(uid, callback, onError) {
+  const { db } = requireFirebase();
+  return onSnapshot(doc(db, COLLECTIONS.USERS, uid), (snapshot) => {
+    callback(
+      snapshot.exists()
+        ? { ...snapshot.data(), id: snapshot.id, uid: snapshot.id }
+        : null,
+    );
+  }, onError);
 }
 
 /**

@@ -10,7 +10,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 
 | Collection | One document is | Who writes it |
 | --- | --- | --- |
-| `users/{uid}` | An account of any role | The user (never the `role` after sign-up) |
+| `users/{uid}` | An account of any role | The user can update allowed profile fields; admins control account status and tutor review fields |
 | `tutors/{uid}` | Public profile fields students need to find and book a tutor, same id as their user | The applicant submits a pending profile; admin publishes approval |
 | `tutorApplications/{uid}` | Private application evidence, same id as their user | The student or tutor applicant; admin reviews verification |
 | `wallets/{uid}` | Private integer token balances for one account | Initialized by its owner or an admin; adjusted only by atomic booking transitions or an admin |
@@ -31,6 +31,8 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `uid` | string | Firebase Authentication user id; matches the document id |
 | `email` | string | |
 | `role` | `'student'` \| `'tutor'` \| `'professional'` (legacy) \| `'admin'` | Set once at sign-up. Tutor accounts use `'tutor'`; newly created tutor accounts use the Professor / Alumni path. Existing peer tutor and `'professional'` accounts remain supported through the Tutor sign-in portal. A student applying to tutor keeps `role: 'student'`; application status is stored separately. Users must not be able to change their role, and nobody can sign up as `admin` (admins are created in the Firebase console) |
+| `accountStatus` | `'active'` \| `'suspended'` | Admin-controlled access status. Missing status means active for legacy accounts. Suspended accounts cannot use authenticated Firestore features or app screens; admins can reactivate them. This does not delete Firebase Authentication credentials or historical records |
+| `accountStatusUpdatedAt`, `accountStatusUpdatedBy` | timestamp, admin uid | Audit fields set by the admin who last suspended or reactivated the account |
 | `tutorType` | `'peer'` \| `'professional'` | Tutor accounts only. Saved at sign-up to determine the verification evidence requirements; never user-editable. Existing accounts without it infer the type from their tutor application tier |
 | `tutorVerificationStatus` | `'pending'` \| `'approved'` \| `'rejected'` | Direct tutor sign-ups start pending and are reviewed by an admin using basic account details. This status alone does not create an approved public tutor profile or permit tutor operations |
 | `tutorVerificationNote`, `tutorVerificationReviewedBy`, `tutorVerificationReviewedAt` | string, uid, timestamp | Admin-only outcome details for direct tutor account review. Rejection requires a reason |

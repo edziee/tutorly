@@ -2,10 +2,12 @@
 // 'admin' (see AppNavigator). Member 3 builds the layout, Member 4 connects the
 // data.
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ROUTES } from '../constants/routes';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
 import AdminVerificationsScreen from '../screens/admin/AdminVerificationsScreen';
 import AdminReviewHistoryScreen from '../screens/admin/AdminReviewHistoryScreen';
 import AdminWalletsScreen from '../screens/admin/AdminWalletsScreen';
@@ -13,6 +15,7 @@ import AdminHeader from '../components/AdminHeader';
 import { colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
 const tabIcons = {
   [ROUTES.ADMIN_DASHBOARD]: 'grid-outline',
@@ -29,6 +32,23 @@ const tabTitles = {
 };
 
 export default function AdminNavigator() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="AdminTabs"
+        component={AdminTabs}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.ADMIN_USERS}
+        component={AdminUsersScreen}
+        options={{ title: 'Manage users' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+function AdminTabs() {
   return (
     <Tab.Navigator
       initialRouteName={ROUTES.ADMIN_DASHBOARD}

@@ -10,6 +10,8 @@
 import ErrorState from '../components/ErrorState';
 import LoadingState from '../components/LoadingState';
 import { useAuth } from '../context/AuthContext';
+import AccountSuspendedScreen from '../screens/shared/AccountSuspendedScreen';
+import { USER_ACCOUNT_STATUS } from '../constants/statuses';
 import { getActiveWorkspace } from '../utils/workspace';
 import AdminNavigator from './AdminNavigator';
 import AuthNavigator from './AuthNavigator';
@@ -21,6 +23,9 @@ export default function AppNavigator() {
 
   if (loading) return <LoadingState />;
   if (!user) return <AuthNavigator />;
+  if (user.accountStatus === USER_ACCOUNT_STATUS.SUSPENDED) {
+    return <AccountSuspendedScreen />;
+  }
 
   switch (getActiveWorkspace(role, workspaceMode)) {
     case 'student':

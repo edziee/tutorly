@@ -15,6 +15,7 @@ import {
 
 import { isFirebaseConfigured, requireAuth, requireFirebase } from '../config/firebase';
 import { isRoleAllowedInPortal, LOGIN_ROLES, ROLES, SIGNUP_ROLES } from '../constants/roles';
+import { USER_ACCOUNT_STATUS } from '../constants/statuses';
 import { createUserProfile, ensureUserProfileUid, getUserProfile } from './userService';
 
 // Errors we throw ourselves use Firebase-style codes so src/utils/errors.js can
@@ -124,6 +125,14 @@ export async function signIn(email, password, portal) {
       );
     }
 
+    if (profile.accountStatus === USER_ACCOUNT_STATUS.SUSPENDED) {
+      await firebaseSignOut(auth);
+      throw authError(
+        'auth/account-suspended',
+        'This account is suspended. Contact an administrator for help.',
+      );
+    }
+
     if (!isRoleAllowedInPortal(profile.role, portal)) {
       await firebaseSignOut(auth);
       throw authError(
@@ -166,6 +175,14 @@ export async function signInAdmin(email, password) {
     if (profile?.role !== ROLES.ADMIN) {
       await firebaseSignOut(auth);
       throw authError('auth/not-admin', 'This account is not authorized for admin access.');
+    }
+
+    if (profile.accountStatus === USER_ACCOUNT_STATUS.SUSPENDED) {
+      await firebaseSignOut(auth);
+      throw authError(
+        'auth/account-suspended',
+        'This account is suspended. Contact an administrator for help.',
+      );
     }
 
     return { uid: user.uid, role: ROLES.ADMIN };

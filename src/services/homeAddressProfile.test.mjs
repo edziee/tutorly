@@ -30,7 +30,7 @@ test('home addresses are allowed only as private owner profile updates', () => {
   assert.match(profileUpdate, /request\.resource\.data\.homeAddress\.size\(\) <= 300/);
   assert.match(
     rules,
-    /match \/users\/\{uid\} \{\s+allow get: if signedIn\(\) && \(request\.auth\.uid == uid \|\| isAdmin\(\)\);/,
+    /match \/users\/\{uid\} \{\s+allow get: if authenticated\(\) && \(request\.auth\.uid == uid \|\| isAdmin\(\)\);/,
   );
   assert.match(
     rules,
