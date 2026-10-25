@@ -29,6 +29,7 @@ Each brief lists your files, your tasks by week, what to watch out for and when 
 | [`FIRESTORE_SCHEMA.md`](FIRESTORE_SCHEMA.md) | Draft data structure for Firebase. Member 1 confirms it in Week 1. Change it only together with Member 1 |
 | [`MOCK_DATA_INVENTORY.md`](MOCK_DATA_INVENTORY.md) | Every place that uses mock data, what replaces it and who owns it. Tick items off as you delete them |
 | [`SCREEN_DATA_CONTRACTS.md`](SCREEN_DATA_CONTRACTS.md) | What each screen built by Member 3 expects from its service functions (fields, ids). Read it before connecting a screen to Firestore |
+| [`GAMIFICATION_BADGES.md`](GAMIFICATION_BADGES.md) | Proposed tutor-awarded student badges and an integration contract; design only, not implemented |
 | [`../.github/pull_request_template.md`](../.github/pull_request_template.md) | The checklist that appears when you open a pull request |
 
 ## Your first 10 minutes
