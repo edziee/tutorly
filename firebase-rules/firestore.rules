@@ -609,6 +609,7 @@ service cloud.firestore {
           'phone',
           'age',
           'location',
+          'homeAddress',
           'year',
           'campus',
           'campusAddress',
@@ -627,6 +628,9 @@ service cloud.firestore {
           (request.resource.data.name is string && request.resource.data.name.size() <= 120)) &&
         (!('phone' in request.resource.data) ||
           (request.resource.data.phone is string && request.resource.data.phone.size() <= 40)) &&
+        (!('homeAddress' in request.resource.data) ||
+          (request.resource.data.homeAddress is string &&
+            request.resource.data.homeAddress.size() <= 300)) &&
         (!('age' in request.resource.data) ||
           (request.resource.data.age is string &&
             request.resource.data.age.matches('^[1-9][0-9]{0,2}$'))) &&

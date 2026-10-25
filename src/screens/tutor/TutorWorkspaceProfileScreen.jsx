@@ -60,6 +60,27 @@ import { getTutorLeaderboards, TOP_RATED_MINIMUM_REVIEWS } from '../../utils/lea
 import { formatTokenUnits } from '../../utils/tokens';
 import { getMinimumTutorRate, getTutorRateError } from '../../utils/tutorPricing';
 
+const COMMON_CITY_SUGGESTIONS = [
+  'Quezon City',
+  'Manila',
+  'Makati',
+  'Pasig',
+  'Taguig',
+  'Marikina',
+  'Mandaluyong',
+  'Pasay',
+  'Parañaque',
+  'Las Piñas',
+  'Muntinlupa',
+  'Caloocan',
+  'Antipolo',
+  'Cebu City',
+  'Davao City',
+  'Baguio City',
+  'Iloilo City',
+  'Cagayan de Oro',
+];
+
 function SectionTitle({ title, subtitle, action }) {
   return (
     <View style={styles.sectionTitle}>
@@ -130,10 +151,25 @@ function LeaderboardRow({ tutor, rank, mode }) {
 }
 
 export default function TutorWorkspaceProfileScreen({ navigation }) {
-  const { user, signOut, setWorkspaceMode, workspaceModeError } = useAuth();
+  const { user, signOut, updateProfile, setWorkspaceMode, workspaceModeError } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const [application, setApplication] = useState(null);
+  const [location, setLocation] = useState(user?.location ?? '');
+  const [locationDraft, setLocationDraft] = useState(user?.location ?? '');
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [homeAddress, setHomeAddress] = useState(user?.homeAddress ?? '');
+  const [homeAddressDraft, setHomeAddressDraft] = useState(user?.homeAddress ?? '');
+  const [homeAddressEditorVisible, setHomeAddressEditorVisible] = useState(false);
+  const [savingHomeAddress, setSavingHomeAddress] = useState(false);
+  const [homeAddressError, setHomeAddressError] = useState('');
+  const normalizedLocationQuery = locationDraft.trim().toLowerCase();
+  const locationSuggestions = COMMON_CITY_SUGGESTIONS
+    .filter((city) =>
+      city.toLowerCase() !== normalizedLocationQuery &&
+      (!normalizedLocationQuery || city.toLowerCase().includes(normalizedLocationQuery)),
+    )
+    .slice(0, 6);
   const [hourlyRate, setHourlyRate] = useState('');
   const [savingBookingDetails, setSavingBookingDetails] = useState(false);
   const [bookingDetailsError, setBookingDetailsError] = useState('');
@@ -153,6 +189,15 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   useEffect(() => {
     setAchievementModalVisible(false);
   }, [uid]);
+  useEffect(() => {
+    setLocation(user?.location ?? '');
+    setLocationDraft(user?.location ?? '');
+    setShowLocationSuggestions(false);
+    setHomeAddress(user?.homeAddress ?? '');
+    setHomeAddressDraft(user?.homeAddress ?? '');
+    setHomeAddressEditorVisible(false);
+    setHomeAddressError('');
+  }, [uid, user?.location, user?.homeAddress]);
   const isDirectTutorAccount = hasDirectTutorAccountStatus(
     user?.role,
     user?.tutorVerificationStatus,
@@ -340,6 +385,33 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     }
   };
 
+  const saveHomeAddress = async () => {
+    if (savingHomeAddress) return;
+    const updatedAddress = homeAddressDraft.trim();
+    const updatedLocation = locationDraft.trim();
+    setSavingHomeAddress(true);
+    setHomeAddressError('');
+    try {
+      await updateProfile({ location: updatedLocation, homeAddress: updatedAddress });
+      setLocation(updatedLocation);
+      setHomeAddress(updatedAddress);
+      setShowLocationSuggestions(false);
+      setHomeAddressEditorVisible(false);
+    } catch (error) {
+      setHomeAddressError(getErrorMessage(error, 'Couldn’t save your address.'));
+    } finally {
+      setSavingHomeAddress(false);
+    }
+  };
+
+  const openHomeAddressEditor = () => {
+    setLocationDraft(location);
+    setHomeAddressDraft(homeAddress);
+    setShowLocationSuggestions(false);
+    setHomeAddressError('');
+    setHomeAddressEditorVisible(true);
+  };
+
   const respondToBooking = async (bookingId, status) => {
     if (workingBookingId) return;
     setWorkingBookingId(bookingId);
@@ -441,7 +513,11 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
 
   return (
     <ScreenContainer>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.activeBanner}>
           <View style={styles.activeDot} />
           <Text style={styles.activeText}>Tutor workspace</Text>
@@ -557,6 +633,48 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
                 : 'View application and course details'}
             </Text>
           </Pressable>
+        </View>
+
+        <View style={styles.personalInfoCard}>
+          <View style={styles.personalInfoHeader}>
+            <View style={styles.personalInfoHeadingCopy}>
+              <Text style={styles.personalInfoTitle}>Personal information</Text>
+              <Text style={styles.personalInfoSubtitle}>Private to you</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit personal information"
+              onPress={openHomeAddressEditor}
+              style={styles.editAddressButton}
+              hitSlop={8}
+            >
+              <Ionicons name="create-outline" size={20} color={colors.primary} />
+            </Pressable>
+          </View>
+          <View style={styles.personalInfoRows}>
+            <View style={styles.homeAddressRow}>
+              <View style={styles.homeAddressIcon}>
+                <Ionicons name="location-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.homeAddressCopy}>
+                <Text style={styles.homeAddressLabel}>City or area</Text>
+                <Text style={styles.homeAddressValue}>
+                  {location || 'Not set'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.homeAddressRow}>
+              <View style={styles.homeAddressIcon}>
+                <Ionicons name="home-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.homeAddressCopy}>
+                <Text style={styles.homeAddressLabel}>Home address</Text>
+                <Text style={styles.homeAddressValue}>
+                  {homeAddress || 'Not set'}
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
 
         {canPerformTutorOperations ? (
@@ -722,7 +840,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           />
         ) : pendingRequests.length ? (
           pendingRequests.map((request) => (
-            <View key={request.id} style={styles.requestContainer}>
+            <View key={request.id}>
               <RequestCard
                 request={request}
                 working={workingBookingId === request.id}
@@ -884,6 +1002,125 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         />
       </ScrollView>
       <Modal
+        visible={homeAddressEditorVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!savingHomeAddress) setHomeAddressEditorVisible(false);
+        }}
+      >
+        <View style={styles.addressModalBackdrop}>
+          <View style={styles.addressModalCard}>
+            <View style={styles.addressModalHeader}>
+              <View style={styles.addressModalHeadingCopy}>
+                <Text style={styles.addressModalTitle}>Edit personal information</Text>
+                <Text style={styles.addressModalSubtitle}>
+                  Your city and home address are saved to your private account profile.
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Close home address editor"
+                accessibilityRole="button"
+                disabled={savingHomeAddress}
+                onPress={() => setHomeAddressEditorVisible(false)}
+                hitSlop={10}
+              >
+                <Ionicons name="close" size={22} color={colors.text} />
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.addressModalForm}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <AppInput
+                label="City or area"
+                value={locationDraft}
+                handleChangeText={(value) => {
+                  setLocationDraft(value);
+                  setShowLocationSuggestions(true);
+                }}
+                placeholder="Choose or type a city or area"
+                onFocus={() => setShowLocationSuggestions(true)}
+                autoCorrect={false}
+                returnKeyType="done"
+                editable={!savingHomeAddress}
+                rightElement={
+                  <Ionicons
+                    name={showLocationSuggestions ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={colors.mutedText}
+                  />
+                }
+              />
+              {showLocationSuggestions ? (
+                <View style={styles.locationSuggestions}>
+                  <Text style={styles.locationSuggestionsTitle}>
+                    {normalizedLocationQuery ? 'Suggestions' : 'Popular cities'}
+                  </Text>
+                  {locationSuggestions.length ? locationSuggestions.map((city) => (
+                    <Pressable
+                      key={city}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Use ${city}`}
+                      accessibilityState={{ disabled: savingHomeAddress }}
+                      disabled={savingHomeAddress}
+                      onPress={() => {
+                        setLocationDraft(city);
+                        setShowLocationSuggestions(false);
+                      }}
+                      style={styles.locationSuggestion}
+                    >
+                      <Ionicons name="location-outline" size={17} color={colors.primary} />
+                      <Text style={styles.locationSuggestionText}>{city}</Text>
+                    </Pressable>
+                  )) : (
+                    <Text style={styles.noLocationSuggestions}>
+                      No matches. Keep typing to use your own location.
+                    </Text>
+                  )}
+                </View>
+              ) : null}
+              <AppInput
+                label="Home address"
+                value={homeAddressDraft}
+                handleChangeText={setHomeAddressDraft}
+                placeholder="Your home address"
+                maxLength={300}
+                autoComplete="street-address"
+                editable={!savingHomeAddress}
+              />
+              <Text style={styles.addressPrivacyHint}>
+                Your address is not included in your public tutor profile.
+              </Text>
+              {homeAddressError ? (
+                <Text accessibilityRole="alert" style={styles.formError}>
+                  {homeAddressError}
+                </Text>
+              ) : null}
+              <View style={styles.addressModalActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={savingHomeAddress}
+                  onPress={() => setHomeAddressEditorVisible(false)}
+                  style={styles.addressCancelButton}
+                >
+                  <Text style={styles.addressCancelText}>Cancel</Text>
+                </Pressable>
+                <View style={styles.addressSaveButton}>
+                  <AppButton
+                    title="Save details"
+                    onPress={saveHomeAddress}
+                    loading={savingHomeAddress}
+                    disabled={savingHomeAddress}
+                  />
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      <Modal
         visible={achievementModalVisible}
         transparent
         animationType="slide"
@@ -1010,18 +1247,17 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingBottom: spacing.xxl },
-  signOutError: { marginBottom: spacing.sm, color: colors.error, fontSize: 13 },
+  content: { gap: spacing.md, paddingBottom: spacing.xxl },
+  signOutError: { color: colors.error, fontSize: 13 },
   paymentSetupCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
   formError: { marginBottom: spacing.sm, color: colors.errorText, fontSize: 12, lineHeight: 17 },
-  requestContainer: { marginBottom: spacing.sm },
   paymentVerificationCard: { gap: spacing.sm, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },
   emptyRequests: { padding: spacing.md, borderRadius: radius.md, color: colors.mutedText, backgroundColor: colors.surface, fontSize: 12 },
   activeBanner: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: 999, backgroundColor: '#E6E8EA' },
-  applicantWallet: { alignItems: 'flex-end', marginTop: spacing.sm },
+  applicantWallet: { alignItems: 'flex-end' },
   activeDot: { width: 7, height: 7, borderRadius: 4, marginRight: 6, backgroundColor: colors.secondary },
   activeText: { color: colors.text, fontSize: 11, fontWeight: '600' },
-  profileCard: { marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface, shadowColor: colors.black, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
+  profileCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface, shadowColor: colors.black, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
   profileRow: { flexDirection: 'row', gap: spacing.sm },
   avatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
   avatarText: { color: colors.white, fontSize: 22, fontWeight: '700' },
@@ -1040,7 +1276,36 @@ const styles = StyleSheet.create({
   rate: { color: colors.primary, fontSize: 18, fontWeight: '800' },
   rateUnit: { color: colors.mutedText, fontSize: 11 },
   profileDescription: { marginTop: spacing.sm, color: colors.mutedText, fontSize: 11, lineHeight: 16 },
-  leaderboardCard: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  personalInfoCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  personalInfoHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  personalInfoHeadingCopy: { flex: 1 },
+  personalInfoTitle: { color: colors.heading, fontSize: 16, fontWeight: '700' },
+  personalInfoSubtitle: { marginTop: 2, color: colors.mutedText, fontSize: 11 },
+  editAddressButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: colors.background },
+  personalInfoRows: { gap: spacing.sm },
+  homeAddressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.background },
+  homeAddressIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: colors.surface },
+  homeAddressCopy: { flex: 1 },
+  homeAddressLabel: { color: colors.mutedText, fontSize: 11, fontWeight: '600' },
+  homeAddressValue: { marginTop: 3, color: colors.text, fontSize: 13, lineHeight: 18 },
+  addressModalBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(20, 20, 30, 0.48)' },
+  addressModalCard: { maxHeight: '92%', padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface },
+  addressModalHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md },
+  addressModalHeadingCopy: { flex: 1 },
+  addressModalForm: { flexGrow: 0 },
+  addressModalTitle: { color: colors.heading, fontSize: 18, fontWeight: '700' },
+  addressModalSubtitle: { marginTop: 3, color: colors.mutedText, fontSize: 12, lineHeight: 17 },
+  addressPrivacyHint: { marginTop: -spacing.sm, marginBottom: spacing.md, color: colors.mutedText, fontSize: 12, lineHeight: 17 },
+  locationSuggestions: { marginTop: -spacing.sm, marginBottom: spacing.md, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  locationSuggestionsTitle: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, color: colors.mutedText, fontSize: 12, fontWeight: '600' },
+  locationSuggestion: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderRadius: radius.sm },
+  locationSuggestionText: { color: colors.text, fontSize: 14 },
+  noLocationSuggestions: { paddingHorizontal: spacing.sm, paddingVertical: spacing.md, color: colors.mutedText, fontSize: 13 },
+  addressModalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  addressCancelButton: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.background },
+  addressCancelText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+  addressSaveButton: { flex: 1, justifyContent: 'center' },
+  leaderboardCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
   leaderboardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   leaderboardHeadingCopy: { flex: 1 },
   leaderboardRefresh: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: colors.background },
@@ -1065,12 +1330,12 @@ const styles = StyleSheet.create({
   proofDetails: { flexShrink: 1, marginTop: 3, color: colors.mutedText, fontSize: 10, lineHeight: 15 },
   addCourse: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.background },
   addCourseText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  workspaceActions: { marginTop: spacing.sm },
-  applicationAccessCard: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
-  sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.lg, marginBottom: spacing.sm },
+  applicationAccessCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionHeading: { color: colors.heading, fontSize: 17, fontWeight: '700' },
   sectionSubtitle: { marginTop: 2, color: colors.mutedText, fontSize: 11 },
   sectionAction: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  workspaceActions: { gap: spacing.sm },
   availabilityCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
   weekRow: { flexDirection: 'row', gap: 5, marginTop: spacing.md },
   day: { flex: 1, alignItems: 'center', padding: 7, borderRadius: 8, backgroundColor: colors.background },
@@ -1090,7 +1355,7 @@ const styles = StyleSheet.create({
   requestNote: { marginTop: 4, color: colors.mutedText, fontSize: 9, fontStyle: 'italic' },
   requestAmount: { color: colors.primary, fontSize: 10, fontWeight: '700' },
   requestActions: { flexDirection: 'row', gap: spacing.sm },
-  sessionCard: { flexDirection: 'row', marginBottom: spacing.sm, overflow: 'hidden', borderRadius: radius.md, backgroundColor: colors.surface },
+  sessionCard: { flexDirection: 'row', overflow: 'hidden', borderRadius: radius.md, backgroundColor: colors.surface },
   sessionAccent: { width: 5 },
   sessionCopy: { flex: 1, padding: spacing.sm },
   sessionTop: { flexDirection: 'row', justifyContent: 'space-between' },
