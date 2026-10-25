@@ -104,8 +104,6 @@ async function getSavedAddressCoordinates(uid, city, address) {
  * @returns {Promise<{ coordinates: object, source: string, notice: string }>}
  */
 export async function getStudentSearchOrigin(profile) {
-  const profileError = getNearMeProfileError(profile);
-  if (profileError) throw new Error(profileError);
   if (profile.geolocationConsent !== true) {
     throw new Error('Agree to the Near me location policy before searching.');
   }

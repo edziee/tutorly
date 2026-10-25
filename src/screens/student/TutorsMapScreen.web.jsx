@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
 import L from 'leaflet';
 import {
   MapContainer,
@@ -60,19 +62,38 @@ function TutorMarker({ tutor, selected, onSelect }) {
   );
 }
 
-function RecenterMap({ region }) {
+function RecenterMap({ region, searchOrigin, recenterRequest }) {
   const map = useMap();
+  const previousRecenterRequest = useRef(recenterRequest);
   useEffect(() => {
     map.setView([region.latitude, region.longitude], map.getZoom(), { animate: false });
   }, [map, region.latitude, region.longitude]);
+  useEffect(() => {
+    if (recenterRequest > previousRecenterRequest.current && searchOrigin) {
+      map.setView(
+        [searchOrigin.latitude, searchOrigin.longitude],
+        Math.max(13, map.getZoom()),
+        { animate: true },
+      );
+    }
+    previousRecenterRequest.current = recenterRequest;
+  }, [map, recenterRequest, searchOrigin]);
   return null;
 }
 
 export default function TutorsMapScreen({
   tutors,
+  nearMeActive = false,
+  maximumDistanceKm,
+  canRecenterOnSearchOrigin = false,
+  searchOrigin,
+  searchOriginSource,
+  onRequestMapRecenter,
+  mapRecenterRequest = 0,
   onTutorPress,
 }) {
   const [selectedTutorId, setSelectedTutorId] = useState(null);
+  const [shownSearchOriginKey, setShownSearchOriginKey] = useState(null);
   const { locatedTutors, tutorsWithoutLocation } = useMemo(
     () => splitTutorsByMapLocation(tutors),
     [tutors],
@@ -84,6 +105,19 @@ export default function TutorsMapScreen({
   const selectedTutor = locatedTutors.find((tutor) => tutor.id === selectedTutorId)
     ?? locatedTutors[0]
     ?? null;
+  const searchOriginKey = searchOrigin
+    ? `${searchOrigin.latitude}:${searchOrigin.longitude}`
+    : null;
+  const mapRegion = region ?? (
+    searchOrigin && shownSearchOriginKey === searchOriginKey
+    ? { ...searchOrigin, longitudeDelta: 0.08 }
+    : null);
+  useEffect(() => {
+    if (!nearMeActive) setShownSearchOriginKey(null);
+  }, [nearMeActive]);
+  const searchOriginLabel = searchOriginSource === 'device'
+    ? 'your current location'
+    : 'your saved address';
 
   return (
     <ScrollView
@@ -92,17 +126,23 @@ export default function TutorsMapScreen({
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.mapHeading}>
-        <Text style={styles.headingText}>Tutors nearby</Text>
+        <Text style={styles.headingText}>
+          {nearMeActive ? `Tutors within about ${maximumDistanceKm} km` : 'Tutors nearby'}
+        </Text>
       </View>
-      {region ? (
+      {mapRegion ? (
         <View style={styles.mapFrame}>
           <MapContainer
-            center={[region.latitude, region.longitude]}
-            zoom={Math.min(18, Math.max(5, Math.round(Math.log2(360 / region.longitudeDelta))))}
+            center={[mapRegion.latitude, mapRegion.longitude]}
+            zoom={Math.min(18, Math.max(5, Math.round(Math.log2(360 / mapRegion.longitudeDelta))))}
             scrollWheelZoom
             style={styles.map}
           >
-            <RecenterMap region={region} />
+            <RecenterMap
+              region={mapRegion}
+              searchOrigin={searchOrigin}
+              recenterRequest={mapRecenterRequest}
+            />
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -116,18 +156,56 @@ export default function TutorsMapScreen({
               />
             ))}
           </MapContainer>
+          {canRecenterOnSearchOrigin && searchOrigin ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Center map on ${searchOriginLabel}`}
+              onPress={() => onRequestMapRecenter(() => {
+                if (!region) setShownSearchOriginKey(searchOriginKey);
+              })}
+              style={styles.mapControl}
+            >
+              <Feather name="navigation" size={18} color={colors.primary} />
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         <View style={styles.noMapLocations}>
-          <Text style={styles.noMapTitle}>Tutor locations aren’t available yet</Text>
-          <Text style={styles.noMapMessage}>
-            Tutors can still be found and booked below. Approximate pins will appear when locations are added.
+          <Text style={styles.noMapTitle}>
+            {nearMeActive && !locatedTutors.length
+              ? `No tutors with mapped locations found within about ${maximumDistanceKm} km`
+              : 'Tutor locations aren’t available yet'}
           </Text>
+          <Text style={styles.noMapMessage}>
+            {nearMeActive && !locatedTutors.length
+              ? tutorsWithoutLocation.length
+                ? 'Tutors without usable locations remain listed below and cannot be checked against this distance limit. Show all tutors to see every available map pin.'
+                : 'Try changing your search filters or show all tutors to see every available map pin.'
+              : 'Tutors can still be found and booked below. Approximate pins will appear when locations are added.'}
+          </Text>
+          {canRecenterOnSearchOrigin ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Center map on ${searchOriginLabel}`}
+              onPress={() => onRequestMapRecenter(() => setShownSearchOriginKey(searchOriginKey))}
+              style={styles.noMapRecenterButton}
+            >
+              <Text style={styles.noMapRecenterText}>Show map around {searchOriginLabel}</Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
 
+      {mapRegion && nearMeActive && !locatedTutors.length && !tutorsWithoutLocation.length ? (
+        <Text style={styles.sectionDescription}>
+          No tutors with mapped locations were found within about {maximumDistanceKm} km.
+        </Text>
+      ) : null}
+
       <Text style={styles.approximateNote}>
-        Pins and distances are approximate to each tutor’s listed city or area, not their home address. Map tiles are provided by OpenStreetMap.
+        {nearMeActive
+          ? 'Results use approximate straight-line distance from your search origin to each tutor’s listed city or area. Tutors without location data remain listed separately; this is not driving distance. Map tiles are provided by OpenStreetMap.'
+          : 'Pins and distances are approximate to each tutor’s listed city or area, not their home address. Map tiles are provided by OpenStreetMap.'}
       </Text>
 
       {selectedTutor ? (
@@ -187,6 +265,19 @@ const styles = StyleSheet.create({
     height: '100%',
     width: '100%',
   },
+  mapControl: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: spacing.sm,
+    top: spacing.sm,
+    width: 40,
+  },
   popupText: {
     color: colors.heading,
     fontSize: 13,
@@ -212,6 +303,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  noMapRecenterButton: {
+    marginTop: spacing.md,
+    padding: spacing.xs,
+  },
+  noMapRecenterText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
     textAlign: 'center',
   },
   approximateNote: {

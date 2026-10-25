@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -18,11 +18,18 @@ import { getTutorMapRegion, splitTutorsByMapLocation } from '../../utils/tutorMa
 
 export default function TutorsMapScreen({
   tutors,
+  nearMeActive = false,
+  maximumDistanceKm,
+  canRecenterOnSearchOrigin = false,
+  searchOrigin,
+  searchOriginSource,
+  onRequestMapRecenter,
   onTutorPress,
 }) {
   const mapRef = useRef(null);
   const [selectedTutorId, setSelectedTutorId] = useState(null);
   const [zoom, setZoom] = useState(13);
+  const [shownSearchOriginKey, setShownSearchOriginKey] = useState(null);
   const { locatedTutors, tutorsWithoutLocation } = useMemo(
     () => splitTutorsByMapLocation(tutors),
     [tutors],
@@ -31,12 +38,25 @@ export default function TutorsMapScreen({
     () => getTutorMapRegion(locatedTutors),
     [locatedTutors],
   );
-  const initialZoom = region
-    ? Math.min(19, Math.max(4, Math.round(Math.log2(360 / region.longitudeDelta))))
+  const searchOriginKey = searchOrigin
+    ? `${searchOrigin.latitude}:${searchOrigin.longitude}`
+    : null;
+  const mapRegion = region ?? (
+    searchOrigin && shownSearchOriginKey === searchOriginKey
+    ? { ...searchOrigin, latitudeDelta: 0.08, longitudeDelta: 0.08 }
+    : null);
+  useEffect(() => {
+    if (!nearMeActive) setShownSearchOriginKey(null);
+  }, [nearMeActive]);
+  const initialZoom = mapRegion
+    ? Math.min(19, Math.max(4, Math.round(Math.log2(360 / mapRegion.longitudeDelta))))
     : 13;
   const selectedTutor = locatedTutors.find((tutor) => tutor.id === selectedTutorId)
     ?? locatedTutors[0]
     ?? null;
+  const searchOriginLabel = searchOriginSource === 'device'
+    ? 'your current location'
+    : 'your saved address';
 
   const adjustZoom = (amount) => {
     const nextZoom = Math.min(19, Math.max(4, zoom + amount));
@@ -45,9 +65,24 @@ export default function TutorsMapScreen({
   };
 
   const recenter = () => {
-    if (!region) return;
+    if (!mapRegion) return;
     setZoom(initialZoom);
-    mapRef.current?.animateToRegion(region, 350);
+    mapRef.current?.animateToRegion(mapRegion, 350);
+  };
+
+  const recenterOnSearchOrigin = () => {
+    if (!canRecenterOnSearchOrigin || !searchOrigin) return;
+    onRequestMapRecenter(() => {
+      if (!region) {
+        setShownSearchOriginKey(searchOriginKey);
+        return;
+      }
+      mapRef.current?.animateToRegion({
+        ...searchOrigin,
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      }, 350);
+    });
   };
 
   return (
@@ -58,14 +93,16 @@ export default function TutorsMapScreen({
     >
       <View style={styles.mapHeading}>
         <Feather name="map-pin" size={18} color={colors.primary} />
-        <Text style={styles.headingText}>Tutors nearby</Text>
+        <Text style={styles.headingText}>
+          {nearMeActive ? `Tutors within about ${maximumDistanceKm} km` : 'Tutors nearby'}
+        </Text>
       </View>
-      {region ? (
+      {mapRegion ? (
         <View style={styles.mapFrame}>
           <MapView
-            key={`${region.latitude.toFixed(4)}:${region.longitude.toFixed(4)}:${region.latitudeDelta.toFixed(4)}:${region.longitudeDelta.toFixed(4)}`}
+            key={`${mapRegion.latitude.toFixed(4)}:${mapRegion.longitude.toFixed(4)}:${mapRegion.latitudeDelta.toFixed(4)}:${mapRegion.longitudeDelta.toFixed(4)}`}
             ref={mapRef}
-            initialRegion={region}
+            initialRegion={mapRegion}
             onMapReady={() => setZoom(initialZoom)}
             style={styles.map}
           >
@@ -119,28 +156,66 @@ export default function TutorsMapScreen({
             >
               <Feather name="minus" size={20} color={colors.heading} />
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Center map on tutors"
-              onPress={recenter}
-              style={styles.mapControl}
-            >
-              <Feather name="crosshair" size={18} color={colors.primary} />
-            </Pressable>
+            {region ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Center map on tutors"
+                onPress={recenter}
+                style={styles.mapControl}
+              >
+                <Feather name="crosshair" size={18} color={colors.primary} />
+              </Pressable>
+            ) : null}
+            {canRecenterOnSearchOrigin && searchOrigin ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Center map on ${searchOriginLabel}`}
+                onPress={recenterOnSearchOrigin}
+                style={styles.mapControl}
+              >
+                <Feather name="navigation" size={18} color={colors.primary} />
+              </Pressable>
+            ) : null}
           </View>
         </View>
       ) : (
         <View style={styles.noMapLocations}>
           <Feather name="map" size={26} color={colors.mutedText} />
-          <Text style={styles.noMapTitle}>Tutor locations aren’t available yet</Text>
-          <Text style={styles.noMapMessage}>
-            Tutors can still be found and booked below. Approximate pins will appear when locations are added.
+          <Text style={styles.noMapTitle}>
+            {nearMeActive && !locatedTutors.length
+              ? `No tutors with mapped locations found within about ${maximumDistanceKm} km`
+              : 'Tutor locations aren’t available yet'}
           </Text>
+          <Text style={styles.noMapMessage}>
+            {nearMeActive && !locatedTutors.length
+              ? tutorsWithoutLocation.length
+                ? 'Tutors without usable locations remain listed below and cannot be checked against this distance limit. Show all tutors to see every available map pin.'
+                : 'Try changing your search filters or show all tutors to see every available map pin.'
+              : 'Tutors can still be found and booked below. Approximate pins will appear when locations are added.'}
+          </Text>
+          {canRecenterOnSearchOrigin ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Center map on ${searchOriginLabel}`}
+              onPress={recenterOnSearchOrigin}
+              style={styles.noMapRecenterButton}
+            >
+              <Text style={styles.noMapRecenterText}>Show map around {searchOriginLabel}</Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
 
+      {mapRegion && nearMeActive && !locatedTutors.length && !tutorsWithoutLocation.length ? (
+        <Text style={styles.sectionDescription}>
+          No tutors with mapped locations were found within about {maximumDistanceKm} km.
+        </Text>
+      ) : null}
+
       <Text style={styles.approximateNote}>
-        Pins and distances are approximate to each tutor’s listed city or area, not their home address.
+        {nearMeActive
+          ? 'Results use approximate straight-line distance from your search origin to each tutor’s listed city or area. Tutors without location data remain listed separately; this is not driving distance.'
+          : 'Pins and distances are approximate to each tutor’s listed city or area, not their home address.'}
       </Text>
 
       {selectedTutor ? (
@@ -270,6 +345,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  noMapRecenterButton: {
+    marginTop: spacing.md,
+    padding: spacing.xs,
+  },
+  noMapRecenterText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
     textAlign: 'center',
   },
   approximateNote: {

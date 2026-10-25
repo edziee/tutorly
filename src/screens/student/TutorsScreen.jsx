@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -30,12 +30,14 @@ import {
   getStudentSearchOrigin,
   recordGeolocationConsent,
 } from '../../services/locationService';
-import { sortByDistance } from '../../utils/distance';
+import { sortByDistanceWithinRadius } from '../../utils/distance';
 import { getErrorMessage } from '../../utils/errors';
 import {
   coordinatesFromLocationCell,
-  getNearMeProfileError,
+  toLocationCell,
 } from '../../utils/geolocation';
+
+const MAX_NEARBY_DISTANCE_KM = 10;
 
 export const TutorsScreen = () => {
   const navigation = useNavigation();
@@ -52,11 +54,14 @@ export const TutorsScreen = () => {
   const [nearMeMessage, setNearMeMessage] = useState('');
   const [nearMeNotice, setNearMeNotice] = useState('');
   const [nearMeOrigin, setNearMeOrigin] = useState(null);
+  const [nearMeOriginSource, setNearMeOriginSource] = useState(null);
+  const [mapProviderConsentGranted, setMapProviderConsentGranted] = useState(false);
+  const [mapRecenterRequest, setMapRecenterRequest] = useState(0);
 
   const askLocationConsent = () => new Promise((resolve) => {
     Alert.alert(
       'Near me location policy',
-      'Tutorly uses your foreground device location only for this search and does not save those coordinates. If device location is unavailable, your saved private home address may be geocoded and cached in your private profile. Tutorly records your consent decision and time. Tutor addresses and exact coordinates are never shown. Do you agree?',
+      'Tutorly uses your foreground device location only for this search and does not save those coordinates. If you tap the map recenter button, an approximate location is sent to the map provider to load the map. If device location is unavailable, your saved private home address may be geocoded and cached in your private profile. Tutorly records your consent decision and time. Tutor addresses and exact coordinates are never shown. Do you agree?',
       [
         { text: 'Not now', style: 'cancel', onPress: () => resolve(false) },
         { text: 'Agree and continue', onPress: () => resolve(true) },
@@ -68,19 +73,11 @@ export const TutorsScreen = () => {
   const runNearMeSearch = async () => {
     if (nearMeStatus === 'loading') return;
 
-    const profileError = getNearMeProfileError(user);
-    if (profileError) {
-      setNearMeActive(true);
-      setNearMeStatus('error');
-      setNearMeMessage(profileError);
-      setNearMeNotice('');
-      setNearMeOrigin(null);
-      return;
-    }
-
     setNearMeStatus('loading');
     setNearMeMessage('');
     setNearMeNotice('');
+    setNearMeOrigin(null);
+    setNearMeOriginSource(null);
     try {
       let consented = user.geolocationConsent === true;
       if (!consented) {
@@ -93,6 +90,7 @@ export const TutorsScreen = () => {
         setNearMeMessage('Near me needs your consent to use location for this search. You can retry whenever you’re ready.');
         return;
       }
+      if (user.geolocationConsent !== true) setMapProviderConsentGranted(true);
 
       const origin = await getStudentSearchOrigin({
         ...user,
@@ -100,6 +98,7 @@ export const TutorsScreen = () => {
       });
       setNearMeActive(true);
       setNearMeOrigin(origin.coordinates);
+      setNearMeOriginSource(origin.source);
       setNearMeNotice(origin.notice);
       setNearMeStatus('ready');
     } catch (error) {
@@ -115,6 +114,7 @@ export const TutorsScreen = () => {
       setNearMeActive(false);
       setNearMeStatus('idle');
       setNearMeOrigin(null);
+      setNearMeOriginSource(null);
       setNearMeMessage('');
       setNearMeNotice('');
       return;
@@ -131,7 +131,32 @@ export const TutorsScreen = () => {
       setNearMeMessage('');
       setNearMeNotice('');
       setNearMeOrigin(null);
+      setNearMeOriginSource(null);
     }
+  };
+
+  const handleMapRecenter = (onContinue) => {
+    if (mapProviderConsentGranted) {
+      setMapRecenterRequest((request) => request + 1);
+      onContinue();
+      return;
+    }
+    Alert.alert(
+      'Share approximate map location?',
+      'To center the map, an approximate location is sent to the map provider to load nearby map tiles. Your exact device coordinates are not sent or saved.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: () => {
+            setMapProviderConsentGranted(true);
+            setMapRecenterRequest((request) => request + 1);
+            onContinue();
+          },
+        },
+      ],
+      { cancelable: true },
+    );
   };
 
   const handleCoursePress = (selectedCourse) => {
@@ -157,9 +182,10 @@ export const TutorsScreen = () => {
     sanitizeString(tutor.subject ?? '').includes(sanitizeString(courseCategory)) &&
     sanitizeString(tutor.tier ?? '').includes(sanitizeString(tierCategory)));
   const nearbyTutors = nearMeOrigin
-    ? sortByDistance(
+    ? sortByDistanceWithinRadius(
         filteredTutors,
         nearMeOrigin,
+        MAX_NEARBY_DISTANCE_KM,
         (tutor) => tutor.locationCellVersion === 1
           ? coordinatesFromLocationCell(tutor.locationCell)
           : null,
@@ -168,6 +194,12 @@ export const TutorsScreen = () => {
   const displayedTutors = nearMeActive && nearMeOrigin
     ? nearbyTutors
     : filteredTutors;
+  const mapSearchOrigin = useMemo(
+    () => nearMeOrigin
+      ? coordinatesFromLocationCell(toLocationCell(nearMeOrigin))
+      : null,
+    [nearMeOrigin],
+  );
   const openTutor = (tutor) => navigation.navigate(ROUTES.BOOKING, { tutor });
 
   return (
@@ -353,6 +385,13 @@ export const TutorsScreen = () => {
         ) : viewMode === 'map' ? (
           <TutorsMapScreen
             tutors={displayedTutors}
+            nearMeActive={nearMeActive && Boolean(nearMeOrigin)}
+            maximumDistanceKm={MAX_NEARBY_DISTANCE_KM}
+            canRecenterOnSearchOrigin={nearMeActive && Boolean(nearMeOrigin)}
+            searchOrigin={mapSearchOrigin}
+            searchOriginSource={nearMeOriginSource}
+            onRequestMapRecenter={handleMapRecenter}
+            mapRecenterRequest={mapRecenterRequest}
             onTutorPress={openTutor}
           />
         ) : displayedTutors.length ? (

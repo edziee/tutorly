@@ -8,6 +8,7 @@ import {
   distanceInMeters,
   isWithinRadius,
   sortByDistance,
+  sortByDistanceWithinRadius,
 } from './distance.js';
 
 const manila = { latitude: 14.5995, longitude: 120.9842 };
@@ -72,4 +73,37 @@ test('sortByDistance accepts a custom way to find the coordinates', () => {
   const sessions = [{ id: 's1', place: quezonCity }, { id: 's2', place: manila }];
   const sorted = sortByDistance(sessions, manila, (item) => item.place);
   assert.deepEqual(sorted.map((item) => item.id), ['s2', 's1']);
+});
+
+test('sortByDistanceWithinRadius keeps in-range tutors and unknown locations, nearest first', () => {
+  const tutors = [
+    { id: 'far', coordinates: quezonCity },
+    { id: 'unknown' },
+    { id: 'near', coordinates: manila },
+  ];
+
+  const nearby = sortByDistanceWithinRadius(tutors, manila, 1);
+
+  assert.deepEqual(nearby.map(({ id, distanceKm }) => ({ id, distanceKm })), [
+    { id: 'near', distanceKm: 0 },
+    { id: 'unknown', distanceKm: null },
+  ]);
+  assert.deepEqual(tutors.map(({ id }) => id), ['far', 'unknown', 'near']);
+});
+
+test('sortByDistanceWithinRadius includes tutors exactly on the boundary', () => {
+  const boundaryTutor = { id: 'boundary', coordinates: quezonCity };
+  const distance = distanceInKm(manila, quezonCity);
+
+  assert.deepEqual(
+    sortByDistanceWithinRadius([boundaryTutor], manila, distance),
+    [{ ...boundaryTutor, distanceKm: distance }],
+  );
+});
+
+test('sortByDistanceWithinRadius rejects an invalid radius', () => {
+  assert.throws(
+    () => sortByDistanceWithinRadius([], manila, -1),
+    /non-negative distance radius/,
+  );
 });

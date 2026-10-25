@@ -56,12 +56,16 @@ test('map data uses only coarse public cells and keeps tutors without a cell vis
     ['legacy-address-cell'],
   );
   assert.match(nativeMapScreen, /Location not available yet/);
+  assert.match(nativeMapScreen, /nearMeActive && !locatedTutors\.length/);
+  assert.match(nativeMapScreen, /cannot be checked against this distance limit/);
   assert.match(nativeMapScreen, /tutorsWithoutLocation\.map/);
   assert.match(webMapScreen, /Location not available yet/);
+  assert.match(webMapScreen, /nearMeActive && !locatedTutors\.length/);
+  assert.match(webMapScreen, /cannot be checked against this distance limit/);
   assert.match(webMapScreen, /tutorsWithoutLocation\.map/);
 });
 
-test('map region is derived from coarse tutor cells, never the private search origin', () => {
+test('map pins use coarse tutor cells; search origin is rounded and only used for recentering', () => {
   const region = getTutorMapRegion([
     { locationCell: { latitudeCell: 1465, longitudeCell: 12105 }, locationCellVersion: 1 },
     { locationCell: { latitudeCell: 1475, longitudeCell: 12115 }, locationCellVersion: 1 },
@@ -71,9 +75,18 @@ test('map region is derived from coarse tutor cells, never the private search or
   assert.ok(Math.abs(region.latitudeDelta - 0.16) < 1e-9);
   assert.ok(Math.abs(region.longitudeDelta - 0.16) < 1e-9);
   assert.equal(getTutorMapRegion([{ id: 'no-location' }]), null);
-  assert.doesNotMatch(tutorsScreen, /locationOrigin=\{nearMeOrigin\}/);
-  assert.doesNotMatch(nativeMapScreen, /locationOrigin/);
-  assert.doesNotMatch(webMapScreen, /locationOrigin/);
+  assert.match(tutorsScreen, /coordinatesFromLocationCell\(toLocationCell\(nearMeOrigin\)\)/);
+  assert.match(tutorsScreen, /approximate location is sent to the map provider/);
+  assert.match(tutorsScreen, /Share approximate map location\?/);
+  assert.match(tutorsScreen, /Your exact device coordinates are not sent or saved/);
+  assert.match(nativeMapScreen, /Center map on \$\{searchOriginLabel\}/);
+  assert.match(nativeMapScreen, /shownSearchOriginKey === searchOriginKey/);
+  assert.match(nativeMapScreen, /recenterOnSearchOrigin/);
+  assert.match(webMapScreen, /Center map on \$\{searchOriginLabel\}/);
+  assert.match(webMapScreen, /shownSearchOriginKey === searchOriginKey/);
+  assert.match(webMapScreen, /recenterRequest > previousRecenterRequest\.current && searchOrigin/);
+  assert.doesNotMatch(nativeMapScreen, /coordinate=\{searchOrigin\}/);
+  assert.doesNotMatch(webMapScreen, /position=\{\[searchOrigin\.latitude/);
 });
 
 test('Near me is exposed only in map mode and clears its search when returning to list', () => {
@@ -85,6 +98,9 @@ test('Near me is exposed only in map mode and clears its search when returning t
     tutorsScreen,
     /if \(nextView === 'list'\) \{\s+setNearMeActive\(false\);[\s\S]*?setNearMeOrigin\(null\);/,
   );
+  assert.match(tutorsScreen, /const MAX_NEARBY_DISTANCE_KM = 10/);
+  assert.match(tutorsScreen, /sortByDistanceWithinRadius/);
+  assert.match(tutorsScreen, /nearMeActive=\{nearMeActive && Boolean\(nearMeOrigin\)\}/);
 });
 
 test('both discovery views use approved public tutors regardless of location-cell availability', () => {

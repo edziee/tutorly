@@ -30,7 +30,7 @@ The app has Firebase-backed authentication and data flows for bookings, tutor pr
 | Splash screen and two-page onboarding | Built (the onboarding is marked to be edited later) |
 | Student app with five tabs: Tutors, Profile, Schedule, Tutor Profile, Messages | Screens use Firebase-backed services; remaining feature gaps are listed below |
 | Tutors list with search and course and tier filters | Reads approved tutor profiles from Firestore |
-| Tutor map discovery | List and interactive map views share filters; Near me is map-only. Maps use coarse public tutor locations and keep tutors without locations visible without pins |
+| Tutor map discovery | List and interactive map views share filters; map-only Near me filters to approximately 10 km using coarse tutor locations, with an explicit recenter control. Tutors without locations remain visible without pins |
 | Schedule with upcoming and past sessions, reschedule, add to calendar | Reads live bookings from Firestore |
 | Messages screen | Reads live conversations and approved tutors from Firestore |
 | Tutor schedule and session ledger | Reads live bookings from Firestore |

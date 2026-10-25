@@ -53,3 +53,17 @@ export function sortByDistance(items, origin, getCoordinates = (item) => item.co
       return a.distanceKm - b.distanceKm;
     });
 }
+
+export function sortByDistanceWithinRadius(
+  items,
+  origin,
+  radiusKm,
+  getCoordinates = (item) => item.coordinates,
+) {
+  if (!Number.isFinite(radiusKm) || radiusKm < 0) {
+    throw new RangeError('A non-negative distance radius is required.');
+  }
+
+  return sortByDistance(items, origin, getCoordinates)
+    .filter((item) => item.distanceKm === null || item.distanceKm <= radiusKm);
+}

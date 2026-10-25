@@ -128,8 +128,17 @@ test('nearby search reads only the signed-in student profile for its fallback ad
   assert.match(locationService, /geolocationConsent: consented/);
 });
 
-test('Near me gates only the discovery action and links to the existing profile editor', () => {
-  assert.match(tutorsScreen, /const profileError = getNearMeProfileError\(user\)/);
+test('Near me tries device location before requiring a saved-address fallback', () => {
+  assert.doesNotMatch(tutorsScreen, /getNearMeProfileError/);
+  assert.doesNotMatch(
+    locationService.slice(locationService.indexOf('export async function getStudentSearchOrigin')),
+    /getNearMeProfileError/,
+  );
+  assert.match(
+    locationService.slice(locationService.indexOf('async function getSavedAddressCoordinates')),
+    /getNearMeProfileError/,
+  );
+  assert.match(locationService, /requestLocationPermission\(\)[\s\S]*?getCurrentCoordinates\(\)/);
   assert.match(tutorsScreen, /navigation\.navigate\(ROUTES\.PROFILE\)/);
   assert.match(tutorsScreen, /recordGeolocationConsent\(user\.uid, consented\)/);
   assert.match(tutorsScreen, />Retry<\/Text>/);
