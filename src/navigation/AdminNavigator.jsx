@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ROUTES } from '../constants/routes';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import AdminUsersScreen from '../screens/admin/AdminUsersScreen';
+import AdminBookingsScreen from '../screens/admin/AdminBookingsScreen';
 import AdminVerificationsScreen from '../screens/admin/AdminVerificationsScreen';
 import AdminReviewHistoryScreen from '../screens/admin/AdminReviewHistoryScreen';
 import AdminWalletsScreen from '../screens/admin/AdminWalletsScreen';
@@ -43,6 +44,11 @@ export default function AdminNavigator() {
         name={ROUTES.ADMIN_USERS}
         component={AdminUsersScreen}
         options={{ title: 'Manage users' }}
+      />
+      <Stack.Screen
+        name={ROUTES.ADMIN_BOOKINGS}
+        component={AdminBookingsScreen}
+        options={{ title: 'View bookings' }}
       />
     </Stack.Navigator>
   );
