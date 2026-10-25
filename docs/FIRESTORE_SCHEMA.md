@@ -36,6 +36,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `tutorVerificationNote`, `tutorVerificationReviewedBy`, `tutorVerificationReviewedAt` | string, uid, timestamp | Admin-only outcome details for direct tutor account review. Rejection requires a reason |
 | `name` | string | |
 | `phone`, `age`, `location` (city), `year`, `campus`, `campusAddress` | string | From the student profile screen |
+| `homeAddress` | string | Optional private home address for student and tutor profile owners; editable from the profile, never copied to the public tutor document. Intended for a future geolocation feature; it is not required for sign-up or normal app use |
 | `photoUrl` | string | Optional instructor-approved external image URL. If empty, show initials; do not use Firebase Storage |
 | `notificationPreferences` | map of booleans | Week 3, Member 4 (for example `bookings`, `messages`, `reminders`) |
 | `tutorCompletedBookingCount`, `lastTutorCompletedBookingId` | private integer, string | Rules-guarded aggregate and last-booking marker. Updated only in the same atomic transition that confirms a completed tutoring session; clients cannot edit these through profile updates |

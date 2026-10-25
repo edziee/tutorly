@@ -45,6 +45,27 @@ import { formatDateKey } from '../../utils/format';
 import { getFirstName, getUserId } from '../../utils/user';
 import { isHttpsUrl } from '../../utils/validation';
 
+const COMMON_CITY_SUGGESTIONS = [
+  'Quezon City',
+  'Manila',
+  'Makati',
+  'Pasig',
+  'Taguig',
+  'Marikina',
+  'Mandaluyong',
+  'Pasay',
+  'Parañaque',
+  'Las Piñas',
+  'Muntinlupa',
+  'Caloocan',
+  'Antipolo',
+  'Cebu City',
+  'Davao City',
+  'Baguio City',
+  'Iloilo City',
+  'Cagayan de Oro',
+];
+
 const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export default function StudentProfileScreen({ navigation }) {
@@ -59,24 +80,43 @@ export default function StudentProfileScreen({ navigation }) {
     name: user?.name ?? '',
     age: user?.age == null ? '' : String(user.age),
     location: user?.location ?? '',
+    homeAddress: user?.homeAddress ?? '',
     email: user?.email ?? '',
     phone: user?.phone ?? '',
     photoUrl: user?.photoUrl ?? '',
   });
   const [profileDraft, setProfileDraft] = useState(profile);
   const [editVisible, setEditVisible] = useState(false);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const normalizedLocationQuery = profileDraft.location.trim().toLowerCase();
+  const locationSuggestions = COMMON_CITY_SUGGESTIONS
+    .filter((city) =>
+      city.toLowerCase() !== normalizedLocationQuery &&
+      (!normalizedLocationQuery || city.toLowerCase().includes(normalizedLocationQuery)),
+    )
+    .slice(0, 6);
   useEffect(() => {
     const currentProfile = {
       name: user?.name ?? '',
       age: user?.age == null ? '' : String(user.age),
       location: user?.location ?? '',
+      homeAddress: user?.homeAddress ?? '',
       email: user?.email ?? '',
       phone: user?.phone ?? '',
       photoUrl: user?.photoUrl ?? '',
     };
     setProfile(currentProfile);
     setProfileDraft(currentProfile);
-  }, [user?.uid, user?.name, user?.age, user?.location, user?.email, user?.phone, user?.photoUrl]);
+  }, [
+    user?.uid,
+    user?.name,
+    user?.age,
+    user?.location,
+    user?.homeAddress,
+    user?.email,
+    user?.phone,
+    user?.photoUrl,
+  ]);
   const stats = user?.stats ?? {};
   const streakDays = Number(stats.streakDays) || 0;
   const nextStreakMilestone = Number(stats.nextStreakMilestone) || streakDays + 1;
@@ -200,6 +240,7 @@ export default function StudentProfileScreen({ navigation }) {
   };
   const openProfileEditor = () => {
     setProfileDraft(profile);
+    setShowLocationSuggestions(false);
     setEditVisible(true);
   };
   const saveProfile = async () => {
@@ -207,6 +248,7 @@ export default function StudentProfileScreen({ navigation }) {
       name: profileDraft.name.trim(),
       age: profileDraft.age.trim(),
       location: profileDraft.location.trim(),
+      homeAddress: profileDraft.homeAddress.trim(),
       phone: profileDraft.phone.trim(),
       photoUrl: profileDraft.photoUrl.trim(),
     };
@@ -316,8 +358,13 @@ export default function StudentProfileScreen({ navigation }) {
             />
             <PersonalDetail
               icon="location-outline"
-              label="Location"
+              label="City or area"
               value={profile.location || 'Not set'}
+            />
+            <PersonalDetail
+              icon="home-outline"
+              label="Home address"
+              value={profile.homeAddress || 'Not set'}
             />
             <PersonalDetail icon="mail-outline" label="Email" value={profile.email} />
             <PersonalDetail
@@ -629,7 +676,10 @@ export default function StudentProfileScreen({ navigation }) {
                 <Text style={styles.modalTitle}>Edit your profile</Text>
                 <Pressable
                   accessibilityLabel="Close profile editor"
-                  onPress={() => setEditVisible(false)}
+                  onPress={() => {
+                    setShowLocationSuggestions(false);
+                    setEditVisible(false);
+                  }}
                   hitSlop={8}
                 >
                   <Ionicons name="close" size={23} color={colors.mutedText} />
@@ -651,11 +701,61 @@ export default function StudentProfileScreen({ navigation }) {
                   keyboardType="number-pad"
                 />
                 <AppInput
-                  label="Location"
+                  label="City or area"
                   value={profileDraft.location}
-                  handleChangeText={(value) => setProfileDraft({ ...profileDraft, location: value })}
-                  placeholder="City or area"
+                  handleChangeText={(value) => {
+                    setProfileDraft({ ...profileDraft, location: value });
+                    setShowLocationSuggestions(true);
+                  }}
+                  placeholder="Choose or type a city or area"
+                  onFocus={() => setShowLocationSuggestions(true)}
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  rightElement={
+                    <Ionicons
+                      name={showLocationSuggestions ? 'chevron-up' : 'chevron-down'}
+                      size={18}
+                      color={colors.mutedText}
+                    />
+                  }
                 />
+                {showLocationSuggestions ? (
+                  <View style={styles.locationSuggestions}>
+                    <Text style={styles.locationSuggestionsTitle}>
+                      {normalizedLocationQuery ? 'Suggestions' : 'Popular cities'}
+                    </Text>
+                    {locationSuggestions.length ? locationSuggestions.map((city) => (
+                      <Pressable
+                        key={city}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Use ${city}`}
+                        onPress={() => {
+                          setProfileDraft({ ...profileDraft, location: city });
+                          setShowLocationSuggestions(false);
+                        }}
+                        style={styles.locationSuggestion}
+                      >
+                        <Ionicons name="location-outline" size={17} color={colors.primary} />
+                        <Text style={styles.locationSuggestionText}>{city}</Text>
+                      </Pressable>
+                    )) : (
+                      <Text style={styles.noLocationSuggestions}>
+                        No matches. Keep typing to use your own location.
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
+                <AppInput
+                  label="Home address (private)"
+                  value={profileDraft.homeAddress}
+                  handleChangeText={(value) => setProfileDraft({ ...profileDraft, homeAddress: value })}
+                  placeholder="Your home address"
+                  maxLength={300}
+                  autoComplete="street-address"
+                />
+                <Text style={styles.profileHint}>
+                  This address is saved to your private account profile and isn’t shown to other users.
+                </Text>
                 <AppInput
                   label="Phone"
                   value={profileDraft.phone}
@@ -672,7 +772,7 @@ export default function StudentProfileScreen({ navigation }) {
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                <Text style={styles.photoUrlHint}>
+                <Text style={styles.profileHint}>
                   Use an HTTPS image link. Firebase Storage uploads are not used.
                 </Text>
               </ScrollView>
@@ -1126,10 +1226,44 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  photoUrlHint: {
+  profileHint: {
     marginTop: -spacing.sm,
     marginBottom: spacing.md,
     color: colors.mutedText,
     fontSize: 12,
+  },
+  locationSuggestions: {
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  locationSuggestionsTitle: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  locationSuggestion: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+  },
+  locationSuggestionText: {
+    color: colors.text,
+    fontSize: 14,
+  },
+  noLocationSuggestions: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+    color: colors.mutedText,
+    fontSize: 13,
   },
 });
