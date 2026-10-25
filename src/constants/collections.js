@@ -9,6 +9,7 @@ export const COLLECTIONS = {
   WALLETS: 'wallets', // private token balances, one per account
   TOKEN_TRANSACTIONS: 'tokenTransactions', // immutable token movement ledger
   BOOKINGS: 'bookings', // sessions between a student and a tutor
+  TUTOR_ACHIEVEMENTS: 'tutorAchievements', // private, immutable earned tutor milestones
   CONVERSATIONS: 'conversations', // one chat between a student and a tutor
   MESSAGES: 'messages', // subcollection: conversations/{id}/messages
   NOTIFICATIONS: 'notifications', // in-app alerts, one document per alert

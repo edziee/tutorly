@@ -22,6 +22,11 @@ import {
   TOKEN_BOOKING_STATUS,
   TOKEN_TRANSACTION_TYPES,
 } from '../constants/statuses';
+import {
+  getNewlyQualifiedTutorAchievements,
+  TUTOR_ACHIEVEMENT_BY_ID,
+  TUTOR_HOURS_OF_IMPACT_THRESHOLD_SECONDS,
+} from '../constants/gamification';
 import { formatTokenUnits } from '../utils/tokens';
 import { assertApprovedTutor } from './tutorService';
 import { createNotification } from './notificationService';
@@ -387,6 +392,9 @@ export async function updateBookingStatus(bookingId, status) {
     const isStudent = booking.studentId === userId;
     let tutorRef;
     let nextTeachingSeconds;
+    let userRef;
+    let nextCompletedBookings;
+    let newlyQualifiedAchievements = [];
     if (status === BOOKING_STATUS.UPCOMING || status === BOOKING_STATUS.REJECTED) {
       if (!isTutor || booking.status !== BOOKING_STATUS.REQUESTED) {
         throw new Error('Only the assigned tutor can respond to a pending request.');
@@ -404,17 +412,50 @@ export async function updateBookingStatus(bookingId, status) {
         throw new Error('Stop the timer and review a positive recorded teaching duration before confirming completion.');
       }
       tutorRef = doc(db, COLLECTIONS.TUTORS, booking.tutorId);
-      const tutorSnapshot = await transaction.get(tutorRef);
-      if (!tutorSnapshot.exists()) throw new Error('The tutor profile is unavailable.');
+      userRef = doc(db, COLLECTIONS.USERS, booking.tutorId);
+      const [tutorSnapshot, userSnapshot] = await Promise.all([
+        transaction.get(tutorRef),
+        transaction.get(userRef),
+      ]);
+      if (!tutorSnapshot.exists() || !userSnapshot.exists()) {
+        throw new Error('The tutor profile is unavailable.');
+      }
       const currentTeachingSeconds = tutorSnapshot.data().totalRecordedTeachingSeconds ?? 0;
+      const currentCompletedBookings = userSnapshot.data().tutorCompletedBookingCount ?? 0;
       nextTeachingSeconds = currentTeachingSeconds + booking.accumulatedDurationSeconds;
+      nextCompletedBookings = currentCompletedBookings + 1;
       if (
         !Number.isSafeInteger(currentTeachingSeconds) ||
         currentTeachingSeconds < 0 ||
-        !Number.isSafeInteger(nextTeachingSeconds)
+        !Number.isSafeInteger(nextTeachingSeconds) ||
+        !Number.isSafeInteger(currentCompletedBookings) ||
+        currentCompletedBookings < 0 ||
+        !Number.isSafeInteger(nextCompletedBookings)
       ) {
-        throw new Error('The tutor teaching-time total is invalid. Contact support.');
+        throw new Error('The tutor completion totals are invalid. Contact support.');
       }
+      newlyQualifiedAchievements = getNewlyQualifiedTutorAchievements({
+        previousCompletedBookings: currentCompletedBookings,
+        nextCompletedBookings,
+        previousTeachingSeconds: currentTeachingSeconds,
+        nextTeachingSeconds,
+      });
+      if (
+        nextTeachingSeconds >= TUTOR_HOURS_OF_IMPACT_THRESHOLD_SECONDS &&
+        !newlyQualifiedAchievements.some(({ id }) => id === 'hours_of_impact')
+      ) {
+        newlyQualifiedAchievements.push(TUTOR_ACHIEVEMENT_BY_ID.hours_of_impact);
+      }
+      const achievementRefs = newlyQualifiedAchievements.map(({ id }) =>
+        doc(db, COLLECTIONS.TUTOR_ACHIEVEMENTS, `${booking.tutorId}_${id}`));
+      const achievementSnapshots = await Promise.all(
+        achievementRefs.map((ref) => transaction.get(ref)),
+      );
+      newlyQualifiedAchievements = newlyQualifiedAchievements.filter((achievement, index) => {
+        if (!achievementSnapshots[index].exists()) return true;
+        if (achievement.id === 'hours_of_impact') return false;
+        throw new Error('A tutor milestone record already exists unexpectedly. Contact support.');
+      });
     } else if ((!isTutor && !isStudent) || ![BOOKING_STATUS.REQUESTED, BOOKING_STATUS.UPCOMING].includes(booking.status)) {
       throw new Error('Only a participant can cancel an active booking.');
     }
@@ -684,10 +725,26 @@ export async function updateBookingStatus(bookingId, status) {
           createdAt: timestamp,
         });
         if (status === BOOKING_STATUS.COMPLETED) {
+          newlyQualifiedAchievements.forEach((achievement) => {
+            transaction.set(
+              doc(db, COLLECTIONS.TUTOR_ACHIEVEMENTS, `${booking.tutorId}_${achievement.id}`),
+              {
+                badgeId: achievement.id,
+                tutorId: booking.tutorId,
+                qualifyingBookingId: bookingId,
+                criterionVersion: 1,
+                createdAt: timestamp,
+              },
+            );
+          });
           transaction.update(tutorRef, {
             totalRecordedTeachingSeconds: nextTeachingSeconds,
             lastTeachingBookingId: bookingId,
             updatedAt: timestamp,
+          });
+          transaction.update(userRef, {
+            tutorCompletedBookingCount: nextCompletedBookings,
+            lastTutorCompletedBookingId: bookingId,
           });
         }
       }
@@ -724,10 +781,26 @@ export async function updateBookingStatus(bookingId, status) {
       updatedAt: serverTimestamp(),
     });
     if (status === BOOKING_STATUS.COMPLETED) {
+      newlyQualifiedAchievements.forEach((achievement) => {
+        transaction.set(
+          doc(db, COLLECTIONS.TUTOR_ACHIEVEMENTS, `${booking.tutorId}_${achievement.id}`),
+          {
+            badgeId: achievement.id,
+            tutorId: booking.tutorId,
+            qualifyingBookingId: bookingId,
+            criterionVersion: 1,
+            createdAt: serverTimestamp(),
+          },
+        );
+      });
       transaction.update(tutorRef, {
         totalRecordedTeachingSeconds: nextTeachingSeconds,
         lastTeachingBookingId: bookingId,
         updatedAt: serverTimestamp(),
+      });
+      transaction.update(userRef, {
+        tutorCompletedBookingCount: nextCompletedBookings,
+        lastTutorCompletedBookingId: bookingId,
       });
     }
   });

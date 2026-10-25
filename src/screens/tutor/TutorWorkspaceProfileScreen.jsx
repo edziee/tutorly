@@ -1,7 +1,16 @@
-import { formatRecordedDuration, getCompletionTimerError } from '../../utils/sessionTimer';
-import { useCallback, useState } from 'react';
+import { formatRecordedDuration } from '../../utils/sessionTimer';
+import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppButton from '../../components/AppButton';
@@ -15,6 +24,11 @@ import { openTutorApplication } from '../../navigation/studentNavigationActions'
 import { ROLES } from '../../constants/roles';
 import { ROUTES } from '../../constants/routes';
 import {
+  STUDENT_BADGES,
+  STUDENT_BADGE_BY_ID,
+  TUTOR_ACHIEVEMENTS,
+} from '../../constants/gamification';
+import {
   BOOKING_STATUS,
   TOKEN_BOOKING_STATUS,
   TUTOR_TYPES,
@@ -27,6 +41,13 @@ import {
   getTutors,
   updateTutorBookingDetails,
 } from '../../services/tutorService';
+import {
+  awardStudentBadge,
+  setTutorAchievementVisibility,
+  subscribeToTutorAchievements,
+  subscribeToTutorAchievementVisibility,
+  subscribeToTutorBadgeAwards,
+} from '../../services/badgeService';
 import {
   subscribeToTutorBookings,
   updateBookingStatus,
@@ -118,9 +139,20 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
   const [bookingDetailsError, setBookingDetailsError] = useState('');
   const [bookingActionError, setBookingActionError] = useState('');
   const [workingBookingId, setWorkingBookingId] = useState('');
+  const [awardSession, setAwardSession] = useState(null);
+  const [selectedStudentBadgeId, setSelectedStudentBadgeId] = useState('');
+  const [studentBadgeNote, setStudentBadgeNote] = useState('');
+  const [savingStudentAward, setSavingStudentAward] = useState(false);
+  const [studentAwardError, setStudentAwardError] = useState('');
+  const [savingAchievementId, setSavingAchievementId] = useState('');
+  const [achievementVisibilityError, setAchievementVisibilityError] = useState('');
+  const [achievementModalVisible, setAchievementModalVisible] = useState(false);
   const [loadStatus, setLoadStatus] = useState('loading');
   const [loadError, setLoadError] = useState(null);
   const uid = user?.uid;
+  useEffect(() => {
+    setAchievementModalVisible(false);
+  }, [uid]);
   const isDirectTutorAccount = hasDirectTutorAccountStatus(
     user?.role,
     user?.tutorVerificationStatus,
@@ -146,6 +178,30 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     ),
     [uid, canPerformTutorOperations],
   );
+  const studentAwardResults = useSubscription(
+    (onData, onError) => (
+      uid && canPerformTutorOperations
+        ? subscribeToTutorBadgeAwards(uid, onData, onError)
+        : undefined
+    ),
+    [uid, canPerformTutorOperations],
+  );
+  const achievementResults = useSubscription(
+    (onData, onError) => (
+      uid && canPerformTutorOperations
+        ? subscribeToTutorAchievements(uid, onData, onError)
+        : undefined
+    ),
+    [uid, canPerformTutorOperations],
+  );
+  const achievementVisibility = useSubscription(
+    (onData, onError) => (
+      uid && canPerformTutorOperations
+        ? subscribeToTutorAchievementVisibility(uid, onData, onError)
+        : undefined
+    ),
+    [uid, canPerformTutorOperations],
+  );
   const pendingRequests = (bookingResults.data ?? []).filter((booking) => booking.status === 'requested');
   const sessions = (bookingResults.data ?? [])
     .filter((booking) =>
@@ -156,6 +212,14 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     );
   const upcomingSessions = sessions.filter((session) => session.status === BOOKING_STATUS.UPCOMING);
   const completedSessions = sessions.filter((session) => session.status === BOOKING_STATUS.COMPLETED);
+  const awardsByBooking = new Map(
+    (studentAwardResults.data ?? []).map((award) => [award.bookingId, award]),
+  );
+  const allAchievements = achievementResults.data ?? [];
+  const shownAchievements = allAchievements.filter(
+    (record) => achievementVisibility.data?.[record.badgeId] ?? true,
+  );
+  const displayedAchievements = shownAchievements.slice(0, 3);
   const tutorName = application?.name || user?.name || 'Tutor';
   const tutorType = application?.tutorType
     ?? user?.tutorType
@@ -282,12 +346,97 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     setBookingActionError('');
     try {
       await updateBookingStatus(bookingId, status);
-      if (status === BOOKING_STATUS.COMPLETED) tutorResults.retry();
     } catch (error) {
       setBookingActionError(getErrorMessage(error, 'Couldn’t update this booking.'));
     } finally {
       setWorkingBookingId('');
     }
+  };
+
+  const openStudentBadgePicker = (session) => {
+    setAwardSession(session);
+    setSelectedStudentBadgeId('');
+    setStudentBadgeNote('');
+    setStudentAwardError('');
+  };
+
+  const saveStudentBadge = async () => {
+    if (!awardSession || !selectedStudentBadgeId || savingStudentAward) return;
+    setSavingStudentAward(true);
+    setStudentAwardError('');
+    try {
+      await awardStudentBadge({
+        bookingId: awardSession.id,
+        badgeId: selectedStudentBadgeId,
+        note: studentBadgeNote,
+      });
+      setAwardSession(null);
+      setSelectedStudentBadgeId('');
+      setStudentBadgeNote('');
+    } catch (error) {
+      setStudentAwardError(getErrorMessage(error, 'Could not award this badge.'));
+    } finally {
+      setSavingStudentAward(false);
+    }
+  };
+
+  const changeAchievementVisibility = async (badgeId, visible) => {
+    if (savingAchievementId) return;
+    setSavingAchievementId(badgeId);
+    setAchievementVisibilityError('');
+    try {
+      await setTutorAchievementVisibility(badgeId, visible);
+    } catch (error) {
+      setAchievementVisibilityError(
+        getErrorMessage(error, 'Could not update this achievement.'),
+      );
+    } finally {
+      setSavingAchievementId('');
+    }
+  };
+
+  const renderAchievement = (record) => {
+    const achievement = TUTOR_ACHIEVEMENTS.find((item) => item.id === record.badgeId);
+    if (!achievement) return null;
+    const visible = achievementVisibility.data?.[record.badgeId] ?? true;
+    return (
+      <View
+        key={record.id}
+        style={[
+          styles.achievementRow,
+          !visible && styles.achievementRowHidden,
+        ]}
+      >
+        <View style={styles.achievementMedal}>
+          <View style={styles.achievementRibbonPair}>
+            <View style={[styles.achievementRibbon, styles.achievementRibbonLeft]} />
+            <View style={[styles.achievementRibbon, styles.achievementRibbonRight]} />
+          </View>
+          <View style={styles.achievementSeal}>
+            <Ionicons name="ribbon" size={23} color="#765013" />
+          </View>
+        </View>
+        <View style={styles.achievementCopy}>
+          <View style={styles.achievementHeading}>
+            <Text style={styles.achievementName}>{achievement.name}</Text>
+            <View style={styles.achievementEarnedTag}>
+              <Text style={styles.achievementEarnedText}>EARNED</Text>
+            </View>
+          </View>
+          <Text style={styles.achievementDescription}>{achievement.description}</Text>
+          <Text style={styles.achievementCriterion}>{achievement.criterionDescription}</Text>
+        </View>
+        <View style={styles.achievementToggle}>
+          <Text style={styles.achievementToggleLabel}>{visible ? 'Shown' : 'Hidden'}</Text>
+          <Switch
+            accessibilityLabel={`${visible ? 'Hide' : 'Show'} ${achievement.name} on your private profile`}
+            value={visible}
+            disabled={Boolean(savingAchievementId)}
+            onValueChange={(value) => changeAchievementVisibility(record.badgeId, value)}
+          />
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -495,6 +644,68 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           </Text>
         </View>
 
+        {canPerformTutorOperations ? (
+          <>
+            <SectionTitle
+              title="Tutor achievements"
+              subtitle="Earned milestones · private to you"
+            />
+            <View style={styles.achievementCard}>
+              <Text style={styles.achievementPrivacy}>
+                Milestones use completed sessions and confirmed timer records. Only you can view this list.
+              </Text>
+              {achievementResults.status === 'loading' || achievementVisibility.status === 'loading' ? (
+                <LoadingState compact message="Loading your achievements..." />
+              ) : achievementResults.status === 'error' ? (
+                <ErrorState
+                  compact
+                  title="Achievements aren’t available"
+                  message={getErrorMessage(achievementResults.error)}
+                  onRetry={achievementResults.retry}
+                />
+              ) : achievementVisibility.status === 'error' ? (
+                <ErrorState
+                  compact
+                  title="Achievement controls aren’t available"
+                  message={getErrorMessage(achievementVisibility.error)}
+                  onRetry={achievementVisibility.retry}
+                />
+              ) : allAchievements.length ? (
+                <>
+                  {displayedAchievements.map(renderAchievement)}
+                  {!shownAchievements.length ? (
+                    <Text style={styles.achievementPrivacy}>
+                      Your earned achievements are hidden. Manage them to show them on your private profile.
+                    </Text>
+                  ) : null}
+                  {allAchievements.length ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Manage all earned achievements"
+                      onPress={() => setAchievementModalVisible(true)}
+                      style={styles.achievementExpandButton}
+                    >
+                      <Text style={styles.achievementExpandButtonText}>
+                        Manage all achievements ({allAchievements.length})
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                    </Pressable>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={styles.achievementPrivacy}>
+                  Your first completed session will earn your first milestone.
+                </Text>
+              )}
+              {achievementVisibilityError ? (
+                <Text accessibilityRole="alert" style={styles.formError}>
+                  {achievementVisibilityError}
+                </Text>
+              ) : null}
+            </View>
+          </>
+        ) : null}
+
         <SectionTitle
           title="Session requests"
           subtitle={bookingResults.status === 'ready' ? `${pendingRequests.length} pending` : 'Live requests'}
@@ -525,6 +736,14 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         )}
         {bookingActionError ? (
           <Text accessibilityRole="alert" style={styles.formError}>{bookingActionError}</Text>
+        ) : null}
+        {studentAwardResults.status === 'error' ? (
+          <ErrorState
+            compact
+            title="Student badge records aren’t available"
+            message={getErrorMessage(studentAwardResults.error)}
+            onRetry={studentAwardResults.retry}
+          />
         ) : null}
 
         <SectionTitle
@@ -571,34 +790,19 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
                     <Text style={styles.sessionMeta}>
                       Scheduled: {session.durationHours}h - Recorded teaching: {formatRecordedDuration(session.accumulatedDurationSeconds)}
                     </Text>
-              {session.status === BOOKING_STATUS.UPCOMING ? (
-                <AppButton
-                  title="Confirm session completed"
-                  variant="secondary"
-                  onPress={() => Alert.alert(
-                    'Complete this session?',
-                    `Recorded teaching time: ${formatRecordedDuration(session.accumulatedDurationSeconds)}. Only confirm after reviewing this timer. ${
-                      session.tokenStatus === TOKEN_BOOKING_STATUS.RESERVED
-                        ? 'This transfers the held tokens to your wallet.'
-                        : 'This older manual-payment booking will not transfer tokens. Resolve any payment separately.'
-                    }`,
-                    [
-                      { text: 'Keep session upcoming', style: 'cancel' },
-                      {
-                        text: 'Confirm completion',
-                        onPress: () => {
-                          const timerError = getCompletionTimerError(session);
-                          if (timerError) {
-                            setBookingActionError(timerError);
-                            return;
-                          }
-                          respondToBooking(session.id, BOOKING_STATUS.COMPLETED);
-                        },
-                      },
-                    ],
-                  )}
-                  loading={workingBookingId === session.id}
-                />
+              {session.status === BOOKING_STATUS.COMPLETED &&
+              studentAwardResults.status === 'ready' ? (
+                awardsByBooking.has(session.id) ? (
+                  <Text style={styles.awardSavedText}>
+                    Badge given: {STUDENT_BADGE_BY_ID[awardsByBooking.get(session.id).badgeId]?.name ?? 'Student badge'}
+                  </Text>
+                ) : (
+                  <AppButton
+                    title="Give the student a badge (optional)"
+                    variant="outline"
+                    onPress={() => openStudentBadgePicker(session)}
+                  />
+                )
               ) : null}
             </View>
           </View>
@@ -679,6 +883,128 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           loading={signingOut}
         />
       </ScrollView>
+      <Modal
+        visible={achievementModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAchievementModalVisible(false)}
+      >
+        <View style={styles.badgeModalBackdrop}>
+          <View style={styles.badgeModalCard}>
+            <View style={styles.badgeModalHeader}>
+              <View style={styles.badgeModalCopy}>
+                <Text style={styles.badgeModalTitle}>Your tutor achievements</Text>
+                <Text style={styles.badgeModalSubtitle}>
+                  Manage which earned milestones appear on your private profile.
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Close achievement manager"
+                onPress={() => setAchievementModalVisible(false)}
+                hitSlop={10}
+              >
+                <Ionicons name="close" size={22} color={colors.text} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {allAchievements.map(renderAchievement)}
+              {achievementVisibilityError ? (
+                <Text accessibilityRole="alert" style={styles.formError}>
+                  {achievementVisibilityError}
+                </Text>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={Boolean(awardSession)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!savingStudentAward) setAwardSession(null);
+        }}
+      >
+        <View style={styles.badgeModalBackdrop}>
+          <View style={styles.badgeModalCard}>
+            <View style={styles.badgeModalHeader}>
+              <View style={styles.badgeModalCopy}>
+                <Text style={styles.badgeModalTitle}>Recognize your student</Text>
+                <Text style={styles.badgeModalSubtitle}>
+                  {awardSession?.studentName || 'Student'} · {awardSession?.subject || 'Completed session'}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Skip giving a badge"
+                disabled={savingStudentAward}
+                onPress={() => setAwardSession(null)}
+                hitSlop={10}
+              >
+                <Ionicons name="close" size={22} color={colors.text} />
+              </Pressable>
+            </View>
+            <Text style={styles.badgeModalHint}>
+              A badge is optional encouragement, not a grade. Keep notes brief; don’t include grades, chat, or private session details.
+            </Text>
+            <ScrollView style={styles.badgeChoices} keyboardShouldPersistTaps="handled">
+              {STUDENT_BADGES.map((badge) => {
+                const selected = selectedStudentBadgeId === badge.id;
+                return (
+                  <Pressable
+                    key={badge.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    disabled={savingStudentAward}
+                    onPress={() => setSelectedStudentBadgeId(badge.id)}
+                    style={[styles.badgeChoice, selected && styles.badgeChoiceSelected]}
+                  >
+                    <View style={styles.badgeChoiceEmblem}>
+                      <Ionicons
+                        name="ribbon"
+                        size={19}
+                        color={selected ? colors.primary : '#9A6A20'}
+                      />
+                    </View>
+                    <View style={styles.badgeChoiceCopy}>
+                      <Text style={[styles.badgeChoiceTitle, selected && styles.badgeChoiceSelectedText]}>
+                        {badge.name}
+                      </Text>
+                      <Text style={styles.badgeChoiceDescription}>{badge.description}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <AppInput
+              label="Optional note (280 characters max)"
+              value={studentBadgeNote}
+              handleChangeText={setStudentBadgeNote}
+              placeholder="What did the student do well?"
+              maxLength={280}
+              multiline
+            />
+            {studentAwardError ? (
+              <Text accessibilityRole="alert" style={styles.formError}>
+                {studentAwardError}
+              </Text>
+            ) : null}
+            <AppButton
+              title="Confirm and award badge"
+              variant="secondary"
+              disabled={!selectedStudentBadgeId}
+              loading={savingStudentAward}
+              onPress={saveStudentBadge}
+            />
+            <Pressable
+              disabled={savingStudentAward}
+              onPress={() => setAwardSession(null)}
+              style={styles.skipBadgeButton}
+            >
+              <Text style={styles.skipBadgeText}>Skip for now</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -774,4 +1100,43 @@ const styles = StyleSheet.create({
   sessionMeta: { marginTop: 3, color: colors.mutedText, fontSize: 10 },
   sessionAction: { marginTop: 7, color: colors.primary, fontSize: 10, fontWeight: '700' },
   sessionActionMuted: { color: colors.mutedText, fontWeight: '400' },
+  achievementCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  achievementPrivacy: { marginBottom: spacing.sm, color: colors.mutedText, fontSize: 11, lineHeight: 16 },
+  achievementRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: '#F0D79C', borderRadius: radius.lg, backgroundColor: '#FFFAED' },
+  achievementRowHidden: { backgroundColor: colors.surface, borderColor: colors.border },
+  achievementMedal: { width: 48, height: 58, alignItems: 'center', justifyContent: 'center' },
+  achievementRibbonPair: { position: 'absolute', top: 34, flexDirection: 'row', gap: 2 },
+  achievementRibbon: { width: 11, height: 17, backgroundColor: '#D4952C' },
+  achievementRibbonLeft: { transform: [{ rotate: '12deg' }] },
+  achievementRibbonRight: { transform: [{ rotate: '-12deg' }] },
+  achievementSeal: { width: 39, height: 39, zIndex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#E0A93D', borderRadius: 20, backgroundColor: '#FFF0BD' },
+  achievementCopy: { flex: 1 },
+  achievementHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
+  achievementName: { color: colors.heading, fontSize: 13, fontWeight: '700' },
+  achievementEarnedTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: '#F3E1B8' },
+  achievementEarnedText: { color: '#765013', fontSize: 8, fontWeight: '800', letterSpacing: 0.6 },
+  achievementExpandButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: spacing.sm, paddingVertical: spacing.sm },
+  achievementExpandButtonText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  achievementDescription: { marginTop: 3, color: colors.mutedText, fontSize: 11, lineHeight: 16 },
+  achievementCriterion: { marginTop: 2, color: colors.primary, fontSize: 10, lineHeight: 14 },
+  achievementToggle: { alignItems: 'center' },
+  achievementToggleLabel: { color: colors.mutedText, fontSize: 10 },
+  awardSavedText: { marginTop: spacing.sm, color: colors.successText, fontSize: 11, fontWeight: '700' },
+  badgeModalBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.md, backgroundColor: 'rgba(18, 21, 32, 0.55)' },
+  badgeModalCard: { maxHeight: '94%', padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  badgeModalHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  badgeModalCopy: { flex: 1 },
+  badgeModalTitle: { color: colors.heading, fontSize: 18, fontWeight: '700' },
+  badgeModalSubtitle: { marginTop: 3, color: colors.mutedText, fontSize: 11 },
+  badgeModalHint: { marginTop: spacing.sm, marginBottom: spacing.sm, color: colors.mutedText, fontSize: 11, lineHeight: 16 },
+  badgeChoices: { maxHeight: 280, marginBottom: spacing.sm },
+  badgeChoice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md },
+  badgeChoiceSelected: { borderColor: colors.primary, backgroundColor: colors.lavender },
+  badgeChoiceEmblem: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#E0C079', borderRadius: 17, backgroundColor: '#FFF5D9' },
+  badgeChoiceCopy: { flex: 1 },
+  badgeChoiceTitle: { color: colors.heading, fontSize: 12, fontWeight: '700' },
+  badgeChoiceSelectedText: { color: colors.primary },
+  badgeChoiceDescription: { marginTop: 2, color: colors.mutedText, fontSize: 10, lineHeight: 14 },
+  skipBadgeButton: { alignItems: 'center', paddingVertical: spacing.sm },
+  skipBadgeText: { color: colors.mutedText, fontSize: 12, fontWeight: '600' },
 });

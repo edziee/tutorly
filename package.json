@@ -30,8 +30,11 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "emulators:badges": "npx --yes firebase-tools emulators:start --config firebase.badges-test.json --only auth,firestore,storage --project demo-tutorly-badges",
+    "seed:badges": "node scripts/seed-badge-demo.mjs",
     "test": "node --test \"src/**/*.test.mjs\"",
-    "test:chat": "node --loader ./tests/firebase-loader.mjs --test tests/chat-notifications.test.mjs"
+    "test:chat": "node --loader ./tests/firebase-loader.mjs --test tests/chat-notifications.test.mjs",
+    "test:gamification": "node --loader ./tests/firebase-loader.mjs --test tests/gamification.test.mjs"
   },
   "private": true
 }

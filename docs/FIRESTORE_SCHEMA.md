@@ -15,7 +15,9 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `tutorApplications/{uid}` | Private application evidence, same id as their user | The student or tutor applicant; admin reviews verification |
 | `wallets/{uid}` | Private integer token balances for one account | Initialized by its owner or an admin; adjusted only by atomic booking transitions or an admin |
 | `tokenTransactions/{id}` | Immutable audit record for one token movement | Admin or an atomic booking lifecycle transition |
-| `bookings/{id}` | A session between a student and a tutor, including its token hold state | Student creates, tutor answers |
+| `bookings/{id}` | A session between a student and a tutor, including its token hold state and optional badge award subcollection | Student creates, tutor answers |
+| `bookings/{id}/badgeAwards/award` | One immutable tutor-awarded student badge for that booking | Assigned tutor, after confirmed completion |
+| `tutorAchievements/{tutorId}_{badgeId}` | One immutable earned tutor milestone | Atomic qualifying booking-completion transaction |
 | `conversations/{id}` | A chat between one student and one tutor | Either person in the chat |
 | `conversations/{id}/messages/{id}` | One message | Either person in the chat |
 | `notifications/{id}` | One in-app alert for one user | The app, on events |
@@ -36,7 +38,15 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `phone`, `age`, `location` (city), `year`, `campus`, `campusAddress` | string | From the student profile screen |
 | `photoUrl` | string | Optional instructor-approved external image URL. If empty, show initials; do not use Firebase Storage |
 | `notificationPreferences` | map of booleans | Week 3, Member 4 (for example `bookings`, `messages`, `reminders`) |
+| `tutorCompletedBookingCount`, `lastTutorCompletedBookingId` | private integer, string | Rules-guarded aggregate and last-booking marker. Updated only in the same atomic transition that confirms a completed tutoring session; clients cannot edit these through profile updates |
 | `createdAt` | timestamp | |
+
+Private per-item display preferences live in owner-only subcollections:
+`users/{uid}/studentBadgeVisibility/{bookingId}` and
+`users/{uid}/tutorAchievementVisibility/{badgeId}`. Each contains `visible`
+(boolean) and `updatedAt` (timestamp). Rules validate each preference against
+the immutable source award or earned achievement. Hiding does not modify the
+source record.
 
 Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `scholarLevel`, `scholarProgress`, `studyHours`, `completedSessions`, `rating`, `subjectHonors`) can live in a `stats` map on this document. The app shows neutral empty/zero values when the corresponding data has not been saved; it must not present sample leaderboard entries or statistics as real account data. Most progress can be calculated from completed bookings instead of stored; Member 1 and Member 2 decide.
 
@@ -168,6 +178,38 @@ any external fee before processing a request.
 | `ratingCreatedAt` | timestamp | Server timestamp for the rating submission |
 | `checkedInAt`, `checkInCoordinates` | timestamp, map | Week 3 |
 | `createdAt`, `updatedAt` | timestamp | |
+
+`bookings/{bookingId}/badgeAwards/award` is an optional, immutable record with
+`badgeId`, `bookingId`, `tutorId`, `studentId`, optional tutor-written `note`
+(up to 280 characters), and server `createdAt`. Its fixed document ID enforces
+one award per booking. The assigned approved tutor and completed booking are
+validated by both service logic and Firestore rules. Award queries are
+recipient-scoped; the awarding tutor may read the award for its booking.
+Neither the award nor its visibility preference is included in public profiles.
+
+`tutorAchievements/{tutorId}_{badgeId}` is an immutable, private achievement
+record with `badgeId`, `tutorId`, `qualifyingBookingId`, `criterionVersion`,
+and server `createdAt`. Only the first-release IDs `first_lesson` (1 completed
+booking), `steady_mentor` (10), `experienced_guide` (25), and
+`hours_of_impact` (10 confirmed timer-recorded hours) are materialized. The
+achievement document is created atomically with a qualifying completion;
+Firestore rules verify the private counter or time aggregate meets the
+threshold and the linked booking transitions from upcoming to completed.
+Already-confirmed teaching time counts toward the 10-hour milestone, but a
+record for a tutor who met that threshold before release is materialized with
+their next valid completion because there is no trusted background worker.
+Deterministic IDs and create-only rules prevent duplicates and arbitrary
+client grants.
+
+The completed-booking counter is private on `users/{uid}` because achievement
+eligibility must not be exposed in public tutor profiles. It starts at zero
+when released and is not historically backfilled by clients; booking-count
+milestones therefore count completions from release onward. The hours
+aggregate uses the existing `tutors/{uid}.totalRecordedTeachingSeconds` and
+`lastTeachingBookingId`. As with other timer-derived hours, Firebase Spark has
+no trusted Cloud Function to attest physical teaching; rules validate the
+timer state and atomic completion but cannot prove the session occurred as
+recorded.
 
 ## `conversations/{id}` and `messages`
 

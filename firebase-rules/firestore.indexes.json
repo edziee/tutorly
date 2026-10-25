@@ -32,6 +32,18 @@
     { "collectionGroup": "notifications", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "recipientId", "order": "ASCENDING" },
       { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "badgeAwards", "queryScope": "COLLECTION_GROUP", "fields": [
+      { "fieldPath": "studentId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "badgeAwards", "queryScope": "COLLECTION_GROUP", "fields": [
+      { "fieldPath": "tutorId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "tutorAchievements", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "tutorId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "ASCENDING" }
     ] }
   ],
   "fieldOverrides": []

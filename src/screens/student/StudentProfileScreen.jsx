@@ -23,8 +23,17 @@ import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
 import StatusBadge, { BOOKING_STATUS_BADGE } from '../../components/StatusBadge';
 import { ROUTES } from '../../constants/routes';
+import {
+  groupStudentBadgeAwards,
+  STUDENT_BADGE_BY_ID,
+} from '../../constants/gamification';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../hooks/useSubscription';
+import {
+  setStudentBadgeVisibility,
+  subscribeToStudentBadgeAwards,
+  subscribeToStudentBadgeVisibility,
+} from '../../services/badgeService';
 import { subscribeToStudentBookings } from '../../services/bookingService';
 import { colors } from '../../theme/colors';
 import { radius } from '../../theme/spacing';
@@ -85,6 +94,89 @@ export default function StudentProfileScreen({ navigation }) {
       : undefined),
     [userId],
   );
+  const badgeAwards = useSubscription(
+    (onData, onError) => (userId
+      ? subscribeToStudentBadgeAwards(userId, onData, onError)
+      : undefined),
+    [userId],
+  );
+  const badgeVisibility = useSubscription(
+    (onData, onError) => (userId
+      ? subscribeToStudentBadgeVisibility(userId, onData, onError)
+      : undefined),
+    [userId],
+  );
+  const [savingBadgeId, setSavingBadgeId] = useState('');
+  const [badgeVisibilityError, setBadgeVisibilityError] = useState('');
+  const [badgeModalVisible, setBadgeModalVisible] = useState(false);
+  useEffect(() => {
+    setBadgeModalVisible(false);
+  }, [userId]);
+  const allBadgeAwards = badgeAwards.data ?? [];
+  const groupedBadgeAwards = groupStudentBadgeAwards(
+    allBadgeAwards,
+    (award) => badgeVisibility.data?.[award.id] ?? true,
+  );
+  const visibleBadgeGroups = groupedBadgeAwards.filter((group) => group.visibleCount > 0);
+  const badgePreviewGroups = visibleBadgeGroups.slice(0, 3);
+
+  const changeBadgeVisibility = async (bookingId, visible) => {
+    if (savingBadgeId) return;
+    setSavingBadgeId(bookingId);
+    setBadgeVisibilityError('');
+    try {
+      await setStudentBadgeVisibility(bookingId, visible);
+    } catch (error) {
+      setBadgeVisibilityError(getErrorMessage(error, 'Could not update this badge.'));
+    } finally {
+      setSavingBadgeId('');
+    }
+  };
+  const renderBadgeAward = (award) => {
+    const badge = STUDENT_BADGE_BY_ID[award.badgeId];
+    const visible = badgeVisibility.data?.[award.id] ?? true;
+    return (
+      <View key={award.id} style={styles.badgeAwardRow}>
+        <View
+          accessible={false}
+          style={[styles.badgeMedal, !visible && styles.badgeMedalHidden]}
+        >
+          <View style={styles.badgeMedalRibbons}>
+            <View style={[styles.badgeRibbonTail, styles.badgeRibbonLeft]} />
+            <View style={[styles.badgeRibbonTail, styles.badgeRibbonRight]} />
+          </View>
+          <View style={styles.badgeMedalSeal}>
+            <Ionicons
+              name="ribbon"
+              size={24}
+              color={visible ? colors.warningText : colors.mutedText}
+            />
+          </View>
+        </View>
+        <View style={styles.badgeAwardCopy}>
+          <View style={styles.badgeAwardHeading}>
+            <Text style={styles.badgeAwardTitle}>{badge?.name ?? 'Badge'}</Text>
+            <View style={styles.badgeAwardTag}>
+              <Text style={styles.badgeAwardTagText}>EARNED</Text>
+            </View>
+          </View>
+          <Text style={styles.badgeAwardDescription}>
+            {badge?.description ?? 'A tutor recognized your learning.'}
+          </Text>
+          {award.note ? <Text style={styles.badgeAwardNote}>{award.note}</Text> : null}
+        </View>
+        <View style={styles.badgeVisibilityControl}>
+          <Text style={styles.badgeVisibilityLabel}>{visible ? 'Shown' : 'Hidden'}</Text>
+          <Switch
+            accessibilityLabel={`${visible ? 'Hide' : 'Show'} ${badge?.name ?? 'badge'} on your private profile`}
+            value={visible}
+            disabled={Boolean(savingBadgeId)}
+            onValueChange={(value) => changeBadgeVisibility(award.id, value)}
+          />
+        </View>
+      </View>
+    );
+  };
   const handleSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
@@ -235,6 +327,107 @@ export default function StudentProfileScreen({ navigation }) {
             />
           </View>
         </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Learning badges</Text>
+          <Text style={styles.emptyProfileData}>
+            Optional recognition from tutors. This area is private to you.
+          </Text>
+          {badgeAwards.status === 'loading' || badgeVisibility.status === 'loading' ? (
+            <LoadingState compact message="Loading your badges..." />
+          ) : badgeAwards.status === 'error' ? (
+            <ErrorState
+              compact
+              title="Badges aren’t available"
+              message={getErrorMessage(badgeAwards.error)}
+              onRetry={badgeAwards.retry}
+            />
+          ) : badgeVisibility.status === 'error' ? (
+            <ErrorState
+              compact
+              title="Badge controls aren’t available"
+              message={getErrorMessage(badgeVisibility.error)}
+              onRetry={badgeVisibility.retry}
+            />
+          ) : allBadgeAwards.length ? (
+            <>
+              {badgePreviewGroups.length ? (
+                badgePreviewGroups.map((group) => {
+                  const badge = STUDENT_BADGE_BY_ID[group.badgeId];
+                  return (
+                    <View key={group.badgeId} style={styles.badgeSummaryRow}>
+                      <View style={styles.badgeSummaryMedal}>
+                        <Ionicons name="ribbon" size={20} color={colors.warningText} />
+                      </View>
+                      <Text style={styles.badgeSummaryName}>
+                        {badge?.name ?? 'Badge'} <Text style={styles.badgeSummaryCount}>× {group.visibleCount}</Text>
+                      </Text>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.emptyProfileData}>
+                  Your earned badges are hidden. Manage them to show badges on your private profile.
+                </Text>
+              )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Manage all received badges"
+                onPress={() => setBadgeModalVisible(true)}
+                style={styles.badgeExpandButton}
+              >
+                <Text style={styles.badgeExpandButtonText}>
+                  Manage all badges ({allBadgeAwards.length})
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.emptyProfileData}>
+              Badges from completed sessions will appear here.
+            </Text>
+          )}
+          {badgeVisibilityError ? (
+            <Text accessibilityRole="alert" style={styles.badgeVisibilityError}>
+              {badgeVisibilityError}
+            </Text>
+          ) : null}
+        </View>
+
+        <Modal
+          visible={badgeModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setBadgeModalVisible(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.badgeListModal}>
+              <View style={styles.modalHeading}>
+                <View style={styles.badgeModalTitleCopy}>
+                  <Text style={styles.modalTitle}>Your learning badges</Text>
+                  <Text style={styles.badgeModalSubtitle}>
+                    Each award can be shown or hidden separately.
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityLabel="Close badge manager"
+                  onPress={() => setBadgeModalVisible(false)}
+                  hitSlop={8}
+                >
+                  <Ionicons name="close" size={23} color={colors.mutedText} />
+                </Pressable>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {allBadgeAwards.map(renderBadgeAward)}
+                {badgeVisibilityError ? (
+                  <Text accessibilityRole="alert" style={styles.badgeVisibilityError}>
+                    {badgeVisibilityError}
+                  </Text>
+                ) : null}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         <View style={styles.sectionCard}>
           <View style={styles.streakHeader}>
@@ -705,6 +898,82 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
   },
+  badgeAwardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#F0D79C',
+    borderRadius: radius.lg,
+    backgroundColor: '#FFFAED',
+  },
+  badgeSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#F0D79C',
+    borderRadius: radius.md,
+    backgroundColor: '#FFFAED',
+  },
+  badgeSummaryMedal: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E0A93D',
+    borderRadius: 17,
+    backgroundColor: '#FFF0BD',
+  },
+  badgeSummaryName: { flex: 1, color: colors.heading, fontSize: 13, fontWeight: '700' },
+  badgeSummaryCount: { color: '#765013', fontWeight: '800' },
+  badgeListModal: {
+    maxHeight: '88%',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+  },
+  badgeModalTitleCopy: { flex: 1 },
+  badgeModalSubtitle: { marginTop: 3, color: colors.mutedText, fontSize: 11, lineHeight: 15 },
+  badgeMedal: { width: 54, height: 62, alignItems: 'center', justifyContent: 'center' },
+  badgeMedalHidden: { opacity: 0.55 },
+  badgeMedalRibbons: { position: 'absolute', top: 35, flexDirection: 'row', gap: 2 },
+  badgeRibbonTail: { width: 13, height: 19, backgroundColor: '#D4952C' },
+  badgeRibbonLeft: { transform: [{ rotate: '12deg' }] },
+  badgeRibbonRight: { transform: [{ rotate: '-12deg' }] },
+  badgeMedalSeal: {
+    width: 43,
+    height: 43,
+    zIndex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#E0A93D',
+    borderRadius: 22,
+    backgroundColor: '#FFF0BD',
+    shadowColor: '#8A5A11',
+    shadowOpacity: 0.16,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  badgeAwardCopy: { flex: 1 },
+  badgeAwardHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs },
+  badgeAwardTitle: { color: colors.heading, fontSize: 14, fontWeight: '700' },
+  badgeAwardTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: '#F3E1B8' },
+  badgeAwardTagText: { color: '#765013', fontSize: 8, fontWeight: '800', letterSpacing: 0.6 },
+  badgeExpandButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: spacing.sm, paddingVertical: spacing.sm },
+  badgeExpandButtonText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  badgeAwardDescription: { marginTop: 3, color: colors.mutedText, fontSize: 12, lineHeight: 17 },
+  badgeAwardNote: { marginTop: spacing.xs, color: colors.text, fontSize: 12, fontStyle: 'italic' },
+  badgeVisibilityControl: { alignItems: 'center' },
+  badgeVisibilityLabel: { color: colors.mutedText, fontSize: 10 },
+  badgeVisibilityError: { marginTop: spacing.sm, color: colors.errorText, fontSize: 12 },
+  emptyProfileData: { marginTop: spacing.sm, color: colors.mutedText, fontSize: 12, lineHeight: 17 },
   streakHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   streakIcon: {
     width: 34,

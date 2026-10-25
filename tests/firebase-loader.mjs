@@ -15,7 +15,16 @@ export async function resolve(specifier, context, nextResolve) {
 export async function load(url, context, nextLoad) {
   if (url === 'tutorly:test-firebase') return {
     format: 'module', shortCircuit: true,
-    source: 'export function requireFirebase() { return globalThis.__tutorlyTestFirebase; }',
+    source: `
+      export function requireFirebase() {
+        return globalThis.__tutorlyTestFirebase;
+      }
+      export function requireAuth() {
+        const firebase = globalThis.__tutorlyTestFirebase;
+        if (!firebase?.auth) throw new Error('Test Firebase auth is unavailable.');
+        return firebase.auth;
+      }
+    `,
   };
   return nextLoad(url, context);
 }

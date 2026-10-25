@@ -30,6 +30,18 @@ service cloud.firestore {
       return /databases/$(database)/documents/bookings/$(bookingId);
     }
 
+    function studentBadgeAwardPath(bookingId) {
+      return /databases/$(database)/documents/bookings/$(bookingId)/badgeAwards/award;
+    }
+
+    function tutorAchievementPath(uid, badgeId) {
+      return /databases/$(database)/documents/tutorAchievements/$(uid + '_' + badgeId);
+    }
+
+    function tutorAchievementDocumentPath(achievementId) {
+      return /databases/$(database)/documents/tutorAchievements/$(achievementId);
+    }
+
     function hasAccount() {
       return signedIn() && exists(userPath(request.auth.uid));
     }
@@ -870,6 +882,166 @@ service cloud.firestore {
         ]);
     }
 
+    function validTutorCompletedBookingsAggregate(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      let bookingId = request.resource.data.get('lastTutorCompletedBookingId', '');
+      let bookingBefore = get(bookingPath(bookingId)).data;
+      let bookingAfter = getAfter(bookingPath(bookingId)).data;
+      let oldCount = resource.data.get('tutorCompletedBookingCount', 0);
+      return isApprovedTutor(uid) &&
+        request.auth.uid == uid &&
+        bookingBefore.tutorId == uid &&
+        bookingBefore.status == 'upcoming' &&
+        bookingBefore.get('timerStatus', '') == 'stopped' &&
+        bookingBefore.get('accumulatedDurationSeconds', 0) is int &&
+        bookingBefore.get('accumulatedDurationSeconds', 0) > 0 &&
+        bookingAfter.status == 'completed' &&
+        oldCount is int &&
+        oldCount >= 0 &&
+        request.resource.data.tutorCompletedBookingCount == oldCount + 1 &&
+        request.resource.data.lastTutorCompletedBookingId == bookingId &&
+        changes.hasOnly([
+          'tutorCompletedBookingCount',
+          'lastTutorCompletedBookingId'
+        ]);
+    }
+
+    function validStudentBadgeAwardCreate(bookingId, awardId) {
+      let booking = get(bookingPath(bookingId)).data;
+      let data = request.resource.data;
+      return signedIn() &&
+        awardId == 'award' &&
+        isApprovedTutor(request.auth.uid) &&
+        booking.tutorId == request.auth.uid &&
+        booking.status == 'completed' &&
+        data.keys().hasOnly([
+          'badgeId',
+          'bookingId',
+          'tutorId',
+          'studentId',
+          'note',
+          'createdAt'
+        ]) &&
+        data.keys().hasAll([
+          'badgeId',
+          'bookingId',
+          'tutorId',
+          'studentId',
+          'createdAt'
+        ]) &&
+        data.badgeId in [
+          'curious_mind',
+          'prepared_learner',
+          'persistent_effort',
+          'big_step',
+          'clear_communicator',
+          'great_collaborator',
+          'creative_thinker',
+          'practice_pro',
+          'goal_getter',
+          'brave_beginner',
+          'thoughtful_reflector',
+          'kind_and_respectful'
+        ] &&
+        data.bookingId == bookingId &&
+        data.tutorId == request.auth.uid &&
+        data.studentId == booking.studentId &&
+        data.createdAt == request.time &&
+        (!('note' in data) ||
+          (data.note is string && data.note.size() <= 280));
+    }
+
+    function validTutorAchievementCreate(achievementId) {
+      let badgeId = request.resource.data.get('badgeId', '');
+      let tutorId = request.resource.data.get('tutorId', '');
+      let bookingId = request.resource.data.get('qualifyingBookingId', '');
+      let userBefore = get(userPath(tutorId)).data;
+      let userAfter = getAfter(userPath(tutorId)).data;
+      let tutorAfter = getAfter(tutorPath(tutorId)).data;
+      let oldCount = userBefore.get('tutorCompletedBookingCount', 0);
+      let newCount = userAfter.get('tutorCompletedBookingCount', 0);
+      let newSeconds = tutorAfter.get('totalRecordedTeachingSeconds', 0);
+      return signedIn() &&
+        request.auth.uid == tutorId &&
+        isApprovedTutor(tutorId) &&
+        achievementId == tutorId + '_' + badgeId &&
+        badgeId in [
+          'first_lesson',
+          'steady_mentor',
+          'experienced_guide',
+          'hours_of_impact'
+        ] &&
+        request.resource.data.keys().hasOnly([
+          'badgeId',
+          'tutorId',
+          'qualifyingBookingId',
+          'criterionVersion',
+          'createdAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'badgeId',
+          'tutorId',
+          'qualifyingBookingId',
+          'criterionVersion',
+          'createdAt'
+        ]) &&
+        request.resource.data.criterionVersion == 1 &&
+        request.resource.data.createdAt == request.time &&
+        get(bookingPath(bookingId)).data.tutorId == tutorId &&
+        get(bookingPath(bookingId)).data.status == 'upcoming' &&
+        get(bookingPath(bookingId)).data.get('timerStatus', '') == 'stopped' &&
+        get(bookingPath(bookingId)).data.get('accumulatedDurationSeconds', 0) is int &&
+        get(bookingPath(bookingId)).data.get('accumulatedDurationSeconds', 0) > 0 &&
+        getAfter(bookingPath(bookingId)).data.status == 'completed' &&
+        userAfter.lastTutorCompletedBookingId == bookingId &&
+        tutorAfter.lastTeachingBookingId == bookingId &&
+        ((badgeId == 'first_lesson' &&
+            oldCount < 1 && newCount >= 1) ||
+          (badgeId == 'steady_mentor' &&
+            oldCount < 10 && newCount >= 10) ||
+          (badgeId == 'experienced_guide' &&
+            oldCount < 25 && newCount >= 25) ||
+          (badgeId == 'hours_of_impact' &&
+            newSeconds >= 36000));
+    }
+
+    function validStudentBadgeVisibility(uid, bookingId) {
+      let award = get(studentBadgeAwardPath(bookingId)).data;
+      let data = request.resource.data;
+      return signedIn() &&
+        request.auth.uid == uid &&
+        award.studentId == uid &&
+        data.keys().hasOnly(['visible', 'updatedAt']) &&
+        data.keys().hasAll(['visible', 'updatedAt']) &&
+        data.visible is bool &&
+        data.updatedAt == request.time;
+    }
+
+    function validTutorAchievementVisibility(uid, badgeId) {
+      let achievementPath = tutorAchievementPath(uid, badgeId);
+      let data = request.resource.data;
+      return signedIn() &&
+        request.auth.uid == uid &&
+        badgeId in [
+          'first_lesson',
+          'steady_mentor',
+          'experienced_guide',
+          'hours_of_impact'
+        ] &&
+        exists(achievementPath) &&
+        get(achievementPath).data.tutorId == uid &&
+        data.keys().hasOnly(['visible', 'updatedAt']) &&
+        data.keys().hasAll(['visible', 'updatedAt']) &&
+        data.visible is bool &&
+        data.updatedAt == request.time;
+    }
+
+    function milestoneRecordMatches(bookingId, tutorId, badgeId) {
+      let path = tutorAchievementPath(tutorId, badgeId);
+      return existsAfter(path) &&
+        getAfter(path).data.qualifyingBookingId == bookingId;
+    }
+
     function validAdminTutorReview(uid) {
       return isAdmin() &&
         request.auth.uid != uid &&
@@ -1043,7 +1215,7 @@ service cloud.firestore {
               tutorAfter.heldUnits == tutorBefore.heldUnits));
     }
 
-    function validBookingCreate(bookingId) {
+    function validBookingCreate() {
       let data = request.resource.data;
       let publicTutor = get(tutorPath(data.tutorId)).data;
       let student = get(userPath(request.auth.uid)).data;
@@ -1269,7 +1441,10 @@ service cloud.firestore {
       let tokenBooking = 'tokenStatus' in resource.data;
       let tutorBefore = get(tutorPath(resource.data.tutorId)).data;
       let tutorAfter = getAfter(tutorPath(resource.data.tutorId)).data;
+      let userBefore = get(userPath(resource.data.tutorId)).data;
+      let userAfter = getAfter(userPath(resource.data.tutorId)).data;
       let oldSeconds = tutorBefore.get('totalRecordedTeachingSeconds', 0);
+      let oldCount = userBefore.get('tutorCompletedBookingCount', 0);
       return isBookingTutor() &&
         resource.data.status == 'upcoming' &&
         resource.data.get('timerStatus', '') == 'stopped' &&
@@ -1283,6 +1458,21 @@ service cloud.firestore {
           oldSeconds + resource.data.accumulatedDurationSeconds &&
         tutorAfter.lastTeachingBookingId == bookingId &&
         tutorAfter.updatedAt == request.time &&
+        oldCount is int &&
+        oldCount >= 0 &&
+        userAfter.tutorCompletedBookingCount == oldCount + 1 &&
+        userAfter.lastTutorCompletedBookingId == bookingId &&
+        ((oldCount >= 1) ||
+          milestoneRecordMatches(bookingId, resource.data.tutorId, 'first_lesson')) &&
+        ((oldCount >= 10) ||
+          userAfter.tutorCompletedBookingCount < 10 ||
+          milestoneRecordMatches(bookingId, resource.data.tutorId, 'steady_mentor')) &&
+        ((oldCount >= 25) ||
+          userAfter.tutorCompletedBookingCount < 25 ||
+          milestoneRecordMatches(bookingId, resource.data.tutorId, 'experienced_guide')) &&
+        ((tutorAfter.totalRecordedTeachingSeconds < 36000) ||
+          exists(tutorAchievementPath(resource.data.tutorId, 'hours_of_impact')) ||
+          milestoneRecordMatches(bookingId, resource.data.tutorId, 'hours_of_impact')) &&
         (tokenBooking
           ? (data.tokenStatus == 'settled' &&
               data.diff(resource.data).affectedKeys()
@@ -1410,10 +1600,23 @@ service cloud.firestore {
         request.auth.uid == uid &&
         validAccountCreate(uid);
       allow update: if validAdminTutorAccountReviewSync(uid) ||
+        validTutorCompletedBookingsAggregate(uid) ||
         (signedIn() &&
           request.auth.uid == uid &&
           validProfileUpdate(uid));
       allow delete: if false;
+
+      match /studentBadgeVisibility/{bookingId} {
+        allow get, list: if signedIn() && request.auth.uid == uid;
+        allow create, update: if validStudentBadgeVisibility(uid, bookingId);
+        allow delete: if false;
+      }
+
+      match /tutorAchievementVisibility/{badgeId} {
+        allow get, list: if signedIn() && request.auth.uid == uid;
+        allow create, update: if validTutorAchievementVisibility(uid, badgeId);
+        allow delete: if false;
+      }
     }
 
     match /tutors/{uid} {
@@ -1461,11 +1664,20 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /tutorAchievements/{achievementId} {
+      allow get: if signedIn() &&
+        (!exists(tutorAchievementDocumentPath(achievementId)) ||
+          resource.data.tutorId == request.auth.uid);
+      allow list: if signedIn() && resource.data.tutorId == request.auth.uid;
+      allow create: if validTutorAchievementCreate(achievementId);
+      allow update, delete: if false;
+    }
+
     match /bookings/{bookingId} {
       allow get, list: if isAdmin() ||
         (isBookingStudent()) ||
         (isBookingTutor());
-      allow create: if validBookingCreate(bookingId);
+      allow create: if validBookingCreate();
       allow update: if validTutorResponse(bookingId) ||
         validBookingCancellation(bookingId) ||
         validBookingTimerUpdate() ||
@@ -1476,6 +1688,26 @@ service cloud.firestore {
         validCheckIn() ||
         validStudentBookingRating(bookingId);
       allow delete: if false;
+
+      match /badgeAwards/{awardId} {
+        allow get: if signedIn() &&
+          (!exists(studentBadgeAwardPath(bookingId))
+            ? (get(bookingPath(bookingId)).data.studentId == request.auth.uid ||
+                get(bookingPath(bookingId)).data.tutorId == request.auth.uid)
+            : (resource.data.studentId == request.auth.uid ||
+                resource.data.tutorId == request.auth.uid));
+        allow create: if validStudentBadgeAwardCreate(bookingId, awardId);
+        allow update, delete: if false;
+      }
+    }
+
+    match /{path=**}/badgeAwards/{awardId} {
+      allow get: if signedIn() &&
+        (resource.data.studentId == request.auth.uid ||
+          resource.data.tutorId == request.auth.uid);
+      allow list: if signedIn() &&
+        (resource.data.studentId == request.auth.uid ||
+          resource.data.tutorId == request.auth.uid);
     }
 
     // Chat remains closed in the main application rules until its ownership
