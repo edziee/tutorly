@@ -475,11 +475,13 @@ service cloud.firestore {
           'verificationStatus',
           'verificationNote',
           'publicProfileVersion',
+          'locationPrivacyVersion',
           'createdAt',
           'updatedAt',
           'photoUrl',
           'location',
-          'coordinates',
+          'locationCell',
+          'locationCellVersion',
           'availability',
           'online',
           'rating',
@@ -504,6 +506,7 @@ service cloud.firestore {
           'verificationStatus',
           'verificationNote',
           'publicProfileVersion',
+          'locationPrivacyVersion',
           'subject',
           'createdAt',
           'updatedAt'
@@ -522,11 +525,26 @@ service cloud.firestore {
         data.verificationStatus in ['pending', 'approved', 'rejected'] &&
         data.verificationNote is string &&
         validProfileVersion(data) &&
+        data.locationPrivacyVersion == 1 &&
         data.createdAt is timestamp &&
         data.updatedAt is timestamp &&
         (!('photoUrl' in data) ||
           data.photoUrl == '' ||
           data.photoUrl.matches('^https://.+')) &&
+        (!('location' in data) ||
+          (data.location is string && data.location.size() <= 200)) &&
+        (!('locationCell' in data) ||
+          (data.locationCell is map &&
+            data.locationCell.keys().hasOnly(['latitudeCell', 'longitudeCell']) &&
+            data.locationCell.keys().hasAll(['latitudeCell', 'longitudeCell']) &&
+            data.locationCell.latitudeCell is int &&
+            data.locationCell.latitudeCell >= -9000 &&
+            data.locationCell.latitudeCell <= 9000 &&
+            data.locationCell.longitudeCell is int &&
+            data.locationCell.longitudeCell >= -18000 &&
+            data.locationCell.longitudeCell <= 18000)) &&
+        (!('locationCellVersion' in data) ||
+          (data.locationCellVersion == 1 && 'locationCell' in data)) &&
         (!('hourlyRate' in data) || validTokenPrice(data.hourlyRate)) &&
         (!('rating' in data) ||
           (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
@@ -616,6 +634,12 @@ service cloud.firestore {
           'age',
           'location',
           'homeAddress',
+          'homeAddressCoordinates',
+          'homeAddressGeocodeKey',
+          'locationAreaCoordinates',
+          'locationAreaGeocodeKey',
+          'geolocationConsent',
+          'geolocationConsentAt',
           'year',
           'campus',
           'campusAddress',
@@ -637,6 +661,49 @@ service cloud.firestore {
         (!('homeAddress' in request.resource.data) ||
           (request.resource.data.homeAddress is string &&
             request.resource.data.homeAddress.size() <= 300)) &&
+        (!changes.hasAny(['location', 'homeAddress']) ||
+          (!('homeAddressCoordinates' in request.resource.data) &&
+            !('homeAddressGeocodeKey' in request.resource.data))) &&
+        (!changes.hasAny(['location']) ||
+          (!('locationAreaCoordinates' in request.resource.data) &&
+            !('locationAreaGeocodeKey' in request.resource.data))) &&
+        (!('homeAddressCoordinates' in request.resource.data) ||
+          (request.resource.data.homeAddressCoordinates is map &&
+            request.resource.data.homeAddressCoordinates.keys()
+              .hasOnly(['latitude', 'longitude']) &&
+            request.resource.data.homeAddressCoordinates.keys()
+              .hasAll(['latitude', 'longitude']) &&
+            request.resource.data.homeAddressCoordinates.latitude is number &&
+            request.resource.data.homeAddressCoordinates.latitude >= -90 &&
+            request.resource.data.homeAddressCoordinates.latitude <= 90 &&
+            request.resource.data.homeAddressCoordinates.longitude is number &&
+            request.resource.data.homeAddressCoordinates.longitude >= -180 &&
+            request.resource.data.homeAddressCoordinates.longitude <= 180)) &&
+        (!('homeAddressGeocodeKey' in request.resource.data) ||
+          (request.resource.data.homeAddressGeocodeKey is string &&
+            request.resource.data.homeAddressGeocodeKey.size() <= 500)) &&
+        (!('locationAreaCoordinates' in request.resource.data) ||
+          (request.resource.data.locationAreaCoordinates is map &&
+            request.resource.data.locationAreaCoordinates.keys()
+              .hasOnly(['latitude', 'longitude']) &&
+            request.resource.data.locationAreaCoordinates.keys()
+              .hasAll(['latitude', 'longitude']) &&
+            request.resource.data.locationAreaCoordinates.latitude is number &&
+            request.resource.data.locationAreaCoordinates.latitude >= -90 &&
+            request.resource.data.locationAreaCoordinates.latitude <= 90 &&
+            request.resource.data.locationAreaCoordinates.longitude is number &&
+            request.resource.data.locationAreaCoordinates.longitude >= -180 &&
+            request.resource.data.locationAreaCoordinates.longitude <= 180)) &&
+        (!('locationAreaGeocodeKey' in request.resource.data) ||
+          (request.resource.data.locationAreaGeocodeKey is string &&
+            request.resource.data.locationAreaGeocodeKey.size() <= 500)) &&
+        (!('geolocationConsent' in request.resource.data) ||
+          request.resource.data.geolocationConsent is bool) &&
+        (!changes.hasAny(['geolocationConsent']) ||
+          (request.resource.data.geolocationConsentAt is timestamp &&
+            request.resource.data.geolocationConsentAt == request.time)) &&
+        (!('geolocationConsentAt' in request.resource.data) ||
+          request.resource.data.geolocationConsentAt is timestamp) &&
         (!('age' in request.resource.data) ||
           (request.resource.data.age is string &&
             request.resource.data.age.matches('^[1-9][0-9]{0,2}$'))) &&
@@ -834,6 +901,29 @@ service cloud.firestore {
           application.get('tutorType', ''),
           tutor.hourlyRate) &&
         request.resource.data.updatedAt == request.time;
+    }
+
+    function validTutorLocationCellUpdate(uid) {
+      let application = get(applicationPath(uid)).data;
+      let profileStatus = resource.data.get('verificationStatus', '');
+      return signedIn() &&
+        request.auth.uid == uid &&
+        exists(applicationPath(uid)) &&
+        isTutorApplicationOwner(uid, application.get('tutorType', '')) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['location', 'locationCell', 'locationCellVersion', 'updatedAt']) &&
+        request.resource.data.updatedAt == request.time &&
+        validPublicTutor(request.resource.data) &&
+        (!('location' in request.resource.data) ||
+          (request.resource.data.location is string &&
+            request.resource.data.location.size() <= 200)) &&
+        ((profileStatus in ['pending', 'approved'] &&
+          application.get('verificationStatus', '') == profileStatus) ||
+          (profileStatus == 'rejected' &&
+            application.get('verificationStatus', '') == 'rejected' &&
+            !('locationCell' in request.resource.data) &&
+            !('locationCellVersion' in request.resource.data) &&
+            'locationCell' in resource.data));
     }
 
     function validTutorRatingAggregate(uid) {
@@ -1076,6 +1166,38 @@ service cloud.firestore {
         getAfter(applicationPath(uid)).data.verificationReviewedAt == request.time &&
         getAfter(applicationPath(uid)).data.verificationStatus ==
           request.resource.data.verificationStatus &&
+        validPublicTutor(request.resource.data);
+    }
+
+    function validAdminLocationPrivacyCleanup(uid) {
+      return isAdmin() &&
+        request.auth.uid != uid &&
+        resource.data.get('verificationStatus', '') == 'approved' &&
+        request.resource.data.get('verificationStatus', '') == 'approved' &&
+        request.resource.data.get('locationPrivacyVersion', 0) == 1 &&
+        (resource.data.get('locationPrivacyVersion', 0) != 1 ||
+          ('coordinates' in resource.data) ||
+          ('homeAddress' in resource.data) ||
+          ('homeAddressCoordinates' in resource.data) ||
+          ('homeAddressGeocodeKey' in resource.data) ||
+          resource.data.get('locationCellVersion', 0) != 1) &&
+        !('coordinates' in request.resource.data) &&
+        !('homeAddress' in request.resource.data) &&
+        !('homeAddressCoordinates' in request.resource.data) &&
+        !('homeAddressGeocodeKey' in request.resource.data) &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'coordinates',
+            'homeAddress',
+            'homeAddressCoordinates',
+            'homeAddressGeocodeKey',
+            'location',
+            'locationCell',
+            'locationCellVersion',
+            'locationPrivacyVersion',
+            'updatedAt'
+          ]) &&
         validPublicTutor(request.resource.data);
     }
 
@@ -1650,15 +1772,19 @@ service cloud.firestore {
         (signedIn() && request.auth.uid == uid) ||
         ((isStudent() || isTutor()) &&
           resource.data.get('verificationStatus', '') == 'approved' &&
+          resource.data.get('locationPrivacyVersion', 0) == 1 &&
           validProfileVersion(resource.data));
       allow list: if isAdmin() ||
         ((isStudent() || isTutor()) &&
           resource.data.get('verificationStatus', '') == 'approved' &&
+          resource.data.get('locationPrivacyVersion', 0) == 1 &&
           validProfileVersion(resource.data));
       allow create: if validPublicApplicationCreate(uid);
       allow update: if validAdminTutorReview(uid) ||
+        validAdminLocationPrivacyCleanup(uid) ||
         validPublicApplicationUpdate(uid) ||
         validTutorBookingDetailsUpdate(uid) ||
+        validTutorLocationCellUpdate(uid) ||
         validTutorRatingAggregate(uid) ||
         validTutorTeachingHoursAggregate(uid);
       allow delete: if false;

@@ -56,11 +56,14 @@ export default function AdminVerificationsScreen() {
     setMigrating(true);
     setMigrationMessage('');
     try {
-      const count = await migrateLegacyApprovedTutors();
+      const { migrated, locationsUpdated, locationsUnavailable } =
+        await migrateLegacyApprovedTutors();
       setMigrationMessage(
-        count === 0
-          ? 'All approved tutors are up to date.'
-          : `Updated ${count} approved tutor profile${count === 1 ? '' : 's'}.`,
+        `Updated ${migrated} approved profile${migrated === 1 ? '' : 's'}; ` +
+          `${locationsUpdated} city/area location${locationsUpdated === 1 ? '' : 's'} ready.` +
+          (locationsUnavailable
+            ? ` ${locationsUnavailable} location${locationsUnavailable === 1 ? '' : 's'} could not be geocoded; run this on iOS/Android and check the tutor’s city/area.`
+            : ''),
       );
     } catch (error) {
       Alert.alert(
@@ -107,7 +110,7 @@ export default function AdminVerificationsScreen() {
       <View style={styles.migration}>
         <Text style={styles.migrationTitle}>Approved tutors</Text>
         <Text style={styles.migrationDescription}>
-          Move older tutor approvals to the current record format.
+          Update older tutor records, remove legacy exact coordinates, and create approximate map locations from each tutor’s saved city/area. No home addresses are used.
         </Text>
         <AppButton
           title="Update approved tutor records"

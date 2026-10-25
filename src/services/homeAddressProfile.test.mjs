@@ -14,6 +14,26 @@ const tutorProfile = await readFile(
   new URL('../screens/tutor/TutorWorkspaceProfileScreen.jsx', import.meta.url),
   'utf8',
 );
+const tutorService = await readFile(
+  new URL('./tutorService.js', import.meta.url),
+  'utf8',
+);
+const userService = await readFile(
+  new URL('./userService.js', import.meta.url),
+  'utf8',
+);
+const locationService = await readFile(
+  new URL('./locationService.js', import.meta.url),
+  'utf8',
+);
+const tutorsScreen = await readFile(
+  new URL('../screens/student/TutorsScreen.jsx', import.meta.url),
+  'utf8',
+);
+const adminService = await readFile(
+  new URL('./adminService.js', import.meta.url),
+  'utf8',
+);
 
 function ruleFunction(name) {
   const match = rules.match(
@@ -57,5 +77,88 @@ test('tutors edit private city and home address details in a profile modal', () 
   );
   assert.match(tutorProfile, /COMMON_CITY_SUGGESTIONS/);
   assert.match(tutorProfile, /No matches\. Keep typing to use your own location\./);
-  assert.match(tutorProfile, /Your address is not included in your public tutor profile\./);
+  assert.match(tutorProfile, /Your home address stays private/);
+});
+
+test('public tutor discovery accepts only coarse location cells and strips legacy exact coordinates', () => {
+  const publicTutor = ruleFunction('validPublicTutor');
+  assert.match(publicTutor, /'locationCell'/);
+  assert.match(publicTutor, /'locationCellVersion'/);
+  assert.match(publicTutor, /data\.locationCellVersion == 1 && 'locationCell' in data/);
+  assert.match(publicTutor, /'locationPrivacyVersion'/);
+  assert.match(ruleFunction('validTutorLocationCellUpdate'), /'location', 'locationCell'/);
+  assert.doesNotMatch(publicTutor, /'coordinates'/);
+  assert.doesNotMatch(publicTutor, /'homeAddress/);
+  assert.match(tutorService, /where\('locationPrivacyVersion', '==', 1\)/);
+  assert.match(
+    rules,
+    /resource\.data\.get\('locationPrivacyVersion', 0\) == 1/,
+    'students and tutors cannot read legacy public profiles until cleaned',
+  );
+  assert.match(
+    ruleFunction('validAdminLocationPrivacyCleanup'),
+    /!\('coordinates' in request\.resource\.data\)/,
+  );
+  const adminLocationCleanup = ruleFunction('validAdminLocationPrivacyCleanup');
+  assert.match(adminLocationCleanup, /'locationCellVersion'/);
+  assert.match(adminLocationCleanup, /'updatedAt'/);
+  assert.match(rules, /validAdminLocationPrivacyCleanup/);
+  assert.match(adminService, /coordinates: deleteField\(\)/);
+  assert.match(adminService, /homeAddress: deleteField\(\)/);
+  assert.match(adminService, /Location\.geocodeAsync\(tutorCity\)/);
+  assert.match(adminService, /locationCellVersion: 1/);
+  assert.match(tutorService, /delete publicData\.coordinates/);
+  assert.match(tutorService, /delete publicData\.homeAddress/);
+  assert.match(
+    schema,
+    /\| `locationCell` \| map .*coarse.*Never publish exact coordinates or addresses/,
+  );
+});
+
+test('nearby search reads only the signed-in student profile for its fallback address', () => {
+  assert.match(
+    locationService,
+    /doc\(requireFirebase\(\)\.db, COLLECTIONS\.USERS, uid\)/,
+  );
+  assert.doesNotMatch(locationService, /collection\(.*COLLECTIONS\.USERS/);
+  assert.match(
+    locationService,
+    /Student device coordinates are[\s\S]{0,60}used only in memory/,
+  );
+  assert.match(locationService, /geolocationConsent: consented/);
+});
+
+test('Near me gates only the discovery action and links to the existing profile editor', () => {
+  assert.match(tutorsScreen, /const profileError = getNearMeProfileError\(user\)/);
+  assert.match(tutorsScreen, /navigation\.navigate\(ROUTES\.PROFILE\)/);
+  assert.match(tutorsScreen, /recordGeolocationConsent\(user\.uid, consented\)/);
+  assert.match(tutorsScreen, />Retry<\/Text>/);
+  assert.match(tutorsScreen, />Update profile<\/Text>/);
+});
+
+test('changing city invalidates its private geocode cache and public tutor cell', () => {
+  assert.match(userService, /if \(locationChanged \|\| homeAddressChanged\)/);
+  assert.match(userService, /import \{\s*deleteField,/);
+  assert.match(userService, /safeChanges\.homeAddressCoordinates = deleteField\(\)/);
+  assert.match(userService, /safeChanges\.homeAddressGeocodeKey = deleteField\(\)/);
+  assert.match(userService, /safeChanges\.locationAreaCoordinates = deleteField\(\)/);
+  assert.match(userService, /safeChanges\.locationAreaGeocodeKey = deleteField\(\)/);
+  assert.match(userService, /locationCell: deleteField\(\)/);
+  assert.match(userService, /batch\.update\(userRef, safeChanges\)[\s\S]*await batch\.commit\(\)/);
+  assert.match(locationService, /Location\.geocodeAsync\(city\)/);
+  const tutorLocationSync = locationService.slice(
+    locationService.indexOf('export async function syncTutorApproximateLocation'),
+  );
+  assert.doesNotMatch(tutorLocationSync, /profile\.homeAddress/);
+  assert.doesNotMatch(tutorLocationSync, /Location\.geocodeAsync\(`\$\{address\}, \$\{city\}`\)/);
+  assert.match(locationService, /locationCellVersion: 1/);
+  assert.match(tutorService, /if \(publicData\.locationCellVersion !== 1\) delete publicData\.locationCell/);
+  assert.match(
+    ruleFunction('validProfileUpdate'),
+    /changes\.hasAny\(\['location', 'homeAddress'\]\)[\s\S]*homeAddressCoordinates/,
+  );
+  assert.match(
+    ruleFunction('validProfileUpdate'),
+    /changes\.hasAny\(\['location'\]\)[\s\S]*locationAreaCoordinates/,
+  );
 });

@@ -27,6 +27,14 @@ import { getTutorRateError } from '../utils/tutorPricing';
 
 function toPublicTutor(snapshot) {
   const data = snapshot.data();
+  const publicData = { ...data };
+  delete publicData.coordinates;
+  delete publicData.homeAddress;
+  delete publicData.homeAddressCoordinates;
+  delete publicData.homeAddressGeocodeKey;
+  delete publicData.locationAreaCoordinates;
+  delete publicData.locationAreaGeocodeKey;
+  if (publicData.locationCellVersion !== 1) delete publicData.locationCell;
   const courseSubjects = (typeof data.courseNames === 'string' ? data.courseNames : '')
     .split('\n')
     .filter(Boolean)
@@ -44,7 +52,7 @@ function toPublicTutor(snapshot) {
     : '';
 
   return {
-    ...data,
+    ...publicData,
     name: typeof data.name === 'string' && data.name.trim() ? data.name.trim() : 'Tutor',
     id: snapshot.id,
     uid: snapshot.id,
@@ -77,6 +85,7 @@ export async function getTutors(filters = {}) {
     collection(db, COLLECTIONS.TUTORS),
     where('verificationStatus', '==', 'approved'),
     where('publicProfileVersion', '==', 2),
+    where('locationPrivacyVersion', '==', 1),
   );
   const snapshot = await getDocs(tutorsQuery);
   const tutors = snapshot.docs.map(toPublicTutor);
@@ -314,13 +323,14 @@ export async function saveTutorApplication(uid, application) {
     verificationStatus: 'pending',
     verificationNote: '',
     publicProfileVersion: 2,
+    locationPrivacyVersion: 1,
     updatedAt: now,
     ...(!existingTutorData?.createdAt ? { createdAt: now } : {}),
   };
   [
     'photoUrl',
     'location',
-    'coordinates',
+    'locationCell',
     'availability',
     'online',
     'rating',

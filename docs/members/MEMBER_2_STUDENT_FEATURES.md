@@ -34,21 +34,17 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 
 **Week 3**
 - Payment: connect the payment screen to bookings. A simulated payment is enough (`markBookingPaid`).
-- Geolocation: ask for permission, show tutors on the map from `coordinates` in Firestore, sort tutors by distance (`sortByDistance`).
+- Near me and map discovery: request foreground permission, use the device position or the student’s saved private address as a fallback, and sort approved tutors by approximate distance using coarse public location cells. Never read other users’ private profile documents or publish exact tutor coordinates or addresses. Tutors without safe location cells remain visible in the list and map's location-unavailable section, without pins or distances. Campus Check-In remains separate.
 - Check-in: allow it only when `isAtCampus` is true, then call `checkInToBooking`. Set the real campus in `.env.local` (`EXPO_PUBLIC_CAMPUS_LATITUDE`, `EXPO_PUBLIC_CAMPUS_LONGITUDE`, `EXPO_PUBLIC_CAMPUS_RADIUS_METERS`).
 - If you finish early in Week 2, start the map setup then. Week 3 is short.
 
 ## Map library
 
-Nothing is installed for the map yet, because it needs a team decision. Checked in the Expo SDK 58 docs on Oct 11, 2026:
+Tutor discovery uses `react-native-maps` on iOS/Android, which is included in Expo Go for SDK 58. The web build uses Leaflet with OpenStreetMap tiles because `react-native-maps` does not support Expo Web. Standalone Android app binaries need a Google Maps API key and a rebuilt native binary. Set `GOOGLE_MAPS_API_KEY` in the local/build environment; `app.config.js` passes it to the map config plugin. Do not commit the key. Expo Go does not require this key.
 
-- `expo-maps` is the map package for SDK 58. It is marked **alpha** ("will frequently experience breaking changes") and **does not run in Expo Go**. You need a development build.
-- It uses Google Maps on Android, which needs a **Google Maps API key** (a Google Cloud project with Maps SDK for Android enabled), and Apple Maps on iOS. The docs do not mention web support.
-- Other options exist (the docs list `react-native-maps` only as a third-party library). Whatever the choice, test it in a development build early.
+The list and map share the same tutor search and filters. Near me is available only in map mode. Distance sorting and map markers use the coarse `locationCell` derived from each approved tutor’s saved city/area; they do not use the tutor’s home address. Exact coordinates remain private. Admin Verifications → **Update approved tutor records** backfills existing approved tutors from their private saved city/area. Legacy cells without the city-area marker are ignored until that migration runs. Tutors without a usable city/area remain discoverable and bookable, but appear only in a clearly labeled map list.
 
-Ask your instructor whether the demo must run in Expo Go. If it must, the map could be a simple list sorted by distance with a "Open in Maps" link, and the nearby sorting still works with `sortByDistance`. Decide before Week 3, and write the choice in `docs/ARCHITECTURE.md`.
-
-Docs: [expo-maps](https://docs.expo.dev/versions/v58.0.0/sdk/maps/), [expo-location](https://docs.expo.dev/versions/v58.0.0/sdk/location/).
+Docs: [react-native-maps](https://docs.expo.dev/versions/v58.0.0/sdk/map-view/), [expo-location](https://docs.expo.dev/versions/v58.0.0/sdk/location/).
 
 ## Runtime data sources
 

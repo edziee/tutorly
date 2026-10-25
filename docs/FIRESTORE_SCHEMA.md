@@ -38,7 +38,10 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `tutorVerificationNote`, `tutorVerificationReviewedBy`, `tutorVerificationReviewedAt` | string, uid, timestamp | Admin-only outcome details for direct tutor account review. Rejection requires a reason |
 | `name` | string | |
 | `phone`, `age`, `location` (city), `year`, `campus`, `campusAddress` | string | From the student profile screen |
-| `homeAddress` | string | Optional private home address for student and tutor profile owners; editable from the profile, never copied to the public tutor document. Intended for a future geolocation feature; it is not required for sign-up or normal app use |
+| `homeAddress` | string | Optional private home address for student and tutor profile owners; editable from the profile, never copied to the public tutor document. Required with `location` only when a student uses Near me; not required for sign-up or ordinary profile saves |
+| `homeAddressCoordinates`, `homeAddressGeocodeKey` | map `{ latitude, longitude }`, string | Optional exact geocode cache for the owner’s saved home address, private to this document. Removed when city or address changes |
+| `locationAreaCoordinates`, `locationAreaGeocodeKey` | map `{ latitude, longitude }`, string | Optional private geocode cache for the owner’s saved city/area, used to publish only a coarse tutor discovery location. Removed when city/area changes |
+| `geolocationConsent`, `geolocationConsentAt` | boolean, timestamp | The student’s recorded decision and timestamp for using foreground location for Near me. Device coordinates are not persisted |
 | `photoUrl` | string | Optional instructor-approved external image URL. If empty, show initials; do not use Firebase Storage |
 | `notificationPreferences` | map of booleans | Week 3, Member 4 (for example `bookings`, `messages`, `reminders`) |
 | `tutorCompletedBookingCount`, `lastTutorCompletedBookingId` | private integer, string | Rules-guarded aggregate and last-booking marker. Updated only in the same atomic transition that confirms a completed tutoring session; clients cannot edit these through profile updates |
@@ -66,7 +69,9 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `totalRecordedTeachingSeconds` | non-negative integer | Aggregate of positive recorded timer seconds from completed sessions; updated atomically when a tutor confirms completion |
 | `lastTeachingBookingId` | string | Internal marker used by Firestore rules to authorize the matching completion and teaching-time aggregate update |
 | `location` | string | City name shown on the card |
-| `coordinates` | map `{ latitude, longitude }` | New. Used for the map and nearby sorting (Week 3) |
+| `locationCell` | map `{ latitudeCell, longitudeCell }` (integers) | Optional coarse (~1 km) cell derived from the tutor’s saved city/area, not their home address. Used for approximate nearby sorting and map pins. Never publish exact coordinates or addresses |
+| `locationCellVersion` | integer (`1`) | Present only when `locationCell` was generated from the tutor’s city/area. Older address-derived cells without this marker are ignored for distance and map display |
+| `locationPrivacyVersion` | integer (`1`) | Set only on profiles validated against the coarse-location-only public schema; approved discovery queries require this marker |
 | `credentials`, `bio`, `teachingPhilosophy` | string | |
 | `availability` | array of string | For example `'Monday, 4:00 PM'`, as the mock data has it |
 | `preferredDays`, `preferredTimeSlots` | array of string | From the tutor application |
@@ -78,6 +83,8 @@ Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `s
 | `verificationStatus` | `'not_submitted'` \| `'pending'` \| `'approved'` \| `'rejected'` | `VERIFICATION_STATUS`. Students and tutors only see `approved` tutors |
 | `verificationNote` | string | Public profile field; rejected tutors are not visible to students |
 | `publicProfileVersion` | number | Must be `2` before students or tutors can read a profile. This keeps legacy documents containing proof fields private until migrated |
+
+Deploy the updated rules and app, then run **Update approved tutor records** from Admin Verifications on iOS or Android. It removes legacy exact coordinates and backfills a coarse city/area cell using each tutor's saved city/area; it never uses home addresses. Student discovery queries require `locationPrivacyVersion: 1`, and map pins/distances ignore old cells until they have been regenerated from a city/area. Tutors without a usable city/area remain discoverable without a pin or distance.
 
 ## `tutorApplications/{uid}` (private)
 

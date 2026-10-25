@@ -1,7 +1,9 @@
 // Admin-only Firestore reads and tutor verification reviews.
 import {
   collection,
+  deleteField,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   query,
@@ -10,12 +12,14 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
+import * as Location from 'expo-location';
 
 import { requireAuth, requireFirebase } from '../config/firebase';
 import { COLLECTIONS } from '../constants/collections';
 import { ROLES } from '../constants/roles';
 import { USER_ACCOUNT_STATUS, VERIFICATION_STATUS } from '../constants/statuses';
 import { isHttpsUrl } from '../utils/validation';
+import { isValidCoordinates, toLocationCell } from '../utils/geolocation';
 
 function requireSignedInAdmin() {
   const uid = requireAuth().currentUser?.uid;
@@ -104,13 +108,15 @@ function toPublicTutorProfile(tutor, status, reason, reviewedAt) {
     verificationStatus: status,
     verificationNote: reason,
     publicProfileVersion: 2,
+    locationPrivacyVersion: 1,
     createdAt: tutor.createdAt ?? reviewedAt,
     updatedAt: reviewedAt,
   };
   [
     'photoUrl',
     'location',
-    'coordinates',
+    'locationCell',
+    'locationCellVersion',
     'availability',
     'online',
     'rating',
@@ -394,9 +400,8 @@ export async function setVerificationStatus(tutorId, status, review = {}) {
 }
 
 /**
- * Move existing approved tutor evidence out of public tutor documents before
- * role-based rules are published. Each tutor is migrated independently.
- * @returns {Promise<number>} number of profiles migrated
+ * Clean up older approved profiles and backfill coarse locations from saved
+ * tutor city/area values. Exact home addresses are never read for this purpose.
  */
 export async function migrateLegacyApprovedTutors() {
   const reviewerId = requireSignedInAdmin();
@@ -415,18 +420,58 @@ export async function migrateLegacyApprovedTutors() {
     'verificationReviewedBy',
     'verificationReviewedAt',
   ];
-  const legacyTutors = tutorsSnapshot.docs.filter((snapshot) => {
-    const profile = snapshot.data();
-    return profile.publicProfileVersion !== 2 ||
-      privateProfileFields.some((field) => field in profile);
-  });
   let migrated = 0;
+  let locationsUpdated = 0;
+  let locationsUnavailable = 0;
 
-  for (const tutorSnapshot of legacyTutors) {
+  for (const tutorSnapshot of tutorsSnapshot.docs) {
     const tutorId = tutorSnapshot.id;
+    const initialTutor = tutorSnapshot.data();
+    const needsPrivacyMigration = initialTutor.publicProfileVersion !== 2 ||
+      initialTutor.locationPrivacyVersion !== 1 ||
+      privateProfileFields.some((field) => field in initialTutor) ||
+      ['coordinates', 'homeAddress', 'homeAddressCoordinates', 'homeAddressGeocodeKey']
+        .some((field) => field in initialTutor);
+    const needsLocationMigration = initialTutor.locationCellVersion !== 1;
+    if (!needsPrivacyMigration && !needsLocationMigration) continue;
+
+    const safeLocationCell = needsLocationMigration
+      ? null
+      : initialTutor.locationCell;
+    let tutorCity = '';
+    let cityCell = null;
+    let geocodingFailed = false;
+    if (needsLocationMigration) {
+      const userSnapshot = await getDoc(doc(db, COLLECTIONS.USERS, tutorId));
+      const userProfile = userSnapshot.exists() ? userSnapshot.data() : null;
+      const privateCity = typeof userProfile?.location === 'string'
+        ? userProfile.location.trim()
+        : '';
+      const publicCity = typeof initialTutor.location === 'string'
+        ? initialTutor.location.trim()
+        : '';
+      tutorCity = privateCity || publicCity;
+      if (tutorCity && tutorCity.length <= 200) {
+        try {
+          const [match] = await Location.geocodeAsync(tutorCity);
+          const coordinates = {
+            latitude: match?.latitude,
+            longitude: match?.longitude,
+          };
+          cityCell = isValidCoordinates(coordinates) ? toLocationCell(coordinates) : null;
+          geocodingFailed = cityCell === null;
+        } catch {
+          geocodingFailed = true;
+        }
+      } else {
+        geocodingFailed = true;
+      }
+      if (geocodingFailed) locationsUnavailable += 1;
+    }
+
     const tutorRef = doc(db, COLLECTIONS.TUTORS, tutorId);
     const applicationRef = doc(db, COLLECTIONS.TUTOR_APPLICATIONS, tutorId);
-    const wasMigrated = await runTransaction(db, async (transaction) => {
+    const migrationResult = await runTransaction(db, async (transaction) => {
       const [currentTutorSnapshot, applicationSnapshot, userSnapshot] = await Promise.all([
         transaction.get(tutorRef),
         transaction.get(applicationRef),
@@ -437,9 +482,51 @@ export async function migrateLegacyApprovedTutors() {
       if (
         currentTutor.verificationStatus !== VERIFICATION_STATUS.APPROVED ||
         (currentTutor.publicProfileVersion === 2 &&
-          !privateProfileFields.some((field) => field in currentTutor))
+          currentTutor.locationPrivacyVersion === 1 &&
+          currentTutor.locationCellVersion === 1 &&
+          !privateProfileFields.some((field) => field in currentTutor) &&
+          !['coordinates', 'homeAddress', 'homeAddressCoordinates', 'homeAddressGeocodeKey']
+            .some((field) => field in currentTutor))
       ) {
         return false;
+      }
+      if (
+        currentTutor.publicProfileVersion === 2 &&
+        !privateProfileFields.some((field) => field in currentTutor) &&
+        (
+          currentTutor.locationPrivacyVersion !== 1 ||
+          currentTutor.locationCellVersion !== 1 ||
+          ['coordinates', 'homeAddress', 'homeAddressCoordinates', 'homeAddressGeocodeKey']
+            .some((field) => field in currentTutor)
+        )
+      ) {
+        const currentUser = userSnapshot.exists() ? userSnapshot.data() : null;
+        const currentPrivateCity = typeof currentUser?.location === 'string'
+          ? currentUser.location.trim()
+          : '';
+        const currentPublicCity = typeof currentTutor.location === 'string'
+          ? currentTutor.location.trim()
+          : '';
+        const currentCity = currentPrivateCity || currentPublicCity;
+        const cellToPublish = safeLocationCell ?? cityCell;
+        const canPublishCell = cellToPublish &&
+          (!needsLocationMigration || (tutorCity && currentCity === tutorCity));
+        transaction.update(tutorRef, {
+          coordinates: deleteField(),
+          homeAddress: deleteField(),
+          homeAddressCoordinates: deleteField(),
+          homeAddressGeocodeKey: deleteField(),
+          location: currentCity,
+          ...(canPublishCell
+            ? { locationCell: cellToPublish, locationCellVersion: 1 }
+            : {
+                locationCell: deleteField(),
+                locationCellVersion: deleteField(),
+              }),
+          locationPrivacyVersion: 1,
+          updatedAt: serverTimestamp(),
+        });
+        return { migrated: true, locationUpdated: Boolean(canPublishCell) };
       }
       const user = userSnapshot.exists() ? userSnapshot.data() : null;
       if (!user || !['tutor', 'professional'].includes(user.role)) {
@@ -453,6 +540,14 @@ export async function migrateLegacyApprovedTutors() {
         throw new Error(`Cannot migrate tutor ${tutorId}: application is not approved.`);
       }
 
+      const privateCity = typeof user.location === 'string' ? user.location.trim() : '';
+      const publicCity = typeof currentTutor.location === 'string'
+        ? currentTutor.location.trim()
+        : '';
+      const currentCity = privateCity || publicCity;
+      const cityStillMatches = !needsLocationMigration ||
+        (tutorCity && currentCity === tutorCity);
+      const cellToPublish = safeLocationCell ?? (cityStillMatches ? cityCell : null);
       const timestamp = serverTimestamp();
       const application = {
         ...existingApplication,
@@ -467,20 +562,34 @@ export async function migrateLegacyApprovedTutors() {
         updatedAt: timestamp,
       };
       const publicProfile = toPublicTutorProfile(
-        { ...currentTutor, ...application },
+        {
+          ...currentTutor,
+          ...application,
+          ...(currentCity ? { location: currentCity } : {}),
+          ...(cellToPublish
+            ? { locationCell: cellToPublish, locationCellVersion: 1 }
+            : {}),
+        },
         VERIFICATION_STATUS.APPROVED,
         application.verificationNote,
         timestamp,
       );
+      if (!cellToPublish) {
+        delete publicProfile.locationCell;
+        delete publicProfile.locationCellVersion;
+      }
 
       transaction.set(applicationRef, application);
       transaction.set(tutorRef, publicProfile);
-      return true;
+      return { migrated: true, locationUpdated: Boolean(cellToPublish) };
     });
-    if (wasMigrated) migrated += 1;
+    if (migrationResult?.migrated) {
+      migrated += 1;
+      if (migrationResult.locationUpdated) locationsUpdated += 1;
+    }
   }
 
-  return migrated;
+  return { migrated, locationsUpdated, locationsUnavailable };
 }
 
 /** Return all bookings for the admin dashboard. */

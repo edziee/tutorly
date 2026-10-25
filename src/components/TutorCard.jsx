@@ -13,7 +13,7 @@ const tierStyles = {
   'Peer Tutor': { backgroundColor: colors.inputBackground, color: colors.text, iconColor: colors.text },
 };
 
-export default function TutorCard({ tutor, handlePress }) {
+export default function TutorCard({ tutor, handlePress, approximateDistance = '' }) {
   const tier = tutor.tier || 'Tutor';
   const tierStyle = tierStyles[tier] ?? {
     backgroundColor: colors.inputBackground,
@@ -88,6 +88,12 @@ export default function TutorCard({ tutor, handlePress }) {
       <Text style={styles.subject}>
         Teaches {tutor.subject || 'various subjects'}
       </Text>
+      {approximateDistance ? (
+        <View style={styles.distanceRow}>
+          <Ionicons name="location-outline" size={14} color={colors.mutedText} />
+          <Text style={styles.distance}>{approximateDistance} away (approximate)</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -222,5 +228,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     marginTop: spacing.sm,
+  },
+  distanceRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  distance: {
+    color: colors.mutedText,
+    fontSize: 12,
   },
 });

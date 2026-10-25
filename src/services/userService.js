@@ -2,6 +2,7 @@
 // private home address, campus, streak and so on. See docs/FIRESTORE_SCHEMA.md.
 // Owner: Member 1. Stores user profiles in Firestore.
 import {
+  deleteField,
   doc,
   getDoc,
   onSnapshot,
@@ -129,5 +130,47 @@ export async function updateUserProfile(uid, changes) {
   const safeChanges = { ...changes };
   PROTECTED_FIELDS.forEach((field) => delete safeChanges[field]);
   if (Object.keys(safeChanges).length === 0) return;
-  await updateDoc(doc(db, COLLECTIONS.USERS, uid), safeChanges);
+
+  const userRef = doc(db, COLLECTIONS.USERS, uid);
+  let locationChanged = false;
+  let homeAddressChanged = false;
+  if (['location', 'homeAddress'].some((field) =>
+    Object.prototype.hasOwnProperty.call(safeChanges, field))) {
+    const userSnapshot = await getDoc(userRef);
+    if (!userSnapshot.exists()) throw new Error('Cannot update a missing user profile.');
+    const currentProfile = userSnapshot.data();
+    locationChanged = Object.prototype.hasOwnProperty.call(safeChanges, 'location') &&
+      safeChanges.location !== currentProfile.location;
+    homeAddressChanged = Object.prototype.hasOwnProperty.call(safeChanges, 'homeAddress') &&
+      safeChanges.homeAddress !== currentProfile.homeAddress;
+    if (locationChanged || homeAddressChanged) {
+      const tutorRef = doc(db, COLLECTIONS.TUTORS, uid);
+      const tutorSnapshot = await getDoc(tutorRef);
+      const batch = writeBatch(db);
+      if (
+        locationChanged &&
+        tutorSnapshot.exists() &&
+        ('locationCell' in tutorSnapshot.data() ||
+          'locationCellVersion' in tutorSnapshot.data())
+      ) {
+        batch.update(tutorRef, {
+          locationCell: deleteField(),
+          locationCellVersion: deleteField(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+      if (locationChanged || homeAddressChanged) {
+        safeChanges.homeAddressCoordinates = deleteField();
+        safeChanges.homeAddressGeocodeKey = deleteField();
+      }
+      if (locationChanged) {
+        safeChanges.locationAreaCoordinates = deleteField();
+        safeChanges.locationAreaGeocodeKey = deleteField();
+      }
+      batch.update(userRef, safeChanges);
+      await batch.commit();
+      return;
+    }
+  }
+  await updateDoc(userRef, safeChanges);
 }

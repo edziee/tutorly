@@ -41,6 +41,7 @@ import {
   getTutors,
   updateTutorBookingDetails,
 } from '../../services/tutorService';
+import { syncTutorApproximateLocation } from '../../services/locationService';
 import {
   awardStudentBadge,
   setTutorAchievementVisibility,
@@ -391,14 +392,19 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
     const updatedLocation = locationDraft.trim();
     setSavingHomeAddress(true);
     setHomeAddressError('');
+    let profileSaved = false;
     try {
       await updateProfile({ location: updatedLocation, homeAddress: updatedAddress });
+      profileSaved = true;
       setLocation(updatedLocation);
       setHomeAddress(updatedAddress);
       setShowLocationSuggestions(false);
+      await syncTutorApproximateLocation(uid);
       setHomeAddressEditorVisible(false);
     } catch (error) {
-      setHomeAddressError(getErrorMessage(error, 'Couldn’t save your address.'));
+      setHomeAddressError(profileSaved
+        ? `Your profile was saved, but its approximate city/area location could not be updated. ${getErrorMessage(error, 'Retry or check the city or area.')}`
+        : getErrorMessage(error, 'Couldn’t save your address.'));
     } finally {
       setSavingHomeAddress(false);
     }
@@ -1091,7 +1097,7 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
                 editable={!savingHomeAddress}
               />
               <Text style={styles.addressPrivacyHint}>
-                Your address is not included in your public tutor profile.
+                Your home address stays private. Near me uses only an approximate location derived from your city or area.
               </Text>
               {homeAddressError ? (
                 <Text accessibilityRole="alert" style={styles.formError}>

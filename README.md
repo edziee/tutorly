@@ -30,6 +30,7 @@ The app has Firebase-backed authentication and data flows for bookings, tutor pr
 | Splash screen and two-page onboarding | Built (the onboarding is marked to be edited later) |
 | Student app with five tabs: Tutors, Profile, Schedule, Tutor Profile, Messages | Screens use Firebase-backed services; remaining feature gaps are listed below |
 | Tutors list with search and course and tier filters | Reads approved tutor profiles from Firestore |
+| Tutor map discovery | List and interactive map views share filters; Near me is map-only. Maps use coarse public tutor locations and keep tutors without locations visible without pins |
 | Schedule with upcoming and past sessions, reschedule, add to calendar | Reads live bookings from Firestore |
 | Messages screen | Reads live conversations and approved tutors from Firestore |
 | Tutor schedule and session ledger | Reads live bookings from Firestore |
@@ -41,7 +42,7 @@ The app has Firebase-backed authentication and data flows for bookings, tutor pr
 | Booking flow and payment | Not built. Placeholder screens and the `bookingService` function list are in place |
 | Firebase | The `firebase` package and the connection file `src/config/firebase.js` are in, but not connected: the Firebase project and `.env.local` are not set up yet (Member 1, Week 1) |
 | In-app notifications | Not wired up. The bell in the header shows a placeholder alert. `NotificationCard` is built but no screen uses it yet |
-| Geolocation and map | Not built. `expo-location` is installed and the distance helpers are in `src/utils/distance.js`. The map library is not chosen yet |
+| Geolocation and map | Foreground-only Near me search and tutor map are implemented. `react-native-maps` is used on iOS/Android, Leaflet/OpenStreetMap on web; standalone Android maps require `GOOGLE_MAPS_API_KEY` |
 
 Runtime demo datasets and fallback identities have been removed. The remaining test/seed fixtures and the cleanup scope are documented in [`docs/MOCK_DATA_INVENTORY.md`](docs/MOCK_DATA_INVENTORY.md).
 
@@ -49,10 +50,10 @@ Runtime demo datasets and fallback identities have been removed. The remaining t
 
 - [Expo](https://docs.expo.dev/versions/v58.0.0/) SDK 58 with React Native 0.88 and React 19.3
 - React Navigation (bottom tabs and native stack)
-- Expo modules in use: `expo-calendar`, `expo-document-picker`, `expo-image-picker`, `expo-notifications`, `expo-font`, `expo-location`
+- Expo modules in use: `expo-calendar`, `expo-document-picker`, `expo-image-picker`, `expo-notifications`, `expo-font`, `expo-location`, `react-native-maps`
+- Web map: Leaflet with OpenStreetMap tiles
 - `@react-native-async-storage/async-storage` for data kept on the device
 - Firebase JS SDK (`firebase` 12) for Authentication and Firestore. It runs in Expo Go
-- Still to decide: a map library (see [`docs/members/MEMBER_2_STUDENT_FEATURES.md`](docs/members/MEMBER_2_STUDENT_FEATURES.md))
 
 Expo has changed a lot between versions. Before writing code, check the [SDK 58 docs](https://docs.expo.dev/versions/v58.0.0/) instead of relying on older tutorials. This is also noted in `AGENTS.md` for AI coding tools.
 

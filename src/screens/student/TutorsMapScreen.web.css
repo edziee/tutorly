@@ -1,0 +1,24 @@
+.tutor-map-marker {
+  align-items: center;
+  background: #fff;
+  border: 2px solid #00a39a;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(23, 21, 47, 0.3);
+  color: #00a39a;
+  display: flex;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.tutor-map-marker-selected {
+  border: 3px solid #241a73;
+  color: #241a73;
+}
+
+.tutor-map-marker span {
+  line-height: 1;
+}
