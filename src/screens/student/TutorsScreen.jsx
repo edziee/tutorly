@@ -19,7 +19,6 @@ import LoadingState from '../../components/LoadingState';
 import TutorCard from '../../components/TutorCard';
 import TutorsMapScreen from './TutorsMapScreen';
 import { ROUTES } from '../../constants/routes';
-import { courseCategories } from '../../data/courseCategories';
 import { tierCategories } from '../../data/tierCategories';
 import { useAsync } from '../../hooks/useAsync';
 import { useAuth } from '../../context/AuthContext';
@@ -32,6 +31,10 @@ import {
 } from '../../services/locationService';
 import { sortByDistanceWithinRadius } from '../../utils/distance';
 import { getErrorMessage } from '../../utils/errors';
+import {
+  getAvailableSubjectFilters,
+  tutorMatchesSubject,
+} from '../../utils/courseSubjects';
 import { excludeCurrentUserTutor } from '../../utils/tutorDiscovery';
 import {
   coordinatesFromLocationCell,
@@ -40,14 +43,40 @@ import {
 
 const MAX_NEARBY_DISTANCE_KM = 10;
 
+const normalizeText = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
+
+const getTutorCourseNames = (tutor) => {
+  if (typeof tutor.courseNames === 'string') {
+    const courseNames = tutor.courseNames.split('\n').map((name) => name.trim()).filter(Boolean);
+    if (courseNames.length) return courseNames;
+  }
+
+  if (Array.isArray(tutor.courses)) {
+    const courseNames = tutor.courses
+      .map((course) => {
+        if (typeof course === 'string') return course.trim();
+        if (!course || typeof course !== 'object') return '';
+        return [course.code, course.title]
+          .filter((part) => typeof part === 'string' && part.trim())
+          .map((part) => part.trim())
+          .join(': ');
+      })
+      .filter(Boolean);
+    if (courseNames.length) return courseNames;
+  }
+
+  return normalizeText(tutor.subject)
+    ? [tutor.subject.trim()]
+    : [];
+};
+
 export const TutorsScreen = () => {
   const navigation = useNavigation();
   const { user } = useAuth();
   const tutorResults = useAsync(() => getTutors(), []);
   const [textInput, setTextInput] = useState('');
-  const [courseCategory, setCourseCategory] = useState('');
+  const [subjectCategory, setSubjectCategory] = useState('');
   const [tierCategory, setTierCategory] = useState('');
-  const [courses, setCourses] = useState(courseCategories);
   const [tiers, setTiers] = useState(tierCategories);
   const [viewMode, setViewMode] = useState('list');
   const [nearMeActive, setNearMeActive] = useState(false);
@@ -157,12 +186,17 @@ export const TutorsScreen = () => {
     );
   };
 
-  const handleCoursePress = (selectedCourse) => {
-    setCourses(courses.map((course) => ({
-      ...course,
-      isSelected: course.id === selectedCourse.id,
-    })));
-    setCourseCategory(selectedCourse.keyword);
+  const otherTutors = useMemo(
+    () => excludeCurrentUserTutor(tutorResults.data ?? [], user?.uid),
+    [tutorResults.data, user?.uid],
+  );
+  const subjects = useMemo(() => {
+    const courseNames = otherTutors.flatMap(getTutorCourseNames);
+    return getAvailableSubjectFilters(courseNames);
+  }, [otherTutors]);
+
+  const handleSubjectPress = (selectedSubject) => {
+    setSubjectCategory(selectedSubject.keyword);
   };
 
   const handleTierPress = (selectedTier) => {
@@ -173,13 +207,29 @@ export const TutorsScreen = () => {
     setTierCategory(selectedTier.keyword);
   };
 
-  const sanitizeString = (value) => value.trim().toLowerCase();
-  const otherTutors = excludeCurrentUserTutor(tutorResults.data ?? [], user?.uid);
+  const clearFilters = () => {
+    setTextInput('');
+    setSubjectCategory('');
+    setTierCategory('');
+    setTiers(tierCategories.map((tier) => ({
+      ...tier,
+      isSelected: tier.keyword === '',
+    })));
+  };
+  const activeFilters = [
+    normalizeText(textInput) ? `Search: ${textInput.trim()}` : '',
+    subjectCategory ? `Subject: ${subjectCategory}` : '',
+    tierCategory ? `Tutor type: ${tierCategory}` : '',
+  ].filter(Boolean);
+  const searchTerm = normalizeText(textInput);
+  const selectedSubject = normalizeText(subjectCategory);
+  const selectedTier = normalizeText(tierCategory);
   const filteredTutors = otherTutors.filter((tutor) =>
-    (sanitizeString(tutor.name ?? '').includes(sanitizeString(textInput)) ||
-      sanitizeString(tutor.subject ?? '').includes(sanitizeString(textInput))) &&
-    sanitizeString(tutor.subject ?? '').includes(sanitizeString(courseCategory)) &&
-    sanitizeString(tutor.tier ?? '').includes(sanitizeString(tierCategory)));
+    (normalizeText(tutor.name).includes(searchTerm) ||
+      getTutorCourseNames(tutor).some((courseName) =>
+        normalizeText(courseName).includes(searchTerm))) &&
+    tutorMatchesSubject(getTutorCourseNames(tutor), selectedSubject) &&
+    normalizeText(tutor.tier).includes(selectedTier));
   const nearbyTutors = nearMeOrigin
     ? sortByDistanceWithinRadius(
         filteredTutors,
@@ -220,19 +270,22 @@ export const TutorsScreen = () => {
 
       <FlatList
         horizontal
-        data={courses}
+        data={subjects}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => (
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ selected: item.isSelected }}
-            onPress={() => handleCoursePress(item)}
+            accessibilityState={{ selected: item.keyword === subjectCategory }}
+            onPress={() => handleSubjectPress(item)}
             style={[
               styles.courseChip,
-              item.isSelected && styles.selectedCourseChip,
+              item.keyword === subjectCategory && styles.selectedCourseChip,
             ]}
           >
-            <Text style={[styles.courseText, item.isSelected && styles.selectedCourseText]}>
+            <Text style={[
+              styles.courseText,
+              item.keyword === subjectCategory && styles.selectedCourseText,
+            ]}>
               {item.label}
             </Text>
           </Pressable>
@@ -268,6 +321,26 @@ export const TutorsScreen = () => {
           style={styles.tierOptions}
         />
       </View>
+
+      {activeFilters.length ? (
+        <View style={styles.activeFilters}>
+          <View style={styles.activeFilterTags}>
+            <Text style={styles.activeFiltersLabel}>Active filters</Text>
+            {activeFilters.map((filter) => (
+              <View key={filter} style={styles.activeFilterTag}>
+                <Text style={styles.activeFilterText} numberOfLines={1}>{filter}</Text>
+              </View>
+            ))}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={clearFilters}
+            style={styles.clearFiltersButton}
+          >
+            <Text style={styles.clearFiltersText}>Clear filters</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.discoveryControls}>
         <View accessibilityRole="tablist" style={styles.viewSwitcher}>
@@ -416,8 +489,12 @@ export const TutorsScreen = () => {
           <EmptyState
             compact
             icon="people-outline"
-            title="No tutors found"
-            message="Try another course or check back soon."
+            title={activeFilters.length ? 'No matching tutors' : 'No tutors available yet'}
+            message={activeFilters.length
+              ? 'No tutors match your current search and filters. Try changing or clearing them.'
+              : 'There are no tutors to show right now. Please check back soon.'}
+            actionLabel={activeFilters.length ? 'Clear filters' : undefined}
+            onAction={activeFilters.length ? clearFilters : undefined}
           />
         )}
       </View>
@@ -553,6 +630,50 @@ const styles = StyleSheet.create({
   courseFilter: {
     flexGrow: 0,
     marginBottom: spacing.sm,
+  },
+  activeFilters: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  activeFilterTags: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    flex: 1,
+    gap: spacing.xs,
+    minWidth: 0,
+  },
+  activeFiltersLabel: {
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeFilterTag: {
+    backgroundColor: colors.inputBackground,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    maxWidth: '100%',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  activeFilterText: {
+    color: colors.text,
+    fontSize: 11,
+    maxWidth: 220,
+  },
+  clearFiltersButton: {
+    alignSelf: 'center',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  clearFiltersText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   courseList: {
     alignItems: 'center',
