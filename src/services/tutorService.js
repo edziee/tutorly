@@ -231,7 +231,13 @@ export async function saveTutorApplication(uid, application) {
   if (!application || !Array.isArray(application.courses)) {
     throw new Error('saveTutorApplication needs application details and courses.');
   }
-  const evidenceError = getTutorApplicationEvidenceError(application);
+  const { db } = requireFirebase();
+  const userSnapshot = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+  if (!userSnapshot.exists()) {
+    throw new Error('A user profile is required to submit a tutor application.');
+  }
+  const accountRole = userSnapshot.data().role;
+  const evidenceError = getTutorApplicationEvidenceError(application, accountRole);
   if (evidenceError) throw new Error(evidenceError);
   if (!Object.values(TUTOR_TIERS).includes(application.tier)) {
     throw new Error('Choose a valid tutor category before saving the application.');
@@ -255,7 +261,6 @@ export async function saveTutorApplication(uid, application) {
     return courseDetails;
   });
 
-  const { db } = requireFirebase();
   const tutorRef = doc(db, COLLECTIONS.TUTORS, uid);
   const applicationRef = doc(db, COLLECTIONS.TUTOR_APPLICATIONS, uid);
   const [existingTutor, existingApplication] = await Promise.all([

@@ -451,7 +451,7 @@ service cloud.firestore {
       return signedIn() &&
         request.auth.uid == uid &&
         ((isTutor() && isTutorAccountType(tutorType)) ||
-          (isStudent() && tutorType in ['peer', 'professional']));
+          (isStudent() && tutorType == 'peer'));
     }
 
     function isTutorTypeForAccount(uid, tutorType) {

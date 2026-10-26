@@ -26,9 +26,19 @@ test('tutor operations require an approved private application and public profil
 
 test('student applicants may write only their own pending application', () => {
   assert.match(ruleFunction('isTutorApplicationOwner'), /request\.auth\.uid == uid/);
-  assert.match(ruleFunction('isTutorApplicationOwner'), /isStudent\(\) && tutorType in \['peer', 'professional'\]/);
+  assert.match(ruleFunction('isTutorApplicationOwner'), /isStudent\(\) && tutorType == 'peer'/);
   assert.match(ruleFunction('validTutorApplicationCreate'), /verificationStatus == 'pending'/);
   assert.match(ruleFunction('validTutorApplicationUpdate'), /resource\.data\.verificationStatus in \['pending', 'rejected'\]/);
+});
+
+test('application service checks the account role before accepting a category', async () => {
+  const tutorService = await readFile(new URL('./tutorService.js', import.meta.url), 'utf8');
+  const saveApplication = tutorService.match(
+    /export async function saveTutorApplication\([\s\S]*?\n\}/,
+  )?.[0];
+  assert.ok(saveApplication, 'Expected tutor application submission service');
+  assert.match(saveApplication, /COLLECTIONS\.USERS/);
+  assert.match(saveApplication, /getTutorApplicationEvidenceError\(application, accountRole\)/);
 });
 
 test('application review is admin-only and self-review is denied', () => {

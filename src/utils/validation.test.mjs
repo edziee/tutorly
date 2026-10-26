@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { ROLES } from '../constants/roles.js';
 import {
   MIN_PASSWORD_LENGTH,
   validateEmail,
@@ -106,6 +107,38 @@ test('professional course grades are optional and proof is application-level', (
   assert.match(
     getTutorApplicationEvidenceError({ ...application, courses: [] }),
     /at least one course/,
+  );
+});
+
+test('student applications are restricted to the peer tutor category', () => {
+  const peerApplication = {
+    tutorType: 'peer',
+    tier: 'Peer Tutor',
+    courses: [{
+      id: 'course-1',
+      code: 'CS101',
+      title: 'Programming',
+      grade: '1.50',
+      proofName: 'Transcript',
+      proofUrl: 'https://drive.google.com/file/d/proof/view',
+    }],
+  };
+  const professionalApplication = {
+    tutorType: 'professional',
+    tier: 'Professor',
+    courses: [{ id: 'course-1', code: 'CS101', title: 'Programming', grade: '' }],
+    applicationProofName: 'Faculty ID',
+    applicationProofUrl: 'https://drive.google.com/file/d/proof/view',
+  };
+
+  assert.equal(getTutorApplicationEvidenceError(peerApplication, ROLES.STUDENT), '');
+  assert.match(
+    getTutorApplicationEvidenceError(professionalApplication, ROLES.STUDENT),
+    /only apply as Peer Tutors/,
+  );
+  assert.equal(
+    getTutorApplicationEvidenceError(professionalApplication, ROLES.TUTOR),
+    '',
   );
 });
 

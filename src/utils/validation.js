@@ -3,6 +3,7 @@
 // These only catch typing mistakes early. The real checks happen in Firebase.
 
 import { TUTOR_TIERS, TUTOR_TYPES } from '../constants/statuses.js';
+import { ROLES } from '../constants/roles.js';
 
 export const MIN_PASSWORD_LENGTH = 8;
 
@@ -61,9 +62,15 @@ export function getTutorCourseValidationError(tutorType, course) {
   return '';
 }
 
-export function getTutorApplicationEvidenceError(application) {
+export function getTutorApplicationEvidenceError(application, accountRole = null) {
   if (!Object.values(TUTOR_TYPES).includes(application?.tutorType)) {
     return 'Choose a tutor type before submitting.';
+  }
+  if (
+    accountRole === ROLES.STUDENT &&
+    (application.tutorType !== TUTOR_TYPES.PEER || application.tier !== TUTOR_TIERS.PEER)
+  ) {
+    return 'Student accounts can only apply as Peer Tutors.';
   }
   if (
     (application.tutorType === TUTOR_TYPES.PEER && application.tier !== TUTOR_TIERS.PEER) ||

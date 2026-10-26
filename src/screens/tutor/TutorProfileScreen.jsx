@@ -15,6 +15,7 @@ import AppButton from '../../components/AppButton';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import { ROLES } from '../../constants/roles';
 import { TUTOR_TIERS, TUTOR_TYPES } from '../../constants/statuses';
 import { useAuth } from '../../context/AuthContext';
 import { getTutorApplication, saveTutorApplication } from '../../services/tutorService';
@@ -290,11 +291,14 @@ function CourseForm({ onAdd, tutorType }) {
 
 export default function TutorApplicationScreen() {
   const { user } = useAuth();
+  const isStudentApplicant = user?.role === ROLES.STUDENT;
   const [loadStatus, setLoadStatus] = useState('loading');
   const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState('not_submitted');
-  const [tutorType, setTutorType] = useState(user?.tutorType ?? TUTOR_TYPES.PEER);
+  const [tutorType, setTutorType] = useState(
+    isStudentApplicant ? TUTOR_TYPES.PEER : user?.tutorType ?? TUTOR_TYPES.PEER,
+  );
   const [needsTutorTypeChoice, setNeedsTutorTypeChoice] = useState(false);
   const [tier, setTier] = useState(TUTOR_TIERS.PEER);
   const [courses, setCourses] = useState([]);
@@ -320,19 +324,25 @@ export default function TutorApplicationScreen() {
     try {
       const application = await getTutorApplication(uid);
       setApplicationStatus(application?.verificationStatus ?? 'not_submitted');
-      const savedTutorType = user?.tutorType
-        ?? application?.tutorType
-        ?? (user?.role === 'professional' ? TUTOR_TYPES.PROFESSIONAL : null)
-        ?? (application?.tier
-          ? application.tier === TUTOR_TIERS.PEER
-            ? TUTOR_TYPES.PEER
-            : TUTOR_TYPES.PROFESSIONAL
-          : null);
-      setNeedsTutorTypeChoice(!savedTutorType);
+      const savedTutorType = isStudentApplicant
+        ? TUTOR_TYPES.PEER
+        : user?.tutorType
+          ?? application?.tutorType
+          ?? (user?.role === ROLES.PROFESSIONAL ? TUTOR_TYPES.PROFESSIONAL : null)
+          ?? (application?.tier
+            ? application.tier === TUTOR_TIERS.PEER
+              ? TUTOR_TYPES.PEER
+              : TUTOR_TYPES.PROFESSIONAL
+            : null);
+      setNeedsTutorTypeChoice(!isStudentApplicant && !savedTutorType);
       setTutorType(savedTutorType ?? TUTOR_TYPES.PEER);
       setTier(
-        application?.tier
-        ?? (savedTutorType === TUTOR_TYPES.PROFESSIONAL ? TUTOR_TIERS.ALUMNI : TUTOR_TIERS.PEER),
+        isStudentApplicant
+          ? TUTOR_TIERS.PEER
+          : application?.tier
+            ?? (savedTutorType === TUTOR_TYPES.PROFESSIONAL
+              ? TUTOR_TIERS.ALUMNI
+              : TUTOR_TIERS.PEER),
       );
       const savedCredentials = application?.credentials;
       setCredentials(
@@ -361,7 +371,7 @@ export default function TutorApplicationScreen() {
       setLoadError(error);
       setLoadStatus('error');
     }
-  }, [uid, user?.tutorType]);
+  }, [uid, isStudentApplicant, user?.role, user?.tutorType]);
 
   useEffect(() => {
     loadApplication();
@@ -408,6 +418,8 @@ export default function TutorApplicationScreen() {
   }
 
   async function submitApplication() {
+    const applicationTutorType = isStudentApplicant ? TUTOR_TYPES.PEER : tutorType;
+    const applicationTier = isStudentApplicant ? TUTOR_TIERS.PEER : tier;
     if (
       courses.length === 0 ||
       credentials.some((credential) => !credential.trim()) ||
@@ -420,12 +432,12 @@ export default function TutorApplicationScreen() {
       return;
     }
     const evidenceError = getTutorApplicationEvidenceError({
-      tutorType,
-      tier,
+      tutorType: applicationTutorType,
+      tier: applicationTier,
       courses,
       applicationProofName,
       applicationProofUrl,
-    });
+    }, user?.role);
     if (evidenceError) {
       Alert.alert('Proof details needed', evidenceError);
       return;
@@ -435,8 +447,8 @@ export default function TutorApplicationScreen() {
     try {
       await saveTutorApplication(uid, {
         name: user?.name ?? '',
-        tutorType,
-        tier,
+        tutorType: applicationTutorType,
+        tier: applicationTier,
         credentials: credentials.map((credential) => credential.trim()).join('\n'),
         preferredDays,
         preferredTimeSlots,
@@ -487,9 +499,11 @@ export default function TutorApplicationScreen() {
           <Section>
             <SectionTitle
               title="Tutor category"
-              subtitle={needsTutorTypeChoice
-                ? 'Choose the option that matches your experience.'
-                : 'Selected when you signed up.'}
+              subtitle={isStudentApplicant
+                ? 'Student applications are for Peer Tutors.'
+                : needsTutorTypeChoice
+                  ? 'Choose the option that matches your experience.'
+                  : 'Selected when you signed up.'}
             />
             {needsTutorTypeChoice ? (
               <View style={styles.selectionGrid}>
