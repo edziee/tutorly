@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import L from 'leaflet';
 import {
@@ -62,23 +64,109 @@ function TutorMarker({ tutor, selected, onSelect }) {
   );
 }
 
-function RecenterMap({ region, searchOrigin, recenterRequest }) {
+function SearchOriginMarker({ searchOrigin, label, markerText }) {
+  const icon = useMemo(() => L.divIcon({
+    className: 'search-origin-marker',
+    html: `<span>${markerText}</span>`,
+    iconSize: [64, 32],
+    iconAnchor: [32, 16],
+  }), [markerText]);
+
+  return (
+    <Marker
+      icon={icon}
+      position={[searchOrigin.latitude, searchOrigin.longitude]}
+      title={label}
+    >
+      <Popup>
+        <Text style={styles.popupText}>{label}</Text>
+      </Popup>
+    </Marker>
+  );
+}
+
+function RecenterMap({ region }) {
   const map = useMap();
-  const previousRecenterRequest = useRef(recenterRequest);
   useEffect(() => {
-    map.setView([region.latitude, region.longitude], map.getZoom(), { animate: false });
-  }, [map, region.latitude, region.longitude]);
-  useEffect(() => {
-    if (recenterRequest > previousRecenterRequest.current && searchOrigin) {
-      map.setView(
-        [searchOrigin.latitude, searchOrigin.longitude],
-        Math.max(13, map.getZoom()),
-        { animate: true },
-      );
-    }
-    previousRecenterRequest.current = recenterRequest;
-  }, [map, recenterRequest, searchOrigin]);
+    const zoom = Math.min(18, Math.max(5, Math.round(Math.log2(360 / region.longitudeDelta))));
+    map.setView([region.latitude, region.longitude], zoom, { animate: true });
+  }, [map, region.latitude, region.longitude, region.longitudeDelta]);
   return null;
+}
+
+function MapCanvas({
+  mapRegion,
+  recenterRequest,
+  searchOrigin,
+  locatedTutors,
+  selectedTutor,
+  onSelectTutor,
+  nearMeActive,
+  searchOriginSource,
+  searchOriginMarkerLabel,
+  searchOriginMarkerText,
+  expanded,
+  canRecenterOnSearchOrigin,
+  searchOriginLabel,
+  onRecenterOnSearchOrigin,
+  onToggleExpanded,
+  onCloseExpanded,
+}) {
+  return (
+    <>
+      <MapContainer
+        key={`${expanded ? 'expanded-map' : 'inline-map'}:${recenterRequest}`}
+        center={[mapRegion.latitude, mapRegion.longitude]}
+        zoom={Math.min(18, Math.max(5, Math.round(Math.log2(360 / mapRegion.longitudeDelta))))}
+        scrollWheelZoom
+        style={styles.map}
+      >
+        <RecenterMap
+          region={mapRegion}
+        />
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {locatedTutors.map((tutor) => (
+          <TutorMarker
+            key={tutor.id}
+            tutor={tutor}
+            selected={tutor.id === selectedTutor?.id}
+            onSelect={onSelectTutor}
+          />
+        ))}
+        {nearMeActive && searchOrigin && searchOriginSource ? (
+          <SearchOriginMarker
+            searchOrigin={searchOrigin}
+            label={searchOriginMarkerLabel}
+            markerText={searchOriginMarkerText}
+          />
+        ) : null}
+      </MapContainer>
+      <View style={styles.mapControls}>
+        {canRecenterOnSearchOrigin && searchOrigin ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Center map on ${searchOriginLabel}`}
+            accessibilityHint="Moves the map to the approximate origin used for this search."
+            onPress={onRecenterOnSearchOrigin}
+            style={styles.mapControl}
+          >
+            <Feather name="navigation" size={18} color={colors.primary} />
+          </Pressable>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={expanded ? 'Close expanded map' : 'Expand map'}
+          onPress={expanded ? onCloseExpanded : onToggleExpanded}
+          style={styles.mapControl}
+        >
+          <Feather name={expanded ? 'minimize-2' : 'maximize-2'} size={18} color={colors.primary} />
+        </Pressable>
+      </View>
+    </>
+  );
 }
 
 export default function TutorsMapScreen({
@@ -89,11 +177,11 @@ export default function TutorsMapScreen({
   searchOrigin,
   searchOriginSource,
   onRequestMapRecenter,
-  mapRecenterRequest = 0,
   onTutorPress,
 }) {
   const [selectedTutorId, setSelectedTutorId] = useState(null);
-  const [shownSearchOriginKey, setShownSearchOriginKey] = useState(null);
+  const [searchOriginCenterRequest, setSearchOriginCenterRequest] = useState(0);
+  const [mapExpanded, setMapExpanded] = useState(false);
   const { locatedTutors, tutorsWithoutLocation } = useMemo(
     () => splitTutorsByMapLocation(tutors),
     [tutors],
@@ -105,21 +193,29 @@ export default function TutorsMapScreen({
   const selectedTutor = locatedTutors.find((tutor) => tutor.id === selectedTutorId)
     ?? locatedTutors[0]
     ?? null;
-  const searchOriginKey = searchOrigin
-    ? `${searchOrigin.latitude}:${searchOrigin.longitude}`
-    : null;
-  const mapRegion = region ?? (
-    searchOrigin && shownSearchOriginKey === searchOriginKey
-    ? { ...searchOrigin, longitudeDelta: 0.08 }
-    : null);
   useEffect(() => {
-    if (!nearMeActive) setShownSearchOriginKey(null);
-  }, [nearMeActive]);
+    if (!nearMeActive || !searchOrigin) setSearchOriginCenterRequest(0);
+  }, [nearMeActive, searchOrigin]);
+  const mapRegion = searchOriginCenterRequest > 0 && nearMeActive && searchOrigin
+    ? { ...searchOrigin, latitudeDelta: 0.02, longitudeDelta: 0.02 }
+    : region;
   const searchOriginLabel = searchOriginSource === 'device'
     ? 'your current location'
     : 'your saved address';
+  const searchOriginMarkerLabel = searchOriginSource === 'device'
+    ? 'You (approximate location)'
+    : 'Saved address (approximate)';
+  const searchOriginMarkerText = searchOriginSource === 'device' ? 'You' : 'Address';
+
+  const recenterOnSearchOrigin = () => {
+    if (!canRecenterOnSearchOrigin || !searchOrigin) return;
+    onRequestMapRecenter(() => {
+      setSearchOriginCenterRequest((request) => request + 1);
+    });
+  };
 
   return (
+    <>
     <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.content}
@@ -132,41 +228,23 @@ export default function TutorsMapScreen({
       </View>
       {mapRegion ? (
         <View style={styles.mapFrame}>
-          <MapContainer
-            center={[mapRegion.latitude, mapRegion.longitude]}
-            zoom={Math.min(18, Math.max(5, Math.round(Math.log2(360 / mapRegion.longitudeDelta))))}
-            scrollWheelZoom
-            style={styles.map}
-          >
-            <RecenterMap
-              region={mapRegion}
+          {!mapExpanded ? (
+            <MapCanvas
+              mapRegion={mapRegion}
+              recenterRequest={searchOriginCenterRequest}
               searchOrigin={searchOrigin}
-              recenterRequest={mapRecenterRequest}
+              locatedTutors={locatedTutors}
+              selectedTutor={selectedTutor}
+              onSelectTutor={setSelectedTutorId}
+              nearMeActive={nearMeActive}
+              searchOriginSource={searchOriginSource}
+              searchOriginMarkerLabel={searchOriginMarkerLabel}
+              searchOriginMarkerText={searchOriginMarkerText}
+              canRecenterOnSearchOrigin={canRecenterOnSearchOrigin}
+              searchOriginLabel={searchOriginLabel}
+              onRecenterOnSearchOrigin={recenterOnSearchOrigin}
+              onToggleExpanded={() => setMapExpanded(true)}
             />
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            {locatedTutors.map((tutor) => (
-              <TutorMarker
-                key={tutor.id}
-                tutor={tutor}
-                selected={tutor.id === selectedTutor?.id}
-                onSelect={setSelectedTutorId}
-              />
-            ))}
-          </MapContainer>
-          {canRecenterOnSearchOrigin && searchOrigin ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Center map on ${searchOriginLabel}`}
-              onPress={() => onRequestMapRecenter(() => {
-                if (!region) setShownSearchOriginKey(searchOriginKey);
-              })}
-              style={styles.mapControl}
-            >
-              <Feather name="navigation" size={18} color={colors.primary} />
-            </Pressable>
           ) : null}
         </View>
       ) : (
@@ -187,7 +265,7 @@ export default function TutorsMapScreen({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Center map on ${searchOriginLabel}`}
-              onPress={() => onRequestMapRecenter(() => setShownSearchOriginKey(searchOriginKey))}
+              onPress={recenterOnSearchOrigin}
               style={styles.noMapRecenterButton}
             >
               <Text style={styles.noMapRecenterText}>Show map around {searchOriginLabel}</Text>
@@ -235,6 +313,36 @@ export default function TutorsMapScreen({
         </View>
       ) : null}
     </ScrollView>
+    <Modal
+      visible={mapExpanded && Boolean(mapRegion)}
+      animationType="slide"
+      onRequestClose={() => setMapExpanded(false)}
+    >
+      {mapRegion ? (
+        <SafeAreaView edges={['top', 'bottom']} style={styles.expandedMapContainer}>
+          <View style={styles.expandedMapFrame}>
+            <MapCanvas
+              mapRegion={mapRegion}
+              recenterRequest={searchOriginCenterRequest}
+              searchOrigin={searchOrigin}
+              locatedTutors={locatedTutors}
+              selectedTutor={selectedTutor}
+              onSelectTutor={setSelectedTutorId}
+              nearMeActive={nearMeActive}
+              searchOriginSource={searchOriginSource}
+              searchOriginMarkerLabel={searchOriginMarkerLabel}
+              searchOriginMarkerText={searchOriginMarkerText}
+              expanded
+              canRecenterOnSearchOrigin={canRecenterOnSearchOrigin}
+              searchOriginLabel={searchOriginLabel}
+              onRecenterOnSearchOrigin={recenterOnSearchOrigin}
+              onCloseExpanded={() => setMapExpanded(false)}
+            />
+          </View>
+        </SafeAreaView>
+      ) : null}
+    </Modal>
+    </>
   );
 }
 
@@ -261,6 +369,13 @@ const styles = StyleSheet.create({
     height: 340,
     overflow: 'hidden',
   },
+  expandedMapContainer: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  expandedMapFrame: {
+    flex: 1,
+  },
   map: {
     height: '100%',
     width: '100%',
@@ -273,10 +388,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 40,
     justifyContent: 'center',
-    position: 'absolute',
-    right: spacing.sm,
-    top: spacing.sm,
     width: 40,
+  },
+  mapControls: {
+    gap: spacing.xs,
+    position: 'absolute',
+    right: spacing.md,
+    top: spacing.md,
+    zIndex: 1,
   },
   popupText: {
     color: colors.heading,

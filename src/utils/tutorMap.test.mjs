@@ -65,7 +65,7 @@ test('map data uses only coarse public cells and keeps tutors without a cell vis
   assert.match(webMapScreen, /tutorsWithoutLocation\.map/);
 });
 
-test('map pins use coarse tutor cells; search origin is rounded and only used for recentering', () => {
+test('map pins use coarse tutor cells; the rounded search origin is also marked', () => {
   const region = getTutorMapRegion([
     { locationCell: { latitudeCell: 1465, longitudeCell: 12105 }, locationCellVersion: 1 },
     { locationCell: { latitudeCell: 1475, longitudeCell: 12115 }, locationCellVersion: 1 },
@@ -80,13 +80,34 @@ test('map pins use coarse tutor cells; search origin is rounded and only used fo
   assert.match(tutorsScreen, /Share approximate map location\?/);
   assert.match(tutorsScreen, /Your exact device coordinates are not sent or saved/);
   assert.match(nativeMapScreen, /Center map on \$\{searchOriginLabel\}/);
-  assert.match(nativeMapScreen, /shownSearchOriginKey === searchOriginKey/);
+  assert.match(nativeMapScreen, /accessibilityHint="Moves the map to the approximate origin used for this search\."/);
+  assert.match(nativeMapScreen, /accessibilityLabel=\{expanded \? 'Close expanded map' : 'Expand map'\}/);
+  assert.match(nativeMapScreen, /<Modal[\s\S]*?visible=\{mapExpanded && Boolean\(mapRegion\)\}/);
+  assert.match(nativeMapScreen, /right: spacing\.md,[\s\S]*?top: spacing\.md/);
+  assert.match(nativeMapScreen, /nearMeActive && searchOrigin && searchOriginSource/);
+  assert.match(nativeMapScreen, /coordinate=\{searchOrigin\}/);
+  assert.match(nativeMapScreen, /You \(approximate location\)/);
+  assert.match(nativeMapScreen, /Saved address \(approximate\)/);
   assert.match(nativeMapScreen, /recenterOnSearchOrigin/);
+  assert.match(nativeMapScreen, /setSearchOriginCenterRequest\(\(request\) => request \+ 1\)/);
+  assert.match(nativeMapScreen, /latitudeDelta: 0\.02, longitudeDelta: 0\.02/);
+  assert.match(nativeMapScreen, /:\$\{recenterRequest\}/);
   assert.match(webMapScreen, /Center map on \$\{searchOriginLabel\}/);
-  assert.match(webMapScreen, /shownSearchOriginKey === searchOriginKey/);
-  assert.match(webMapScreen, /recenterRequest > previousRecenterRequest\.current && searchOrigin/);
-  assert.doesNotMatch(nativeMapScreen, /coordinate=\{searchOrigin\}/);
-  assert.doesNotMatch(webMapScreen, /position=\{\[searchOrigin\.latitude/);
+  assert.match(webMapScreen, /accessibilityHint="Moves the map to the approximate origin used for this search\."/);
+  assert.match(webMapScreen, /accessibilityLabel=\{expanded \? 'Close expanded map' : 'Expand map'\}/);
+  assert.match(webMapScreen, /<Modal[\s\S]*?visible=\{mapExpanded && Boolean\(mapRegion\)\}/);
+  assert.match(webMapScreen, /right: spacing\.md,[\s\S]*?top: spacing\.md/);
+  assert.match(webMapScreen, /nearMeActive && searchOrigin && searchOriginSource/);
+  assert.match(webMapScreen, /<SearchOriginMarker/);
+  assert.match(webMapScreen, /position=\{\[searchOrigin\.latitude, searchOrigin\.longitude\]\}/);
+  assert.match(webMapScreen, /You \(approximate location\)/);
+  assert.match(webMapScreen, /Saved address \(approximate\)/);
+  assert.match(webMapScreen, /setSearchOriginCenterRequest\(\(request\) => request \+ 1\)/);
+  assert.match(webMapScreen, /latitudeDelta: 0\.02, longitudeDelta: 0\.02/);
+  assert.match(webMapScreen, /:\$\{recenterRequest\}/);
+  assert.match(webMapScreen, /map\.setView\(\[region\.latitude, region\.longitude\], zoom, \{ animate: true \}\)/);
+  assert.match(nativeMapScreen, /coordinate=\{searchOrigin\}/);
+  assert.match(webMapScreen, /position=\{\[searchOrigin\.latitude, searchOrigin\.longitude\]\}/);
 });
 
 test('Near me is exposed only in map mode and clears its search when returning to list', () => {
@@ -101,6 +122,10 @@ test('Near me is exposed only in map mode and clears its search when returning t
   assert.match(tutorsScreen, /const MAX_NEARBY_DISTANCE_KM = 10/);
   assert.match(tutorsScreen, /sortByDistanceWithinRadius/);
   assert.match(tutorsScreen, /nearMeActive=\{nearMeActive && Boolean\(nearMeOrigin\)\}/);
+  assert.match(tutorsScreen, /nearMeStatus === 'ready' && nearMeOriginSource/);
+  assert.match(tutorsScreen, /Using your device location/);
+  assert.match(tutorsScreen, /Using your saved address/);
+  assert.match(tutorsScreen, /nearMeOriginSource === 'saved-address'/);
 });
 
 test('both discovery views use approved public tutors regardless of location-cell availability', () => {
@@ -114,4 +139,5 @@ test('web uses Leaflet instead of importing native map codegen modules', () => {
   assert.match(webMapScreen, /import \{\s*MapContainer,[\s\S]*?\} from 'react-leaflet'/);
   assert.doesNotMatch(webMapScreen, /from 'react-native-maps'/);
   assert.match(nativeMapScreen, /from 'react-native-maps'/);
+  assert.match(webMapScreen, /<MapContainer[\s\S]*?key=\{`\$\{expanded \? 'expanded-map' : 'inline-map'\}:\$\{recenterRequest\}`\}/);
 });

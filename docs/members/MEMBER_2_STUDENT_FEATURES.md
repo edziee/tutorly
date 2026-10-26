@@ -44,6 +44,8 @@ Tutor discovery uses `react-native-maps` on iOS/Android, which is included in Ex
 
 The list and map share the same tutor search and filters. Near me is available only in map mode. It filters mapped tutors to within approximately 10 km, ordered nearest first, using straight-line distance from the student’s search origin to the coarse `locationCell` derived from each approved tutor’s saved city/area. This is an estimate, not driving distance. Tutors without a usable location remain visible in a clearly labeled section. Tutor home addresses are never used for public pins or distances. Student device coordinates are used in memory; if the student taps the recenter control, only a rounded approximate map location is sent to the map provider to load tiles, after the location-use disclosure is accepted. Admin Verifications → **Update approved tutor records** backfills existing approved tutors from their private saved city/area. Legacy cells without the city-area marker are ignored until that migration runs.
 
+Near me uses a device fix only when its reported accuracy is within 1 km and its timestamp is no more than 2 minutes old. Otherwise, it uses the student's saved private address when available and explains why the device fix was not used.
+
 Docs: [react-native-maps](https://docs.expo.dev/versions/v58.0.0/sdk/map-view/), [expo-location](https://docs.expo.dev/versions/v58.0.0/sdk/location/).
 
 ## Runtime data sources

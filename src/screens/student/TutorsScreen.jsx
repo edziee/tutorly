@@ -56,7 +56,6 @@ export const TutorsScreen = () => {
   const [nearMeOrigin, setNearMeOrigin] = useState(null);
   const [nearMeOriginSource, setNearMeOriginSource] = useState(null);
   const [mapProviderConsentGranted, setMapProviderConsentGranted] = useState(false);
-  const [mapRecenterRequest, setMapRecenterRequest] = useState(0);
 
   const askLocationConsent = () => new Promise((resolve) => {
     Alert.alert(
@@ -137,7 +136,6 @@ export const TutorsScreen = () => {
 
   const handleMapRecenter = (onContinue) => {
     if (mapProviderConsentGranted) {
-      setMapRecenterRequest((request) => request + 1);
       onContinue();
       return;
     }
@@ -150,7 +148,6 @@ export const TutorsScreen = () => {
           text: 'Continue',
           onPress: () => {
             setMapProviderConsentGranted(true);
-            setMapRecenterRequest((request) => request + 1);
             onContinue();
           },
         },
@@ -200,6 +197,9 @@ export const TutorsScreen = () => {
       : null,
     [nearMeOrigin],
   );
+  const nearMeSourceLabel = nearMeOriginSource === 'device'
+    ? 'Using your device location'
+    : 'Using your saved address';
   const openTutor = (tutor) => navigation.navigate(ROUTES.BOOKING, { tutor });
 
   return (
@@ -332,12 +332,19 @@ export const TutorsScreen = () => {
           </Pressable>
         ) : null}
       </View>
-      {viewMode === 'map' && nearMeNotice ? (
+      {viewMode === 'map' && nearMeStatus === 'ready' && nearMeOriginSource ? (
         <View style={styles.nearMeNoticeBox}>
-          <Text accessibilityRole="text" style={styles.nearMeNotice}>
-            {nearMeNotice}
+          <Text accessibilityRole="text" style={styles.nearMeSource}>
+            {nearMeSourceLabel}
           </Text>
-          {nearMeStatus === 'ready' ? (
+          {nearMeOriginSource === 'device' ? (
+            <Text style={styles.nearMeNotice}>
+              Used for this search only; your device coordinates aren’t saved.
+            </Text>
+          ) : (
+            <Text style={styles.nearMeNotice}>{nearMeNotice}</Text>
+          )}
+          {nearMeOriginSource === 'saved-address' ? (
             <Pressable
               accessibilityRole="button"
               onPress={runNearMeSearch}
@@ -391,7 +398,6 @@ export const TutorsScreen = () => {
             searchOrigin={mapSearchOrigin}
             searchOriginSource={nearMeOriginSource}
             onRequestMapRecenter={handleMapRecenter}
-            mapRecenterRequest={mapRecenterRequest}
             onTutorPress={openTutor}
           />
         ) : displayedTutors.length ? (
@@ -504,9 +510,15 @@ const styles = StyleSheet.create({
   nearMeNoticeBox: {
     marginBottom: spacing.sm,
   },
+  nearMeSource: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   nearMeNotice: {
     color: colors.mutedText,
     fontSize: 12,
+    marginTop: spacing.xs,
   },
   nearMeMessageBox: {
     backgroundColor: colors.inputBackground,

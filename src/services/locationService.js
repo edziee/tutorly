@@ -14,6 +14,7 @@ import { COLLECTIONS } from '../constants/collections';
 import {
   geocodeKeyForAddress,
   geocodeKeyForLocationArea,
+  getDevicePositionIssue,
   getLocationFallbackReason,
   getLocationFallbackNotice,
   getNearMeProfileError,
@@ -31,23 +32,37 @@ export async function requestLocationPermission() {
   return permission.status === 'granted';
 }
 
-/**
- * @returns {Promise<{ latitude: number, longitude: number } | null>} null if
- * permission was denied or the position could not be read
- */
-export async function getCurrentCoordinates() {
+async function getCurrentDevicePosition() {
   const permission = await Location.getForegroundPermissionsAsync();
-  if (permission.status !== 'granted') return null;
-  if (!(await Location.hasServicesEnabledAsync())) return null;
+  if (permission.status !== 'granted') {
+    return { reason: 'permission-denied' };
+  }
+  if (!(await Location.hasServicesEnabledAsync())) {
+    return { reason: 'services-disabled' };
+  }
 
   const position = await Location.getCurrentPositionAsync({
     accuracy: Location.Accuracy.Balanced,
   });
-  const coordinates = {
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
+  const issue = getDevicePositionIssue(position);
+  if (issue) return { reason: issue };
+
+  return {
+    coordinates: {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+    },
   };
-  return isValidCoordinates(coordinates) ? coordinates : null;
+}
+
+/**
+ * @returns {Promise<{ latitude: number, longitude: number } | null>} null if
+ * permission was denied or the position could not be read with sufficient
+ * accuracy and freshness
+ */
+export async function getCurrentCoordinates() {
+  const result = await getCurrentDevicePosition();
+  return result.coordinates ?? null;
 }
 
 async function getSavedAddressCoordinates(uid, city, address) {
@@ -116,20 +131,23 @@ export async function getStudentSearchOrigin(profile) {
   }
 
   let servicesEnabled;
+  let positionIssue;
   if (permissionState === 'granted') {
     try {
-      servicesEnabled = await Location.hasServicesEnabledAsync();
-      if (servicesEnabled) {
-        const coordinates = await getCurrentCoordinates();
-        if (coordinates) return { coordinates, source: 'device', notice: '' };
+      const result = await getCurrentDevicePosition();
+      if (result.coordinates) {
+        return { coordinates: result.coordinates, source: 'device', notice: '' };
       }
+      positionIssue = result.reason;
+      servicesEnabled = result.reason === 'services-disabled' ? false : true;
     } catch {
-      servicesEnabled = null;
+      positionIssue = 'position-unavailable';
     }
   }
   const fallbackReason = getLocationFallbackReason({
     permissionState,
     servicesEnabled,
+    positionIssue,
     positionAvailable: false,
   });
 

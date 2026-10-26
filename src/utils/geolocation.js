@@ -1,5 +1,7 @@
 const LATITUDE_CELL_SCALE = 100;
 const LONGITUDE_CELL_SCALE = 100;
+const MAX_DEVICE_LOCATION_ACCURACY_METERS = 1000;
+const MAX_DEVICE_LOCATION_AGE_MS = 2 * 60 * 1000;
 
 export function getNearMeProfileError(profile) {
   if (typeof profile?.location !== 'string' || !profile.location.trim()) {
@@ -34,6 +36,29 @@ export function isValidCoordinates(coordinates) {
     Number.isFinite(coordinates?.longitude) &&
     coordinates.longitude >= -180 &&
     coordinates.longitude <= 180;
+}
+
+export function getDevicePositionIssue(position, now = Date.now()) {
+  if (!isValidCoordinates(position?.coords)) return 'position-unavailable';
+
+  const accuracy = position.coords.accuracy;
+  if (
+    !Number.isFinite(accuracy) ||
+    accuracy < 0 ||
+    accuracy > MAX_DEVICE_LOCATION_ACCURACY_METERS
+  ) {
+    return 'position-inaccurate';
+  }
+
+  if (
+    !Number.isFinite(position.timestamp) ||
+    position.timestamp > now ||
+    now - position.timestamp > MAX_DEVICE_LOCATION_AGE_MS
+  ) {
+    return 'position-stale';
+  }
+
+  return '';
 }
 
 export function toLocationCell(coordinates) {
@@ -81,6 +106,12 @@ export function getLocationFallbackNotice(reason) {
   if (reason === 'position-unavailable') {
     return 'Your device location is unavailable right now. Showing approximate distances from your saved address.';
   }
+  if (reason === 'position-inaccurate') {
+    return 'Your device location is too imprecise for nearby results. Showing approximate distances from your saved address. Retry outdoors or check your device location settings to try again.';
+  }
+  if (reason === 'position-stale') {
+    return 'Your device location is out of date. Showing approximate distances from your saved address. Retry to request a fresh location.';
+  }
   if (reason === 'permission-error') {
     return 'Tutorly could not check device location permission. Showing approximate distances from your saved address.';
   }
@@ -90,11 +121,18 @@ export function getLocationFallbackNotice(reason) {
 export function getLocationFallbackReason({
   permissionState,
   servicesEnabled,
+  positionIssue,
   positionAvailable,
 }) {
   if (permissionState === 'error') return 'permission-error';
   if (permissionState !== 'granted') return 'permission-denied';
   if (servicesEnabled === false) return 'services-disabled';
+  if (
+    ['permission-denied', 'position-unavailable', 'position-inaccurate', 'position-stale']
+      .includes(positionIssue)
+  ) {
+    return positionIssue;
+  }
   if (!positionAvailable) return 'position-unavailable';
   return '';
 }
