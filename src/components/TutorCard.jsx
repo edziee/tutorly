@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { formatTutorRating } from '../utils/ratings';
 import { formatTokenUnits } from '../utils/tokens';
 
 const tierStyles = {
@@ -62,7 +63,7 @@ export default function TutorCard({ tutor, handlePress, approximateDistance = ''
             {Number.isFinite(tutor.rating) ? (
               <>
                 <AntDesign name="star" size={14} color={colors.warning} />
-                <Text style={styles.ratingValue}>{tutor.rating.toFixed(1)} stars</Text>
+                <Text style={styles.ratingValue}>{formatTutorRating(tutor.rating)} stars</Text>
               </>
             ) : (
               <Text style={styles.newTutor}>New tutor</Text>

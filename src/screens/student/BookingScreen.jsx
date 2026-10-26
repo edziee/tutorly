@@ -27,9 +27,10 @@ import {
   tokenAmountUnitsFromPrice,
 } from '../../utils/tokenBookings';
 import { formatTokenUnits } from '../../utils/tokens';
+import { formatTutorRating } from '../../utils/ratings';
 import { getTutorRateError } from '../../utils/tutorPricing';
 
-const SESSION_HOURS = [1, 2, 3];
+const SESSION_DURATION_HOURS = 2;
 
 function getDateKey(date) {
   const year = date.getFullYear();
@@ -108,7 +109,7 @@ function getTutorSlots(tutor, selectedDate) {
           : Math.max(0, Math.min(3, Math.floor((endMinutes - startMinutes) / 60))),
     };
   }).filter((slot) =>
-    slot.maxHours > 0 &&
+    slot.maxHours >= SESSION_DURATION_HOURS &&
     toMinutes(slot.startTime) !== null &&
     (!isToday || toMinutes(slot.startTime) > now.getHours() * 60 + now.getMinutes()),
   );
@@ -172,7 +173,6 @@ export default function BookingScreen({ navigation, route }) {
   const availableDates = useMemo(() => (tutor ? getAvailableDates(tutor) : []), [tutor]);
   const [selectedDateKey, setSelectedDateKey] = useState('');
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [durationHours, setDurationHours] = useState(3);
   const [sessionMode, setSessionMode] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -198,12 +198,7 @@ export default function BookingScreen({ navigation, route }) {
   const activeDate = dates.find((date) => getDateKey(date) === activeDateKey) ?? dates[0];
   const activeSlots = activeDate ? getTutorSlots(tutor, activeDate) : [];
   const activeSlot = activeSlots.find((slot) => slot.startTime === selectedSlot);
-  const validDurations = activeSlot
-    ? SESSION_HOURS.filter((hours) => hours <= activeSlot.maxHours)
-    : [];
-  const safeDuration = validDurations.includes(durationHours)
-    ? durationHours
-    : validDurations[validDurations.length - 1] ?? 0;
+  const safeDuration = activeSlot ? SESSION_DURATION_HOURS : 0;
   const tutorFormats = tutor.formats ?? [];
   const availableUnits = wallet.data?.availableUnits;
   const hasWalletBalance = wallet.status === 'ready' &&
@@ -228,7 +223,6 @@ export default function BookingScreen({ navigation, route }) {
   const selectDate = (date) => {
     setSelectedDateKey(getDateKey(date));
     setSelectedSlot(null);
-    setDurationHours(3);
   };
 
   const handleBook = () => {
@@ -237,7 +231,7 @@ export default function BookingScreen({ navigation, route }) {
       return;
     }
     if (!activeDate || !activeSlot || !safeDuration || !sessionMode) {
-      setSubmitError('Choose an available date, time, session length, and format.');
+      setSubmitError('Choose an available date, time, and format.');
       return;
     }
     if (!hasPrice) {
@@ -364,7 +358,9 @@ export default function BookingScreen({ navigation, route }) {
                 <Text style={styles.tutorSubject}>{tutor.subject}</Text>
                 <View style={styles.ratingRow}>
                   <Ionicons name="star" size={13} color="#E9A11B" />
-                  <Text style={styles.ratingValue}>{tutor.rating ?? 'New'}</Text>
+                  <Text style={styles.ratingValue}>
+                    {Number.isFinite(tutor.rating) ? formatTutorRating(tutor.rating) : 'New'}
+                  </Text>
                   <Text style={styles.reviewCount}>({tutor.reviewCount ?? 0} reviews)</Text>
                 </View>
               </View>
@@ -372,7 +368,7 @@ export default function BookingScreen({ navigation, route }) {
             <View style={styles.ratePanel}>
               <View>
                 <Text style={styles.rateHeading}>Session rate</Text>
-                <Text style={styles.rateSubheading}>Up to 3 hours per session</Text>
+                <Text style={styles.rateSubheading}>2 hours per session</Text>
               </View>
               <Text style={styles.rateAmount}>{displayPrice}</Text>
             </View>
@@ -464,7 +460,6 @@ export default function BookingScreen({ navigation, route }) {
                           accessibilityState={{ selected }}
                           onPress={() => {
                             setSelectedSlot(slot.startTime);
-                            setDurationHours(Math.min(3, slot.maxHours));
                           }}
                           style={[styles.slotOption, selected && styles.slotOptionSelected]}
                         >
@@ -479,19 +474,11 @@ export default function BookingScreen({ navigation, route }) {
                 {activeSlot ? (
                   <View style={styles.durationRow}>
                     <Text style={styles.durationLabel}>Session length</Text>
-                    {validDurations.map((hours) => (
-                      <Pressable
-                        key={hours}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: safeDuration === hours }}
-                        onPress={() => setDurationHours(hours)}
-                        style={[styles.durationOption, safeDuration === hours && styles.durationOptionSelected]}
-                      >
-                        <Text style={[styles.durationText, safeDuration === hours && styles.selectedText]}>
-                          {hours} hr{hours === 1 ? '' : 's'}
-                        </Text>
-                      </Pressable>
-                    ))}
+                    <View style={[styles.durationOption, styles.durationOptionSelected]}>
+                      <Text style={[styles.durationText, styles.selectedText]}>
+                        {SESSION_DURATION_HOURS} hrs
+                      </Text>
+                    </View>
                   </View>
                 ) : null}
               </>
@@ -503,7 +490,9 @@ export default function BookingScreen({ navigation, route }) {
           <View style={styles.card}>
             <SectionHeading title="Price Summary" />
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Session fee ({safeDuration || 0} hr{safeDuration === 1 ? '' : 's'})</Text>
+              <Text style={styles.priceLabel}>
+                Session fee ({SESSION_DURATION_HOURS} hrs)
+              </Text>
               <Text style={styles.priceValue}>{displayPrice}</Text>
             </View>
             <View style={styles.priceDivider} />
@@ -533,7 +522,12 @@ export default function BookingScreen({ navigation, route }) {
           </View>
 
           <View style={styles.card}>
-            <SectionHeading title="Reviews" trailing={tutor.reviewCount ? `${tutor.rating ?? ''} / 5.0` : undefined} />
+            <SectionHeading
+              title="Reviews"
+              trailing={tutor.reviewCount
+                ? `${formatTutorRating(tutor.rating)} / 5.0`
+                : undefined}
+            />
             {reviews.length ? reviews.slice(0, 2).map((review, index) => (
               <View key={review.id || `${review.studentName}-${index}`} style={styles.reviewRow}>
                 <View style={styles.reviewAvatar}><Text style={styles.reviewInitial}>{review.studentName?.charAt(0) || 'S'}</Text></View>

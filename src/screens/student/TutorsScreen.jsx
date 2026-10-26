@@ -32,6 +32,7 @@ import {
 } from '../../services/locationService';
 import { sortByDistanceWithinRadius } from '../../utils/distance';
 import { getErrorMessage } from '../../utils/errors';
+import { excludeCurrentUserTutor } from '../../utils/tutorDiscovery';
 import {
   coordinatesFromLocationCell,
   toLocationCell,
@@ -173,7 +174,8 @@ export const TutorsScreen = () => {
   };
 
   const sanitizeString = (value) => value.trim().toLowerCase();
-  const filteredTutors = (tutorResults.data ?? []).filter((tutor) =>
+  const otherTutors = excludeCurrentUserTutor(tutorResults.data ?? [], user?.uid);
+  const filteredTutors = otherTutors.filter((tutor) =>
     (sanitizeString(tutor.name ?? '').includes(sanitizeString(textInput)) ||
       sanitizeString(tutor.subject ?? '').includes(sanitizeString(textInput))) &&
     sanitizeString(tutor.subject ?? '').includes(sanitizeString(courseCategory)) &&

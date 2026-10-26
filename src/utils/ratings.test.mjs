@@ -3,9 +3,18 @@ import { test } from 'node:test';
 
 import {
   calculateUpdatedTutorRating,
+  formatTutorRating,
   getRatingInputError,
   MAX_RATING_REVIEW_LENGTH,
 } from './ratings.js';
+
+test('displayed tutor ratings use at most two decimals without trailing zeros', () => {
+  assert.equal(formatTutorRating(4.3333), '4.33');
+  assert.equal(formatTutorRating(4.3), '4.3');
+  assert.equal(formatTutorRating(5), '5');
+  assert.equal(formatTutorRating(0), '0');
+  assert.equal(formatTutorRating(Number.NaN), '');
+});
 
 test('rating validation accepts zero stars and an empty optional message', () => {
   assert.equal(getRatingInputError(0, ''), '');

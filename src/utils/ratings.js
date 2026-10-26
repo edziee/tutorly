@@ -1,5 +1,10 @@
 export const MAX_RATING_REVIEW_LENGTH = 1000;
 
+export function formatTutorRating(rating) {
+  if (!Number.isFinite(rating)) return '';
+  return Number(rating.toFixed(2)).toString();
+}
+
 export function getRatingInputError(rating, review) {
   if (!Number.isInteger(rating) || rating < 0 || rating > 5) {
     return 'Choose a rating from 0 to 5 stars.';

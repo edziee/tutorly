@@ -60,6 +60,7 @@ import { radius, spacing } from '../../theme/spacing';
 import { getTutorLeaderboards, TOP_RATED_MINIMUM_REVIEWS } from '../../utils/leaderboards';
 import { formatTokenUnits } from '../../utils/tokens';
 import { getMinimumTutorRate, getTutorRateError } from '../../utils/tutorPricing';
+import { formatTutorRating } from '../../utils/ratings';
 
 const COMMON_CITY_SUGGESTIONS = [
   'Quezon City',
@@ -132,7 +133,7 @@ function LeaderboardRow({ tutor, rank, mode }) {
   const isHours = mode === 'hours';
   const score = isHours
     ? `${Number(tutor.hoursTaught.toFixed(1))} hrs`
-    : `${tutor.averageRating.toFixed(1)} ★`;
+    : `${formatTutorRating(tutor.averageRating)} ★`;
   const detail = isHours
     ? 'recorded teaching'
     : `${tutor.reviewCount} review${tutor.reviewCount === 1 ? '' : 's'}`;
