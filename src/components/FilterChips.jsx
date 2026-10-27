@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // A row of pill buttons that scrolls sideways, one selected at a time. Used to
 // filter a list, for example the admin users by role.
@@ -56,8 +57,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.text,
-    fontSize: 12,
-    fontWeight: '600',
+    ...typography.label,
   },
   selectedLabel: {
     color: colors.inverseText,

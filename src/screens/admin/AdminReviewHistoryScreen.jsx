@@ -6,6 +6,7 @@ import EmptyState from '../../components/EmptyState';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import VerificationBadge from '../../components/VerificationBadge';
 import { VERIFICATION_STATUS } from '../../constants/statuses';
 import { subscribeToReviewedApplications } from '../../services/adminService';
 import { colors } from '../../theme/colors';
@@ -42,10 +43,12 @@ function ReviewCard({ application }) {
           <Text style={styles.note}>{application.verificationNote}</Text>
         ) : null}
       </View>
-      <View>
-        <Text style={[styles.status, !approved && styles.rejected]}>
-          {approved ? 'Approved' : 'Rejected'}
-        </Text>
+      <View style={styles.reviewStatus}>
+        {approved ? (
+          <VerificationBadge align="end" />
+        ) : (
+          <Text style={[styles.status, styles.rejected]}>Rejected</Text>
+        )}
         <Text style={styles.date}>
           {formatReviewDate(application.verificationReviewedAt ?? application.updatedAt)}
         </Text>
@@ -127,5 +130,6 @@ const styles = StyleSheet.create({
   note: { marginTop: 3, color: colors.errorText, fontSize: 10 },
   status: { color: colors.successText, fontSize: 11, fontWeight: '700', textAlign: 'right' },
   rejected: { color: colors.errorText },
+  reviewStatus: { alignItems: 'flex-end' },
   date: { marginTop: 3, color: colors.mutedText, fontSize: 10, textAlign: 'right' },
 });

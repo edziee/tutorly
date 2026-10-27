@@ -115,7 +115,7 @@ export default function WalletScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.balanceCard}>
           <View style={styles.balanceIcon}>
-            <Ionicons name="star" size={22} color="#7A4B00" />
+            <Ionicons name="star" size={22} color={colors.white} />
           </View>
           <Text style={styles.balanceLabel}>Available tokens</Text>
           <Text style={styles.balance}>{formatTokenUnits(available)}</Text>
@@ -186,9 +186,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.sm,
     borderRadius: 22,
-    backgroundColor: '#F5B72E',
-    borderWidth: 2,
-    borderColor: '#D99012',
+    backgroundColor: colors.primary,
   },
   balanceLabel: { color: colors.mutedText, fontSize: 12, fontWeight: '600' },
   balance: { marginTop: spacing.xs, color: colors.heading, fontSize: 30, fontWeight: '800' },

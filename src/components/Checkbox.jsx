@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // A tick box with a label next to it. `children` is the label, so it can hold
 // a <Text> with bold parts. `error` is the message shown under it.
@@ -55,7 +56,7 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: spacing.xs,
     marginLeft: 30,
+    ...typography.bodySmall,
     color: colors.errorText,
-    fontSize: 12,
   },
 });

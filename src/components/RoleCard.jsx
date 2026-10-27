@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // One of the "Select academic portal role" cards on the login and sign-up
 // screens. The selected card is white with a teal dot, the others are grey.
@@ -90,18 +91,14 @@ const styles = StyleSheet.create({
     color: colors.successText,
   },
   title: {
-    color: colors.heading,
-    fontSize: 18,
-    fontWeight: '700',
+    ...typography.heading,
   },
   selectedTitle: {
     color: colors.primary,
   },
   description: {
     marginTop: 2,
-    color: colors.mutedText,
-    fontSize: 11,
-    lineHeight: 14,
+    ...typography.caption,
   },
   dot: {
     position: 'absolute',

@@ -23,6 +23,7 @@ export const colors = {
   // Status colors
   success: '#008F86',
   online: '#00A39A',
+  avatarBackground: '#C8CBD0',
   error: '#D9534F',
   warning: '#E5A928',
 

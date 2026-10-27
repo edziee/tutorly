@@ -20,6 +20,7 @@ import {
 } from '../../services/walletService';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 import { getErrorMessage } from '../../utils/errors';
 import { formatTokenUnits } from '../../utils/tokens';
 
@@ -341,7 +342,7 @@ export default function AdminWalletsScreen() {
 
 const styles = StyleSheet.create({
   content: { paddingBottom: spacing.xxl },
-  intro: { marginBottom: spacing.md, color: colors.mutedText, fontSize: 12, lineHeight: 18 },
+  intro: { ...typography.bodySmall, marginBottom: spacing.md },
   roleTabs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   roleTab: {
     flex: 1,
@@ -369,17 +370,17 @@ const styles = StyleSheet.create({
   },
   selectedAccount: { borderColor: colors.primary, backgroundColor: colors.lavender },
   accountCopy: { flex: 1 },
-  accountName: { color: colors.heading, fontSize: 13, fontWeight: '700' },
-  accountMeta: { marginTop: 3, color: colors.mutedText, fontSize: 10 },
+  accountName: { ...typography.label, color: colors.heading },
+  accountMeta: { ...typography.caption, marginTop: 3 },
   accountBalance: { alignItems: 'flex-end' },
   balanceValue: { color: colors.primary, fontSize: 15, fontWeight: '800' },
-  editor: { marginTop: spacing.md, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
-  sectionTitle: { marginBottom: spacing.xs, color: colors.heading, fontSize: 15, fontWeight: '700' },
+  editor: { marginTop: spacing.md, padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  sectionTitle: { ...typography.sectionTitle, marginBottom: spacing.xs },
   balanceSummary: { marginBottom: spacing.sm, color: colors.mutedText, fontSize: 11 },
   directionRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   direction: { flex: 1, minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.primary },
   directionSelected: { backgroundColor: colors.primary },
-  directionText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  directionText: { ...typography.label, color: colors.primary },
   directionTextSelected: { color: colors.white },
   error: { marginBottom: spacing.sm, color: colors.errorText, fontSize: 12 },
   success: { marginBottom: spacing.sm, color: colors.successText, fontSize: 12 },

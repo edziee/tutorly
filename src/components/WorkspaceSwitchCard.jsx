@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 export default function WorkspaceSwitchCard({
   accessibilityLabel,
@@ -62,13 +63,9 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   title: {
-    color: colors.heading,
-    fontSize: 15,
-    fontWeight: '700',
+    ...typography.sectionTitle,
   },
   description: {
-    color: colors.mutedText,
-    fontSize: 12,
-    lineHeight: 17,
+    ...typography.bodySmall,
   },
 });

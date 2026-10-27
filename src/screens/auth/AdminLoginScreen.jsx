@@ -9,7 +9,8 @@
 // long press on the logo. Hiding the screen is not security: the real
 // protection is the role check in signInAdmin and the Firestore rules.
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppButton from '../../components/AppButton';
@@ -19,12 +20,14 @@ import Card from '../../components/Card';
 import { signInAdmin } from '../../services/authService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 import { getAuthErrorMessage } from '../../utils/errors';
 import { validateEmail, validatePasswordPresent } from '../../utils/validation';
 
 export default function AdminLoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -73,11 +76,27 @@ export default function AdminLoginScreen({ navigation }) {
               value={password}
               handleChangeText={setPassword}
               placeholder="Your password"
-              secureTextEntry
+              secureTextEntry={!passwordVisible}
               autoCapitalize="none"
               autoCorrect={false}
               error={errors.password}
               onSubmitEditing={submit}
+              rightElement={(
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+                  accessibilityHint="Toggles password visibility."
+                  accessibilityState={{ selected: passwordVisible }}
+                  onPress={() => setPasswordVisible((visible) => !visible)}
+                  style={styles.passwordToggle}
+                >
+                  <Ionicons
+                    name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={colors.mutedText}
+                  />
+                </Pressable>
+              )}
             />
             {formError ? (
               <Text accessibilityRole="alert" style={styles.formError}>
@@ -85,7 +104,13 @@ export default function AdminLoginScreen({ navigation }) {
               </Text>
             ) : null}
             <AppButton title="Sign in" onPress={submit} loading={submitting} />
-            <Text onPress={() => navigation.goBack()} style={styles.back}>Back</Text>
+            <View style={styles.backAction}>
+              <AppButton
+                title="Back"
+                variant="outline"
+                onPress={() => navigation.goBack()}
+              />
+            </View>
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -98,8 +123,9 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: spacing.lg },
   card: { padding: spacing.lg },
-  title: { color: colors.heading, fontSize: 18, fontWeight: '700' },
-  helper: { marginTop: spacing.xs, marginBottom: spacing.lg, color: colors.mutedText, fontSize: 12 },
-  formError: { marginBottom: spacing.md, color: colors.errorText, fontSize: 12 },
-  back: { marginTop: spacing.lg, color: colors.primary, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  title: { ...typography.heading },
+  helper: { ...typography.bodySmall, marginTop: spacing.xs, marginBottom: spacing.lg },
+  formError: { ...typography.bodySmall, color: colors.errorText, marginBottom: spacing.md },
+  passwordToggle: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
+  backAction: { marginTop: spacing.sm },
 });

@@ -6,7 +6,6 @@ import { SessionStopwatch } from '../../components/SessionStopwatch';
 import {
   Alert,
   ActivityIndicator,
-  Image,
   Modal,
   Pressable,
   Platform,
@@ -18,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import ErrorState from '../../components/ErrorState';
 import ScreenContainer from '../../components/ScreenContainer';
+import StudentAvatar from '../../components/StudentAvatar';
 import {
   BOOKING_PAYMENT_STATUS,
   BOOKING_STATUS,
@@ -300,7 +300,9 @@ function SessionCard({ session, onPress, onCancel, onReminder }) {
         </View>
       </View>
       <View style={styles.sessionTitleRow}>
-        <View style={styles.tutorAvatar}>{session.image ? <Image source={{ uri: session.image }} style={styles.tutorImage} /> : <Text style={styles.tutorAvatarText}>{session.studentName.charAt(0)}</Text>}</View>
+        <View style={styles.tutorAvatar}>
+          <StudentAvatar imageUri={session.image} name={session.studentName} size={48} />
+        </View>
         <View style={styles.sessionTitleCopy}>
           <Text style={styles.sessionSubject}>{session.subject}</Text>
           <Text style={styles.tutorName}>{session.studentName}</Text>

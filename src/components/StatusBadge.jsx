@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 import { BOOKING_STATUS, VERIFICATION_STATUS } from '../constants/statuses';
 
 // A small coloured label such as "Pending" or "Upcoming".
@@ -49,7 +50,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   label: {
-    fontSize: 11,
-    fontWeight: '700',
+    ...typography.badge,
   },
 });

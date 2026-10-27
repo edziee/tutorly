@@ -20,3 +20,11 @@ test('sign-in keeps one Tutor portal for existing tutor account types', async ()
   assert.match(login, /including peer tutors/);
   assert.match(roles, /portal === ROLES\.TUTOR && isTutorRole\(role\)/);
 });
+
+test('admin sign-in starts with a hidden password and offers an accessible visibility toggle', async () => {
+  const adminLogin = await readFile(new URL('./AdminLoginScreen.jsx', import.meta.url), 'utf8');
+
+  assert.match(adminLogin, /const \[passwordVisible, setPasswordVisible\] = useState\(false\)/);
+  assert.match(adminLogin, /secureTextEntry=\{!passwordVisible\}/);
+  assert.match(adminLogin, /accessibilityLabel=\{passwordVisible \? 'Hide password' : 'Show password'\}/);
+});

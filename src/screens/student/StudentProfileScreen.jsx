@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -21,6 +20,7 @@ import { openTutorApplication } from '../../navigation/studentNavigationActions'
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import StudentAvatar from '../../components/StudentAvatar';
 import StatusBadge, { BOOKING_STATUS_BADGE } from '../../components/StatusBadge';
 import { ROUTES } from '../../constants/routes';
 import {
@@ -452,23 +452,20 @@ export default function StudentProfileScreen({ navigation }) {
         </View>
         <View style={styles.profileCard}>
           <View style={styles.avatarFrame}>
-            {profile.photoUrl ? (
-              <Image source={{ uri: profile.photoUrl }} style={styles.profilePhoto} />
-            ) : (
-              <>
-                <View style={styles.avatarHead} />
-                <View style={styles.avatarShoulders} />
-              </>
-            )}
+            <StudentAvatar
+              imageUri={profile.photoUrl}
+              name={profile.name || user.name}
+              size={112}
+            />
+            <Pressable
+              accessibilityLabel="Change profile photo"
+              accessibilityRole="button"
+              onPress={openProfileEditor}
+              style={styles.editButton}
+            >
+              <Ionicons name="pencil" size={17} color={colors.primary} />
+            </Pressable>
           </View>
-          <Pressable
-            accessibilityLabel="Change profile photo"
-            accessibilityRole="button"
-            onPress={openProfileEditor}
-            style={styles.editButton}
-          >
-            <Ionicons name="pencil" size={17} color={colors.primary} />
-          </Pressable>
         </View>
 
         {workspaceModeError ? (
@@ -766,15 +763,7 @@ export default function StudentProfileScreen({ navigation }) {
                   <Text style={[styles.rank, leader.rank === 1 && styles.firstRank]}>
                     {leader.rank}
                   </Text>
-                  <View style={[styles.leaderAvatar, isCurrentUser && styles.currentAvatar]}>
-                    {isCurrentUser ? (
-                      <Ionicons name="person" size={23} color={colors.white} />
-                    ) : (
-                      <Text style={styles.avatarInitial}>
-                        {(leader.displayName || 'S').charAt(0).toUpperCase()}
-                      </Text>
-                    )}
-                  </View>
+                  <StudentAvatar name={leader.displayName || 'Student'} size={34} />
                   <View style={styles.leaderDetails}>
                     <Text style={[styles.leaderName, isCurrentUser && styles.currentLeaderName]}>
                       {isCurrentUser ? `${leader.displayName} (You)` : leader.displayName}
@@ -1140,9 +1129,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   profileCard: {
-    minHeight: 300,
+    minHeight: 160,
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     padding: spacing.md,
     paddingTop: spacing.lg,
     borderRadius: radius.lg,
@@ -1175,38 +1164,18 @@ const styles = StyleSheet.create({
   personalDetailLabel: { ...typography.caption, fontSize: 10 },
   personalDetailValue: { color: colors.text, fontSize: 13, fontWeight: '600', marginTop: 2 },
   avatarFrame: {
-    width: '72%',
-    aspectRatio: 1,
-    backgroundColor: '#C9C9C9',
+    position: 'relative',
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    backgroundColor: colors.avatarBackground,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  profilePhoto: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarHead: {
-    position: 'absolute',
-    top: '22%',
-    width: '36%',
-    aspectRatio: 1,
-    borderRadius: 999,
-    backgroundColor: '#F7F7F7',
-  },
-  avatarShoulders: {
-    position: 'absolute',
-    bottom: '-12%',
-    width: '82%',
-    height: '46%',
-    borderTopLeftRadius: 999,
-    borderTopRightRadius: 999,
-    backgroundColor: '#F7F7F7',
   },
   editButton: {
     position: 'absolute',
-    top: spacing.lg,
-    right: spacing.lg,
+    right: -spacing.xs,
+    bottom: -spacing.xs,
     width: 36,
     height: 36,
     borderRadius: radius.pill,
@@ -1431,9 +1400,6 @@ const styles = StyleSheet.create({
   currentLeaderRow: { backgroundColor: '#F2F0FF' },
   rank: { width: 24, textAlign: 'center', color: colors.text, fontSize: 14, fontWeight: '700' },
   firstRank: { color: '#754000', fontSize: 17 },
-  leaderAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#A9C8C3', alignItems: 'center', justifyContent: 'center' },
-  currentAvatar: { backgroundColor: '#C7C7C7' },
-  avatarInitial: { color: colors.white, fontWeight: '700' },
   leaderDetails: { flex: 1, minWidth: 0 },
   leaderName: { color: colors.text, fontSize: 13, fontWeight: '600' },
   currentLeaderName: { color: colors.primary, fontWeight: '700' },

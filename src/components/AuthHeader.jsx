@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // The top of the login and sign-up screens: logo, the "limited to" pill, the
 // title and a line of text (see the Figma "SignUp/Login Portal" frames).
@@ -81,24 +82,21 @@ const styles = StyleSheet.create({
   },
   pillText: {
     flexShrink: 1,
+    ...typography.caption,
     color: colors.successText,
-    fontSize: 11,
-    fontWeight: '600',
   },
   title: {
     marginTop: spacing.md,
+    ...typography.title,
     color: colors.primary,
-    fontSize: 26,
-    fontWeight: '700',
     letterSpacing: -0.65,
     textAlign: 'center',
   },
   subtitle: {
     marginTop: spacing.sm,
     paddingHorizontal: spacing.lg,
+    ...typography.body,
     color: colors.mutedText,
-    fontSize: 14,
-    lineHeight: 20,
     textAlign: 'center',
   },
 });

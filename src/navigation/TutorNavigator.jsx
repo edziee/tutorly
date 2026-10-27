@@ -21,6 +21,7 @@ import AppHeader from '../components/AppHeader';
 import { useAuth } from '../context/AuthContext';
 import { getTutorApplication } from '../services/tutorService';
 import { colors } from '../theme/colors';
+import { tabBarLabelStyle, tabBarStyle } from '../theme/navigation';
 import { getErrorMessage } from '../utils/errors';
 import { canUseTutorOperations, hasDirectTutorAccountStatus } from '../utils/workspace';
 
@@ -44,6 +45,58 @@ const tabs = {
     inactiveIcon: 'chatbubble-outline',
   },
 };
+
+function getInitials(name) {
+  return (name ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('') || 'T';
+}
+
+function TutorStackHeader({
+  navigation,
+  title,
+  showBack = true,
+  notificationsEnabled = true,
+}) {
+  const { user } = useAuth();
+
+  return (
+    <AppHeader
+      title={title}
+      {...(showBack ? {
+        backAccessibilityLabel: 'Back to previous screen',
+        onBackPress: () => navigation.goBack(),
+      } : {})}
+      initials={getInitials(user?.name)}
+      imageUri={user?.photoUrl}
+      userId={user?.uid}
+      role={user?.role}
+      onWalletPress={() => navigation.navigate(ROUTES.WALLET)}
+      onNotificationsPress={
+        notificationsEnabled
+          ? () => navigation.navigate(ROUTES.NOTIFICATIONS)
+          : undefined
+      }
+    />
+  );
+}
+
+function stackHeader(title, notificationsEnabled = true) {
+  return {
+    headerShown: true,
+    header: ({ navigation }) => (
+      <TutorStackHeader
+        navigation={navigation}
+        title={title}
+        notificationsEnabled={notificationsEnabled}
+      />
+    ),
+  };
+}
 
 function TutorTabs() {
   const { user } = useAuth();
@@ -81,8 +134,9 @@ function TutorTabs() {
         ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.tabLabel,
+        tabBarStyle,
+        tabBarLabelStyle,
+        tabBarLabelPosition: 'below-icon',
         tabBarIcon: ({ focused, color, size }) => (
           <Ionicons
             name={
@@ -99,9 +153,18 @@ function TutorTabs() {
       <Tab.Screen
         name="TutorProfile"
         component={TutorWorkspaceProfileScreen}
+        options={{ tabBarLabel: 'Tutor Profile' }}
       />
-      <Tab.Screen name="TutorSchedule" component={TutorScheduleScreen} />
-      <Tab.Screen name="TutorChat" component={ChatScreen} />
+      <Tab.Screen
+        name="TutorSchedule"
+        component={TutorScheduleScreen}
+        options={{ tabBarLabel: 'Tutor Schedule' }}
+      />
+      <Tab.Screen
+        name="TutorChat"
+        component={ChatScreen}
+        options={{ tabBarLabel: 'Tutor Chat' }}
+      />
     </Tab.Navigator>
   );
 }
@@ -190,29 +253,43 @@ export default function TutorNavigator() {
       {shouldShowTutorTabs ? (
         <Stack.Screen name="TutorTabs" component={TutorTabs} />
       ) : (
-        <Stack.Screen name="TutorApplicantStatus" component={TutorWorkspaceProfileScreen} />
+        <Stack.Screen
+          name="TutorApplicantStatus"
+          component={TutorWorkspaceProfileScreen}
+          options={{
+            headerShown: true,
+            header: ({ navigation }) => (
+              <TutorStackHeader
+                navigation={navigation}
+                title="Tutor workspace"
+                showBack={false}
+                notificationsEnabled={false}
+              />
+            ),
+          }}
+        />
       )}
       <Stack.Screen
         name={ROUTES.TUTOR_APPLICATION}
         component={TutorApplicationScreen}
-        options={{ headerShown: true, title: 'Tutor application' }}
+        options={stackHeader('Tutor application', canUseTutorWorkspace)}
       />
       <Stack.Screen
         name={ROUTES.WALLET}
         component={WalletScreen}
-        options={{ headerShown: true, title: 'Token wallet' }}
+        options={stackHeader('Token wallet', canUseTutorWorkspace)}
       />
       {canUseTutorWorkspace ? (
         <>
           <Stack.Screen
             name={ROUTES.NOTIFICATIONS}
             component={NotificationsScreen}
-            options={{ headerShown: true, title: 'Notifications' }}
+            options={stackHeader('Notifications')}
           />
           <Stack.Screen
             name={ROUTES.CONVERSATION}
             component={ConversationScreen}
-            options={{ headerShown: true, title: 'Messages' }}
+            options={stackHeader('Messages')}
           />
         </>
       ) : null}
@@ -223,16 +300,5 @@ export default function TutorNavigator() {
 const styles = {
   safeArea: {
     backgroundColor: colors.surface,
-  },
-  tabBar: {
-    height: 70,
-    paddingTop: 8,
-    paddingBottom: 8,
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
-  },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
   },
 };

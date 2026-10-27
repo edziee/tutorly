@@ -24,6 +24,7 @@ import ErrorState from '../../components/ErrorState';
 import FilterChips from '../../components/FilterChips';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import StudentAvatar from '../../components/StudentAvatar';
 import StatusBadge from '../../components/StatusBadge';
 import { VERIFICATION_STATUS_BADGE } from '../../components/StatusBadge';
 import { USER_ACCOUNT_STATUS } from '../../constants/statuses';
@@ -224,9 +225,11 @@ function UserRow({ user, canManage, onStatusChange }) {
 
   return (
     <View style={styles.row}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{name.trim().charAt(0).toUpperCase()}</Text>
-      </View>
+      <StudentAvatar
+        imageUri={user.photoUrl}
+        initials={name.trim().charAt(0).toUpperCase()}
+        size={40}
+      />
       <View style={styles.info}>
         <Text numberOfLines={1} style={styles.name}>
           {name}
@@ -330,19 +333,6 @@ const styles = StyleSheet.create({
   actionError: {
     color: colors.errorText,
     fontSize: 13,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.lavender,
-  },
-  avatarText: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '700',
   },
   info: {
     flex: 1,

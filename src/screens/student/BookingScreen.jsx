@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -14,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppButton from '../../components/AppButton';
 import EmptyState from '../../components/EmptyState';
 import ScreenContainer from '../../components/ScreenContainer';
+import StudentAvatar from '../../components/StudentAvatar';
 import { ROUTES } from '../../constants/routes';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
@@ -304,28 +304,6 @@ export default function BookingScreen({ navigation, route }) {
   return (
     <ScreenContainer>
       <View style={styles.screen}>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back to tutors"
-            onPress={() => navigation.navigate(ROUTES.TUTORS)}
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={21} color={colors.text} />
-          </Pressable>
-          <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>Book a session</Text>
-            <Text numberOfLines={1} style={styles.headerSubtitle}>{tutor.subject}</Text>
-          </View>
-          <View style={styles.headerAvatar}>
-            {tutor.photoUrl ? (
-              <Image source={{ uri: tutor.photoUrl }} style={styles.headerAvatarImage} />
-            ) : (
-              <Text style={styles.headerInitial}>{(user?.name || 'S').charAt(0).toUpperCase()}</Text>
-            )}
-          </View>
-        </View>
-
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
@@ -346,13 +324,11 @@ export default function BookingScreen({ navigation, route }) {
 
           <View style={styles.tutorCard}>
             <View style={styles.tutorRow}>
-              <View style={styles.tutorAvatar}>
-                {tutor.photoUrl ? (
-                  <Image source={{ uri: tutor.photoUrl }} style={styles.tutorImage} />
-                ) : (
-                  <Text style={styles.tutorInitial}>{(tutor.name || 'T').charAt(0).toUpperCase()}</Text>
-                )}
-              </View>
+              <StudentAvatar
+                imageUri={tutor.photoUrl}
+                initials={(tutor.name || 'T').charAt(0).toUpperCase()}
+                size={54}
+              />
               <View style={styles.tutorInfo}>
                 <Text style={styles.tutorName}>{tutor.name}</Text>
                 <Text style={styles.tutorSubject}>{tutor.subject}</Text>
@@ -530,7 +506,10 @@ export default function BookingScreen({ navigation, route }) {
             />
             {reviews.length ? reviews.slice(0, 2).map((review, index) => (
               <View key={review.id || `${review.studentName}-${index}`} style={styles.reviewRow}>
-                <View style={styles.reviewAvatar}><Text style={styles.reviewInitial}>{review.studentName?.charAt(0) || 'S'}</Text></View>
+                <StudentAvatar
+                  initials={review.studentName?.charAt(0)?.toUpperCase() || 'S'}
+                  size={28}
+                />
                 <View style={styles.reviewCopy}>
                   <Text style={styles.reviewName}>{review.studentName || 'Student'}</Text>
                   <Text style={styles.reviewText}>{review.comment}</Text>
@@ -641,14 +620,6 @@ export default function BookingScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, margin: -spacing.md, backgroundColor: colors.background },
-  header: { height: 64, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.sm, backgroundColor: colors.background },
-  backButton: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerCopy: { flex: 1 },
-  headerTitle: { color: colors.heading, fontSize: 16, fontWeight: '700' },
-  headerSubtitle: { marginTop: 2, color: colors.mutedText, fontSize: 11 },
-  headerAvatar: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: colors.lavender },
-  headerAvatarImage: { width: 32, height: 32, borderRadius: 16 },
-  headerInitial: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   content: { padding: spacing.md, paddingBottom: spacing.md, gap: spacing.sm },
   statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   availablePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: '#D5F6EF' },
@@ -658,9 +629,6 @@ const styles = StyleSheet.create({
   verifiedText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
   tutorCard: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },
   tutorRow: { flexDirection: 'row', gap: spacing.md },
-  tutorAvatar: { width: 54, height: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.mint, overflow: 'hidden' },
-  tutorImage: { width: 54, height: 54 },
-  tutorInitial: { color: colors.primary, fontSize: 22, fontWeight: '700' },
   tutorInfo: { flex: 1, justifyContent: 'center' },
   tutorName: { color: colors.heading, fontSize: 17, fontWeight: '700' },
   tutorSubject: { marginTop: 2, color: colors.mutedText, fontSize: 11 },
@@ -712,8 +680,6 @@ const styles = StyleSheet.create({
   balanceNote: { marginTop: spacing.xs, color: colors.mutedText, fontSize: 10, lineHeight: 15 },
   balanceWarning: { color: colors.errorText, fontWeight: '700' },
   reviewRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.xs },
-  reviewAvatar: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.peach },
-  reviewInitial: { color: colors.text, fontSize: 11, fontWeight: '700' },
   reviewCopy: { flex: 1 },
   reviewName: { color: colors.text, fontSize: 10, fontWeight: '700' },
   reviewText: { marginTop: 2, color: colors.mutedText, fontSize: 9, lineHeight: 13 },

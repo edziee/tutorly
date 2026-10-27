@@ -15,6 +15,8 @@ import AppButton from '../../components/AppButton';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import StudentAvatar from '../../components/StudentAvatar';
+import VerificationBadge from '../../components/VerificationBadge';
 import { ROLES } from '../../constants/roles';
 import { TUTOR_TIERS, TUTOR_TYPES } from '../../constants/statuses';
 import { useAuth } from '../../context/AuthContext';
@@ -59,22 +61,24 @@ function FieldLabel({ children, required = false }) {
   );
 }
 
-function MentorHeader({ tutor, statusLabel }) {
+function MentorHeader({ tutor, statusLabel, imageUri, approved }) {
   return (
     <View style={styles.hero}>
       <View style={styles.heroTopLine}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{tutor.name.charAt(0)}</Text>
-        </View>
+        <StudentAvatar imageUri={imageUri} name={tutor.name} size={48} />
         <View style={styles.heroIdentity}>
           <Text style={styles.eyebrow}>Tutor Profile</Text>
           <Text style={styles.heroName}>{tutor.name}</Text>
           <Text style={styles.heroSubject}>{tutor.subject}</Text>
         </View>
-        <View style={styles.statusBadge}>
-          <View style={styles.statusDot} />
-          <Text style={styles.statusText}>{statusLabel}</Text>
-        </View>
+        {approved ? (
+          <VerificationBadge />
+        ) : (
+          <View style={styles.statusBadge}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>{statusLabel}</Text>
+          </View>
+        )}
       </View>
       <View style={styles.heroRule} />
       <Text style={styles.heroCopy}>
@@ -489,7 +493,12 @@ export default function TutorApplicationScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          <MentorHeader tutor={tutor} statusLabel={statusLabel} />
+          <MentorHeader
+            tutor={tutor}
+            statusLabel={statusLabel}
+            imageUri={user?.photoUrl}
+            approved={applicationStatus === 'approved'}
+          />
           <View style={styles.pageIntro}>
             <Text style={styles.pageTitle}>Tutor application</Text>
             <Text style={styles.pageSubtitle}>Tell students what you teach and when you’re available.</Text>

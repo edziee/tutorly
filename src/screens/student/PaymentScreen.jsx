@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import ErrorState from '../../components/ErrorState';
@@ -97,15 +97,6 @@ export default function PaymentScreen({ navigation, route }) {
   return (
     <ScreenContainer>
       <ScrollView contentContainerStyle={styles.content}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to schedule"
-          onPress={() => navigation.navigate(ROUTES.SCHEDULE)}
-          style={styles.back}
-        >
-          <Ionicons name="arrow-back" size={19} color={colors.primary} />
-          <Text style={styles.backText}>Schedule</Text>
-        </Pressable>
         <View style={styles.card}>
           <View style={styles.headingRow}>
             <View style={styles.icon}>
@@ -172,8 +163,6 @@ export default function PaymentScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingBottom: spacing.xxl },
-  back: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.sm },
-  backText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   card: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   icon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: colors.lavender },

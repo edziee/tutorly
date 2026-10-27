@@ -2,6 +2,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // Shown while a screen waits for data from Firebase. Every screen that loads
 // data needs a loading, an empty (EmptyState) and an error (ErrorState) state.
@@ -34,7 +35,7 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: spacing.md,
+    ...typography.body,
     color: colors.mutedText,
-    fontSize: 14,
   },
 });

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // Two or three options side by side where exactly one is selected, like the
 // "Sign In | Sign Up / Register" switch at the top of the login screen.
@@ -47,8 +48,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.mutedText,
-    fontSize: 12,
-    fontWeight: '600',
+    ...typography.label,
   },
   selectedLabel: {
     color: colors.primary,

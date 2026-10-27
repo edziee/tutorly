@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // One row in the notifications list.
 // notification: { title: string, message: string, time: string, read: boolean }
@@ -66,9 +67,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: colors.heading,
-    fontSize: 15,
-    fontWeight: '700',
+    ...typography.sectionTitle,
   },
   unreadDot: {
     width: 8,
@@ -79,12 +78,10 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: spacing.xs,
-    color: colors.text,
-    fontSize: 14,
+    ...typography.body,
   },
   time: {
     marginTop: spacing.xs,
-    color: colors.mutedText,
-    fontSize: 12,
+    ...typography.caption,
   },
 });

@@ -1,10 +1,12 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import StudentAvatar from './StudentAvatar';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 import { formatTutorRating } from '../utils/ratings';
 import { formatTokenUnits } from '../utils/tokens';
 
@@ -30,20 +32,16 @@ export default function TutorCard({ tutor, handlePress, approximateDistance = ''
       style={({ pressed }) => [styles.card, pressed && styles.pressedCard]}
     >
       <View style={styles.topDetails}>
-        <View style={styles.avatar}>
-          {tutor.photoUrl ? (
-            <Image source={{ uri: tutor.photoUrl }} style={styles.avatarImage} />
-          ) : (
-            <Text style={styles.avatarText}>
-              {tutor.initials ||
-                (tutor.name || 'Tutor')
-                  .split(' ')
-                  .map((part) => part[0])
-                  .join('')
-                  .slice(0, 2)}
-            </Text>
-          )}
-        </View>
+        <StudentAvatar
+          imageUri={tutor.photoUrl}
+          initials={tutor.initials ||
+            (tutor.name || 'Tutor')
+              .split(' ')
+              .map((part) => part[0])
+              .join('')
+              .slice(0, 2)}
+          size={48}
+        />
         <View style={styles.details}>
           <Text style={styles.name}>{tutor.name || 'Tutor'}</Text>
           <View style={[styles.tier, { backgroundColor: tierStyle.backgroundColor }]}>
@@ -116,33 +114,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
-  avatar: {
-    alignItems: 'center',
-    backgroundColor: colors.secondary,
-    borderRadius: 24,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  avatarText: {
-    color: colors.white,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  avatarImage: {
-    borderRadius: 24,
-    height: 48,
-    width: 48,
-  },
   details: {
     flex: 1,
     minWidth: 0,
   },
   name: {
-    color: colors.heading,
+    ...typography.sectionTitle,
     flexShrink: 1,
-    fontSize: 17,
-    fontWeight: '700',
     lineHeight: 22,
   },
   tier: {
@@ -157,15 +135,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   tierText: {
+    ...typography.badge,
     flexShrink: 1,
-    fontSize: 11,
-    fontWeight: '700',
   },
   credentials: {
-    color: colors.mutedText,
+    ...typography.bodySmall,
     flexShrink: 1,
-    fontSize: 13,
-    lineHeight: 18,
     marginTop: spacing.xs,
   },
   rating: {
@@ -219,15 +194,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   bookButtonText: {
+    ...typography.button,
     color: colors.white,
-    fontSize: 14,
-    fontWeight: '700',
   },
   subject: {
-    color: colors.mutedText,
+    ...typography.bodySmall,
     flexShrink: 1,
-    fontSize: 12,
-    lineHeight: 17,
     marginTop: spacing.sm,
   },
   distanceRow: {
@@ -237,7 +209,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   distance: {
-    color: colors.mutedText,
-    fontSize: 12,
+    ...typography.caption,
   },
 });

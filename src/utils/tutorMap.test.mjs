@@ -135,6 +135,16 @@ test('both discovery views use approved public tutors regardless of location-cel
   assert.doesNotMatch(tutorService, /where\('locationCell'/);
 });
 
+test('map view offers a direct route to the scrollable tutor list on both platforms', () => {
+  assert.match(tutorsScreen, /onSwitchToList={\(\) => handleViewChange\('list'\)}/);
+  for (const screen of [nativeMapScreen, webMapScreen]) {
+    assert.match(screen, /accessibilityLabel="Switch to tutor list"/);
+    assert.match(screen, /<Text style={styles\.browseButtonText}>Browse tutors<\/Text>/);
+    assert.match(screen, /showsVerticalScrollIndicator/);
+  }
+  assert.match(nativeMapScreen, /nestedScrollEnabled/);
+});
+
 test('web uses Leaflet instead of importing native map codegen modules', () => {
   assert.match(webMapScreen, /import \{\s*MapContainer,[\s\S]*?\} from 'react-leaflet'/);
   assert.doesNotMatch(webMapScreen, /from 'react-native-maps'/);

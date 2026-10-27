@@ -2,6 +2,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // A labelled text field with an optional error message under it.
 //   leftIcon      an Ionicons name shown inside the field, on the left
@@ -66,9 +67,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   label: {
-    color: colors.text,
+    ...typography.label,
     marginBottom: spacing.sm,
-    fontWeight: '600',
   },
   field: {
     justifyContent: 'center',
@@ -77,15 +77,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,
-    padding: spacing.md,
-    fontSize: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 48,
+    ...typography.input,
     backgroundColor: colors.white,
+    textAlignVertical: 'center',
   },
   inputWithLeftIcon: {
     paddingLeft: 42,
   },
   inputWithRightElement: {
-    paddingRight: 48,
+    paddingRight: 56,
   },
   errorInput: {
     borderColor: colors.error,
@@ -104,5 +107,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.errorText,
     marginTop: spacing.xs,
+    fontSize: 12,
+    lineHeight: 17,
   },
 });

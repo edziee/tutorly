@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Image,
   Modal,
   Pressable,
   Platform,
@@ -19,6 +18,7 @@ import EmptyState from '../../components/EmptyState';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import StudentAvatar from '../../components/StudentAvatar';
 import { ROUTES } from '../../constants/routes';
 import {
   BOOKING_PAYMENT_STATUS,
@@ -285,7 +285,9 @@ function SessionCard({ session, onBookAgain, onPress, onCancel, onReminder, onTo
         </View>
       </View>
       <View style={styles.sessionTitleRow}>
-        <View style={styles.tutorAvatar}>{session.image ? <Image source={{ uri: session.image }} style={styles.tutorImage} /> : <Text style={styles.tutorAvatarText}>{session.tutorName.charAt(0)}</Text>}</View>
+        <View style={styles.tutorAvatar}>
+          <StudentAvatar imageUri={session.image} name={session.tutorName} size={48} />
+        </View>
         <View style={styles.sessionTitleCopy}>
           <Text style={styles.sessionSubject}>{session.subject}</Text>
           <View style={[styles.roleTag, { backgroundColor: roleStyle.backgroundColor }]}>
@@ -763,7 +765,7 @@ export default function ScheduleScreen() {
                 </View>
                 {modalMode === 'details' && activeSession ? (
                   <>
-                    <View style={styles.detailHero}><View style={styles.tutorAvatar}><Text style={styles.tutorAvatarText}>{activeSession.tutorName.charAt(0)}</Text></View><View style={styles.modalTitleCopy}><Text style={styles.detailTutor}>{activeSession.tutorName}</Text><Text style={styles.detailRole}>{activeSession.role}</Text></View></View>
+                    <View style={styles.detailHero}><View style={styles.tutorAvatar}><StudentAvatar imageUri={activeSession.image} name={activeSession.tutorName} size={48} /></View><View style={styles.modalTitleCopy}><Text style={styles.detailTutor}>{activeSession.tutorName}</Text><Text style={styles.detailRole}>{activeSession.role}</Text></View></View>
                     <View style={styles.detailRow}><Ionicons name="calendar-outline" size={17} color={colors.success} /><Text style={styles.detailText}>{formatSessionDate(activeSession.dateKey)}</Text></View>
                     <View style={styles.detailRow}><Ionicons name="time-outline" size={17} color={colors.success} /><Text style={styles.detailText}>{activeSession.startTime} - {activeSession.endTime} ({formatDuration(activeSession)})</Text></View>
                     <View style={styles.detailRow}><Ionicons name="location-outline" size={17} color={colors.success} /><Text style={styles.detailText}>{activeSession.location}</Text></View>
@@ -773,9 +775,7 @@ export default function ScheduleScreen() {
                   <>
                     <View style={styles.detailHero}>
                       <View style={styles.tutorAvatar}>
-                        {activeSession.image
-                          ? <Image source={{ uri: activeSession.image }} style={styles.tutorImage} />
-                          : <Text style={styles.tutorAvatarText}>{activeSession.tutorName.charAt(0)}</Text>}
+                        <StudentAvatar imageUri={activeSession.image} name={activeSession.tutorName} size={48} />
                       </View>
                       <View style={styles.modalTitleCopy}>
                         <Text style={styles.detailTutor}>{activeSession.tutorName}</Text>

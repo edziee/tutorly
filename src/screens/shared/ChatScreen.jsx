@@ -12,7 +12,6 @@ import LoadingState from '../../components/LoadingState';
 import { useMemo, useState } from 'react';
 import {
   Alert,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,29 +24,17 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import StudentAvatar from '../../components/StudentAvatar';
 
 const filters = ['All Messages', 'Active Tutors', 'Faculty / Profs'];
 const accent = colors.secondary;
 
-function Avatar({ initials, color, image, size = 46, online = false }) {
-  const [failed, setFailed] = useState(false);
+function Avatar({ initials, image, size = 46, online = false }) {
   return (
     <View
-      style={[
-        styles.avatar,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: color || colors.secondary,
-        },
-      ]}
+      style={[styles.avatar, { width: size, height: size }]}
     >
-      {image && !failed ? (
-        <Image source={image} style={{ width: size, height: size, borderRadius: size / 2 }} onError={() => setFailed(true)} />
-      ) : (
-        <Text style={[styles.avatarText, { fontSize: size * 0.3 }]}>{initials || '?'}</Text>
-      )}
+      <StudentAvatar imageUri={image?.uri} initials={initials} size={size} />
       {online && <View style={styles.onlineDot} />}
     </View>
   );
@@ -64,7 +51,6 @@ function MessageCard({ message, onPress, onAction }) {
       >
         <Avatar
           initials={message.initials}
-          color={message.color}
           image={message.photoUrl ? { uri: message.photoUrl } : undefined}
         />
         <View style={styles.messageContent}>
@@ -472,10 +458,6 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarText: {
-    color: colors.white,
-    fontWeight: '700',
   },
   onlineDot: {
     position: 'absolute',

@@ -33,6 +33,7 @@ import {
 } from '../../services/adminService';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 import { getErrorMessage } from '../../utils/errors';
 import { isGoogleDriveUrl, validateRequired } from '../../utils/validation';
 import { getUserId } from '../../utils/user';
@@ -305,7 +306,14 @@ function PendingCard({ tutor, busy, disabled, onApprove, onReject }) {
             />
           </View>
           <View style={styles.action}>
-            <AppButton title="Approve" loading={busy} disabled={disabled} onPress={onApprove} />
+            <AppButton
+              title="Approve"
+              variant="success"
+              leftIcon="checkmark-circle"
+              loading={busy}
+              disabled={disabled}
+              onPress={onApprove}
+            />
           </View>
         </View>
       )}
@@ -323,15 +331,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   migrationTitle: {
-    color: colors.heading,
-    fontSize: 14,
-    fontWeight: '700',
+    ...typography.sectionTitle,
   },
   migrationDescription: {
     marginTop: spacing.xs,
     marginBottom: spacing.sm,
-    color: colors.mutedText,
-    fontSize: 12,
+    ...typography.bodySmall,
   },
   migrationMessage: {
     marginTop: spacing.sm,
@@ -359,29 +364,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   name: {
-    color: colors.heading,
-    fontSize: 15,
-    fontWeight: '700',
+    ...typography.sectionTitle,
   },
   subject: {
     marginTop: 2,
-    color: colors.mutedText,
-    fontSize: 12,
+    ...typography.bodySmall,
   },
   courses: {
     marginTop: spacing.md,
   },
   coursesLabel: {
     marginBottom: spacing.xs,
-    color: colors.mutedText,
-    fontSize: 11,
+    ...typography.caption,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   course: {
+    ...typography.bodySmall,
     color: colors.text,
-    fontSize: 13,
   },
   courseBlock: {
     marginTop: spacing.xs,
@@ -401,8 +402,7 @@ const styles = StyleSheet.create({
   },
   evidenceLinkText: {
     color: colors.primary,
-    fontSize: 13,
-    fontWeight: '700',
+    ...typography.label,
     textDecorationLine: 'underline',
   },
   missingEvidence: {

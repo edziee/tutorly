@@ -18,6 +18,7 @@ import PaymentScreen from '../screens/student/PaymentScreen';
 import TutorApplicationScreen from '../screens/tutor/TutorProfileScreen';
 import WalletScreen from '../screens/shared/WalletScreen';
 import { colors } from '../theme/colors';
+import { tabBarLabelStyle, tabBarStyle } from '../theme/navigation';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -41,6 +42,35 @@ function getInitials(name) {
     .join('');
 }
 
+function StudentStackHeader({ navigation, title }) {
+  const { user } = useAuth();
+  const initials = getInitials(user?.name) || 'S';
+
+  return (
+    <AppHeader
+      title={title}
+      backAccessibilityLabel="Back to previous screen"
+      onBackPress={() => navigation.goBack()}
+      initials={initials}
+      imageUri={user?.photoUrl}
+      userId={user?.uid}
+      role={user?.role}
+      onWalletPress={() => navigation.navigate(ROUTES.WALLET)}
+      onProfilePress={() => navigation.navigate('StudentTabs', { screen: 'Profile' })}
+      onNotificationsPress={() => navigation.navigate(ROUTES.NOTIFICATIONS)}
+    />
+  );
+}
+
+function stackHeader(title) {
+  return {
+    title,
+    header: ({ navigation }) => (
+      <StudentStackHeader navigation={navigation} title={title} />
+    ),
+  };
+}
+
 // The four student tabs sit inside the stack below so shared screens and the
 // tutor application can open on top of them with a back button.
 function StudentTabs() {
@@ -59,10 +89,17 @@ function StudentTabs() {
         </SafeAreaView>
       )}
       screenOptions={({ route }) => ({
-        headerShown: route.name !== ROUTES.BOOKING && route.name !== ROUTES.PAYMENT,
+        headerShown: true,
         header: ({ navigation }) => (
           <AppHeader
             title={tabConfig[route.name].title}
+            {...(route.name === ROUTES.BOOKING ? {
+              backAccessibilityLabel: 'Back to tutors',
+              onBackPress: () => navigation.navigate(ROUTES.TUTORS),
+            } : route.name === ROUTES.PAYMENT ? {
+              backAccessibilityLabel: 'Back to schedule',
+              onBackPress: () => navigation.navigate(ROUTES.SCHEDULE),
+            } : {})}
             initials={studentInitials}
             imageUri={user?.photoUrl}
             userId={user?.uid}
@@ -75,20 +112,8 @@ function StudentTabs() {
         tabBarLabelPosition: 'below-icon',
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
-        tabBarStyle: {
-          height: 64,
-          paddingTop: 8,
-          paddingBottom: 8,
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-        },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          marginTop: 2,
-          lineHeight: 14,
-          flexShrink: 0,
-          fontWeight: '600',
-        },
+        tabBarStyle,
+        tabBarLabelStyle,
         tabBarIcon: ({ focused, color, size }) => {
           const config = tabConfig[route.name];
           const iconName = focused ? config.icon : config.inactiveIcon;
@@ -150,23 +175,25 @@ export default function StudentNavigator() {
         component={StudentTabs}
         options={{ headerShown: false }}
       />
-      <Stack.Screen name={ROUTES.CONVERSATION} component={ConversationScreen} options={{ title: 'Messages' }} />
+      <Stack.Screen
+        name={ROUTES.CONVERSATION}
+        component={ConversationScreen}
+        options={stackHeader('Messages')}
+      />
       <Stack.Screen
         name={ROUTES.NOTIFICATIONS}
         component={NotificationsScreen}
-        options={{
-          title: 'Notifications',
-        }}
+        options={stackHeader('Notifications')}
       />
       <Stack.Screen
         name={ROUTES.TUTOR_APPLICATION}
         component={TutorApplicationScreen}
-        options={{ title: 'Tutor application' }}
+        options={stackHeader('Tutor application')}
       />
       <Stack.Screen
         name={ROUTES.WALLET}
         component={WalletScreen}
-        options={{ title: 'Token wallet' }}
+        options={stackHeader('Token wallet')}
       />
     </Stack.Navigator>
   );

@@ -23,6 +23,7 @@ import './TutorsMapScreen.web.css';
 import TutorCard from '../../components/TutorCard';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 import { formatApproximateDistance } from '../../utils/geolocation';
 import { getTutorMapRegion, splitTutorsByMapLocation } from '../../utils/tutorMap';
 
@@ -44,12 +45,15 @@ function TutorMarker({ tutor, selected, onSelect }) {
     .map((part) => part[0])
     .join('')
     .toUpperCase();
+  const markerContent = tutor.photoUrl
+    ? `<img src="${escapeHtml(tutor.photoUrl)}" alt="" />`
+    : `<span>${escapeHtml(initials || 'T')}</span>`;
   const icon = useMemo(() => L.divIcon({
     className: `tutor-map-marker${selected ? ' tutor-map-marker-selected' : ''}`,
-    html: `<span>${escapeHtml(initials || 'T')}</span>`,
+    html: markerContent,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
-  }), [initials, selected]);
+  }), [markerContent, selected]);
 
   return (
     <Marker
@@ -177,6 +181,7 @@ export default function TutorsMapScreen({
   searchOrigin,
   searchOriginSource,
   onRequestMapRecenter,
+  onSwitchToList,
   onTutorPress,
 }) {
   const [selectedTutorId, setSelectedTutorId] = useState(null);
@@ -219,12 +224,22 @@ export default function TutorsMapScreen({
     <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+      showsVerticalScrollIndicator
+      keyboardShouldPersistTaps="handled"
     >
       <View style={styles.mapHeading}>
         <Text style={styles.headingText}>
           {nearMeActive ? `Tutors within about ${maximumDistanceKm} km` : 'Tutors nearby'}
         </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Switch to tutor list"
+          onPress={onSwitchToList}
+          style={styles.browseButton}
+        >
+          <Feather name="list" size={16} color={colors.primary} />
+          <Text style={styles.browseButtonText}>Browse tutors</Text>
+        </Pressable>
       </View>
       {mapRegion ? (
         <View style={styles.mapFrame}>
@@ -355,12 +370,29 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
   },
   mapHeading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.xs,
   },
   headingText: {
-    color: colors.heading,
-    fontSize: 17,
-    fontWeight: '700',
+    ...typography.sectionTitle,
+    flex: 1,
+  },
+  browseButton: {
+    alignItems: 'center',
+    backgroundColor: colors.lavender,
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: spacing.md,
+  },
+  browseButtonText: {
+    color: colors.primary,
+    ...typography.label,
   },
   mapFrame: {
     borderColor: colors.border,
@@ -412,15 +444,11 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   noMapTitle: {
-    color: colors.heading,
-    fontSize: 15,
-    fontWeight: '700',
+    ...typography.sectionTitle,
     textAlign: 'center',
   },
   noMapMessage: {
-    color: colors.mutedText,
-    fontSize: 13,
-    lineHeight: 19,
+    ...typography.bodySmall,
     marginTop: spacing.xs,
     textAlign: 'center',
   },
@@ -430,30 +458,23 @@ const styles = StyleSheet.create({
   },
   noMapRecenterText: {
     color: colors.primary,
-    fontSize: 13,
-    fontWeight: '700',
+    ...typography.label,
     textAlign: 'center',
   },
   approximateNote: {
-    color: colors.mutedText,
-    fontSize: 11,
-    lineHeight: 16,
+    ...typography.caption,
     paddingHorizontal: spacing.xs,
   },
   section: {
     marginTop: spacing.sm,
   },
   sectionTitle: {
-    color: colors.heading,
-    fontSize: 15,
-    fontWeight: '700',
+    ...typography.sectionTitle,
     marginBottom: spacing.xs,
     paddingHorizontal: spacing.xs,
   },
   sectionDescription: {
-    color: colors.mutedText,
-    fontSize: 12,
-    lineHeight: 17,
+    ...typography.bodySmall,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.xs,
   },

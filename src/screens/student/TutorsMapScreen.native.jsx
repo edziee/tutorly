@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -13,8 +12,10 @@ import MapView, { Marker } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import TutorCard from '../../components/TutorCard';
+import StudentAvatar from '../../components/StudentAvatar';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 import { formatApproximateDistance } from '../../utils/geolocation';
 import { getTutorMapRegion, splitTutorsByMapLocation } from '../../utils/tutorMap';
 
@@ -52,13 +53,6 @@ function MapCanvas({
       >
         {locatedTutors.map((tutor, index) => {
           const isSelected = tutor.id === selectedTutor?.id;
-          const initials = (tutor.name || 'Tutor')
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((part) => part[0])
-            .join('')
-            .toUpperCase();
           return (
             <Marker
               key={tutor.id}
@@ -71,13 +65,11 @@ function MapCanvas({
                 accessibilityLabel={`${tutor.name || 'Tutor'} approximate map marker`}
                 style={[styles.marker, isSelected && styles.markerSelected]}
               >
-                {tutor.photoUrl ? (
-                  <Image source={{ uri: tutor.photoUrl }} style={styles.markerImage} />
-                ) : (
-                  <Text style={[styles.markerInitials, isSelected && styles.markerInitialsSelected]}>
-                    {initials || String(index + 1)}
-                  </Text>
-                )}
+                <StudentAvatar
+                  imageUri={tutor.photoUrl}
+                  name={tutor.name || 'Tutor'}
+                  size={isSelected ? 42 : 34}
+                />
               </View>
             </Marker>
           );
@@ -156,6 +148,7 @@ export default function TutorsMapScreen({
   searchOrigin,
   searchOriginSource,
   onRequestMapRecenter,
+  onSwitchToList,
   onTutorPress,
 }) {
   const mapRef = useRef(null);
@@ -221,13 +214,24 @@ export default function TutorsMapScreen({
     <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+      showsVerticalScrollIndicator
+      nestedScrollEnabled
+      keyboardShouldPersistTaps="handled"
     >
       <View style={styles.mapHeading}>
         <Feather name="map-pin" size={18} color={colors.primary} />
         <Text style={styles.headingText}>
           {nearMeActive ? `Tutors within about ${maximumDistanceKm} km` : 'Tutors nearby'}
         </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Switch to tutor list"
+          onPress={onSwitchToList}
+          style={styles.browseButton}
+        >
+          <Feather name="list" size={16} color={colors.primary} />
+          <Text style={styles.browseButtonText}>Browse tutors</Text>
+        </Pressable>
       </View>
       {mapRegion ? (
         <View style={styles.mapFrame}>
@@ -372,12 +376,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.xs,
   },
   headingText: {
-    color: colors.heading,
-    fontSize: 17,
-    fontWeight: '700',
+    ...typography.sectionTitle,
+    flex: 1,
+  },
+  browseButton: {
+    alignItems: 'center',
+    backgroundColor: colors.lavender,
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: spacing.md,
+  },
+  browseButtonText: {
+    color: colors.primary,
+    ...typography.label,
   },
   mapFrame: {
     borderColor: colors.border,
@@ -431,19 +449,6 @@ const styles = StyleSheet.create({
     height: 48,
     width: 48,
   },
-  markerImage: {
-    height: '100%',
-    width: '100%',
-  },
-  markerInitials: {
-    color: colors.secondary,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  markerInitialsSelected: {
-    color: colors.primary,
-    fontSize: 14,
-  },
   searchOriginMarker: {
     alignItems: 'center',
     backgroundColor: colors.primary,
@@ -472,16 +477,12 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   noMapTitle: {
-    color: colors.heading,
-    fontSize: 15,
-    fontWeight: '700',
+    ...typography.sectionTitle,
     marginTop: spacing.sm,
     textAlign: 'center',
   },
   noMapMessage: {
-    color: colors.mutedText,
-    fontSize: 13,
-    lineHeight: 19,
+    ...typography.bodySmall,
     marginTop: spacing.xs,
     textAlign: 'center',
   },
@@ -491,30 +492,23 @@ const styles = StyleSheet.create({
   },
   noMapRecenterText: {
     color: colors.primary,
-    fontSize: 13,
-    fontWeight: '700',
+    ...typography.label,
     textAlign: 'center',
   },
   approximateNote: {
-    color: colors.mutedText,
-    fontSize: 11,
-    lineHeight: 16,
+    ...typography.caption,
     paddingHorizontal: spacing.xs,
   },
   section: {
     marginTop: spacing.sm,
   },
   sectionTitle: {
-    color: colors.heading,
-    fontSize: 15,
-    fontWeight: '700',
+    ...typography.sectionTitle,
     marginBottom: spacing.xs,
     paddingHorizontal: spacing.xs,
   },
   sectionDescription: {
-    color: colors.mutedText,
-    fontSize: 12,
-    lineHeight: 17,
+    ...typography.bodySmall,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.xs,
   },

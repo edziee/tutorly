@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppButton from './AppButton';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // Shown when loading or saving data failed. Pass onRetry to show a
 // "Try again" button that runs the request again.
@@ -37,9 +38,7 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: spacing.md,
-    color: colors.heading,
-    fontSize: 18,
-    fontWeight: '700',
+    ...typography.heading,
     textAlign: 'center',
   },
   compact: {
@@ -50,8 +49,8 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: spacing.sm,
+    ...typography.body,
     color: colors.mutedText,
-    fontSize: 14,
     textAlign: 'center',
   },
   action: {

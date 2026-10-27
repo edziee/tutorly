@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 // A small number tile: an icon and label on top, a big value, and a caption.
 // Used for "Hours / Sessions / Rating" on the student dashboard and for the
@@ -40,8 +41,7 @@ const styles = StyleSheet.create({
   label: {
     flexShrink: 1,
     color: colors.mutedText,
-    fontSize: 11,
-    fontWeight: '600',
+    ...typography.caption,
   },
   value: {
     color: colors.primary,
@@ -50,8 +50,7 @@ const styles = StyleSheet.create({
   },
   caption: {
     marginTop: 2,
+    ...typography.caption,
     color: colors.successText,
-    fontSize: 11,
-    fontWeight: '500',
   },
 });

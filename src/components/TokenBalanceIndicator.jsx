@@ -68,7 +68,7 @@ export default function TokenBalanceIndicator({ userId, role, onBalancePress }) 
         style={styles.balanceButton}
       >
         <View style={styles.tokenIcon}>
-          <Ionicons name="star" size={14} color="#7A4B00" />
+          <Ionicons name="star" size={14} color={colors.white} />
         </View>
         <Text numberOfLines={1} style={styles.balance}>{balanceText}</Text>
       </Pressable>
@@ -94,9 +94,9 @@ const styles = StyleSheet.create({
     paddingLeft: 3,
     paddingRight: 4,
     borderRadius: 18,
-    backgroundColor: '#573A2B',
+    backgroundColor: colors.lavender,
     borderWidth: 1,
-    borderColor: '#A2784D',
+    borderColor: colors.primary,
   },
   balanceButton: {
     minWidth: 59,
@@ -110,14 +110,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 13,
-    backgroundColor: '#F5B72E',
-    borderWidth: 2,
-    borderColor: '#D99012',
+    backgroundColor: colors.primary,
   },
   balance: {
     minWidth: 24,
     flexShrink: 1,
-    color: colors.white,
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '800',
     textAlign: 'right',

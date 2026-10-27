@@ -1,9 +1,10 @@
 // Screens for a logged-in admin. Only reachable when the user's role is
 // 'admin' (see AppNavigator). Member 3 builds the layout, Member 4 connects the
 // data.
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { BottomTabBar, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '../constants/routes';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
@@ -14,6 +15,7 @@ import AdminReviewHistoryScreen from '../screens/admin/AdminReviewHistoryScreen'
 import AdminWalletsScreen from '../screens/admin/AdminWalletsScreen';
 import AdminHeader from '../components/AdminHeader';
 import { colors } from '../theme/colors';
+import { tabBarLabelStyle, tabBarStyle } from '../theme/navigation';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -43,12 +45,28 @@ export default function AdminNavigator() {
       <Stack.Screen
         name={ROUTES.ADMIN_USERS}
         component={AdminUsersScreen}
-        options={{ title: 'Manage users' }}
+        options={({ navigation }) => ({
+          title: 'Manage users',
+          header: () => (
+            <AdminHeader
+              title="Manage users"
+              onBackPress={() => navigation.goBack()}
+            />
+          ),
+        })}
       />
       <Stack.Screen
         name={ROUTES.ADMIN_BOOKINGS}
         component={AdminBookingsScreen}
-        options={{ title: 'View bookings' }}
+        options={({ navigation }) => ({
+          title: 'View bookings',
+          header: () => (
+            <AdminHeader
+              title="View bookings"
+              onBackPress={() => navigation.goBack()}
+            />
+          ),
+        })}
       />
     </Stack.Navigator>
   );
@@ -58,11 +76,27 @@ function AdminTabs() {
   return (
     <Tab.Navigator
       initialRouteName={ROUTES.ADMIN_DASHBOARD}
+      tabBar={(props) => (
+        <SafeAreaView edges={['bottom']} style={styles.tabBarSafeArea}>
+          <BottomTabBar {...props} insets={{ ...props.insets, bottom: 0 }} />
+        </SafeAreaView>
+      )}
       screenOptions={({ route }) => ({
         headerShown: true,
-        header: () => <AdminHeader title={tabTitles[route.name]} />,
+        header: ({ navigation }) => (
+          <AdminHeader
+            title={tabTitles[route.name]}
+            onBackPress={
+              route.name === ROUTES.ADMIN_VERIFICATIONS || route.name === ROUTES.ADMIN_WALLETS
+                ? () => navigation.navigate(ROUTES.ADMIN_DASHBOARD)
+                : undefined
+            }
+          />
+        ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedText,
+        tabBarStyle,
+        tabBarLabelStyle,
         tabBarIcon: ({ color, size }) => (
           <Ionicons name={tabIcons[route.name]} size={size} color={color} />
         ),
@@ -91,3 +125,9 @@ function AdminTabs() {
     </Tab.Navigator>
   );
 }
+
+const styles = {
+  tabBarSafeArea: {
+    backgroundColor: colors.surface,
+  },
+};

@@ -18,6 +18,8 @@ import AppInput from '../../components/AppInput';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
+import StudentAvatar from '../../components/StudentAvatar';
+import VerificationBadge from '../../components/VerificationBadge';
 import WorkspaceSwitchCard from '../../components/WorkspaceSwitchCard';
 import TokenBalanceIndicator from '../../components/TokenBalanceIndicator';
 import { openTutorApplication } from '../../navigation/studentNavigationActions';
@@ -57,6 +59,7 @@ import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
 import { canUseTutorOperations, hasDirectTutorAccountStatus } from '../../utils/workspace';
 import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 import { getTutorLeaderboards, TOP_RATED_MINIMUM_REVIEWS } from '../../utils/leaderboards';
 import { formatTokenUnits } from '../../utils/tokens';
 import { getMinimumTutorRate, getTutorRateError } from '../../utils/tutorPricing';
@@ -104,7 +107,11 @@ function RequestCard({ request, onAccept, onDecline, working }) {
   return (
     <View>
       <View style={styles.requestCard}>
-        <View style={styles.requestAvatar}><Text style={styles.requestInitial}>{(request.studentName || 'S').charAt(0)}</Text></View>
+        <StudentAvatar
+          imageUri={request.studentPhotoUrl}
+          name={request.studentName || 'Student'}
+          size={34}
+        />
         <View style={styles.requestCopy}>
           <Text style={styles.requestName}>{request.studentName || 'Student'}</Text>
           <Text style={styles.requestMeta}>{request.subject} · {request.dateKey} · {request.startTime}</Text>
@@ -558,9 +565,9 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
         <View style={styles.profileCard}>
           <View style={styles.profileRow}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{tutorName.charAt(0)}</Text>
+              <StudentAvatar imageUri={user?.photoUrl} name={tutorName} size={56} />
               {application?.verificationStatus === 'approved' ? (
-                <View style={styles.verified}><Ionicons name="checkmark" size={11} color={colors.white} /></View>
+                <View style={styles.verified}><Ionicons name="shield-checkmark" size={13} color={colors.white} /></View>
               ) : null}
             </View>
             <View style={styles.identity}>
@@ -577,11 +584,15 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           </View>
           <View style={styles.rateRow}>
             <Text style={styles.rateLabel}>Verification status</Text>
-            <Text style={styles.rate}>
-              {isDirectTutorAccount && verificationStatus === 'pending'
-                ? 'not verified'
-                : verificationStatus.replace('_', ' ')}
-            </Text>
+            {verificationStatus === 'approved' ? (
+              <VerificationBadge />
+            ) : (
+              <Text style={styles.rate}>
+                {isDirectTutorAccount && verificationStatus === 'pending'
+                  ? 'not verified'
+                  : verificationStatus.replace('_', ' ')}
+              </Text>
+            )}
           </View>
           <Text style={styles.profileDescription}>
             {verificationStatus === 'approved'
@@ -1264,37 +1275,36 @@ const styles = StyleSheet.create({
   applicantWallet: { alignItems: 'flex-end' },
   activeDot: { width: 7, height: 7, borderRadius: 4, marginRight: 6, backgroundColor: colors.secondary },
   activeText: { color: colors.text, fontSize: 11, fontWeight: '600' },
-  profileCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface, shadowColor: colors.black, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
+  profileCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, shadowColor: colors.black, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
   profileRow: { flexDirection: 'row', gap: spacing.sm },
   avatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-  avatarText: { color: colors.white, fontSize: 22, fontWeight: '700' },
-  verified: { position: 'absolute', right: -3, bottom: -3, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-  identity: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  name: { color: colors.heading, fontSize: 18, fontWeight: '700' },
-  education: { marginTop: 3, color: colors.mutedText, fontSize: 12 },
+  verified: { position: 'absolute', right: -3, bottom: -3, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success, borderWidth: 2, borderColor: colors.surface },
+  identity: { flex: 1, minWidth: 0 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs },
+  name: { ...typography.sectionTitle, flexShrink: 1 },
+  education: { ...typography.bodySmall, marginTop: 3 },
   rating: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm },
   ratingValue: { color: colors.text, fontSize: 12, fontWeight: '700' },
   ratingMeta: { color: colors.mutedText, fontSize: 11 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: colors.lavender },
   badgeText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  rateRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.md },
-  rateLabel: { color: colors.mutedText, fontSize: 11, flex: 1 },
-  rate: { color: colors.primary, fontSize: 18, fontWeight: '800' },
-  rateUnit: { color: colors.mutedText, fontSize: 11 },
-  profileDescription: { marginTop: spacing.sm, color: colors.mutedText, fontSize: 11, lineHeight: 16 },
-  personalInfoCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
+  rateRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.md },
+  rateLabel: { ...typography.caption, flex: 1 },
+  rate: { ...typography.heading, color: colors.primary },
+  rateUnit: { ...typography.caption },
+  profileDescription: { ...typography.bodySmall, marginTop: spacing.sm },
+  personalInfoCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   personalInfoHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   personalInfoHeadingCopy: { flex: 1 },
-  personalInfoTitle: { color: colors.heading, fontSize: 16, fontWeight: '700' },
-  personalInfoSubtitle: { marginTop: 2, color: colors.mutedText, fontSize: 11 },
-  editAddressButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: colors.background },
+  personalInfoTitle: { ...typography.sectionTitle },
+  personalInfoSubtitle: { ...typography.caption, marginTop: 2 },
+  editAddressButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: colors.background },
   personalInfoRows: { gap: spacing.sm },
   homeAddressRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.background },
   homeAddressIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: colors.surface },
   homeAddressCopy: { flex: 1 },
-  homeAddressLabel: { color: colors.mutedText, fontSize: 11, fontWeight: '600' },
-  homeAddressValue: { marginTop: 3, color: colors.text, fontSize: 13, lineHeight: 18 },
+  homeAddressLabel: { ...typography.caption, fontWeight: '600' },
+  homeAddressValue: { ...typography.bodySmall, color: colors.text, marginTop: 3 },
   addressModalBackdrop: { flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(20, 20, 30, 0.48)' },
   addressModalCard: { maxHeight: '92%', padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.surface },
   addressModalHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md },
@@ -1335,8 +1345,8 @@ const styles = StyleSheet.create({
   courseText: { flex: 1, color: colors.text, fontSize: 11 },
   proofSummary: { marginTop: spacing.xs },
   proofDetails: { flexShrink: 1, marginTop: 3, color: colors.mutedText, fontSize: 10, lineHeight: 15 },
-  addCourse: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.background },
-  addCourseText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  addCourse: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm, backgroundColor: colors.background },
+  addCourseText: { ...typography.label, color: colors.primary },
   applicationAccessCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionHeading: { color: colors.heading, fontSize: 17, fontWeight: '700' },
@@ -1354,8 +1364,6 @@ const styles = StyleSheet.create({
   dayDotActive: { backgroundColor: colors.primary },
   availabilityMeta: { marginTop: spacing.sm, color: colors.mutedText, fontSize: 10 },
   requestCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface },
-  requestAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.lavender },
-  requestInitial: { color: colors.primary, fontWeight: '700' },
   requestCopy: { flex: 1 },
   requestName: { color: colors.text, fontSize: 12, fontWeight: '700' },
   requestMeta: { marginTop: 2, color: colors.mutedText, fontSize: 10 },

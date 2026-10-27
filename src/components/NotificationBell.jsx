@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotifications } from '../context/NotificationContext';
 import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
 
 export default function NotificationBell({ onPress }) {
   const { unreadCount, error } = useNotifications();
@@ -25,6 +26,6 @@ export default function NotificationBell({ onPress }) {
 const styles = StyleSheet.create({
   button: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   badge: { position: 'absolute', top: -3, right: -6, minWidth: 17, height: 17, paddingHorizontal: 3, borderRadius: 9, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  count: { color: colors.white, fontSize: 10, fontWeight: '700' },
+  count: { ...typography.badge, color: colors.white },
   error: { position: 'absolute', top: 1, right: 1, width: 7, height: 7, borderRadius: 4, backgroundColor: colors.error },
 });

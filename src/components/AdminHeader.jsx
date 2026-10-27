@@ -12,6 +12,7 @@ import AppHeader from './AppHeader';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
 import { radius, spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 import { getAuthErrorMessage } from '../utils/errors';
 
 function getInitials(name, email) {
@@ -21,7 +22,7 @@ function getInitials(name, email) {
     : words[0].slice(0, 2).toUpperCase();
 }
 
-export default function AdminHeader({ title }) {
+export default function AdminHeader({ title, onBackPress }) {
   const { user, signOut } = useAuth();
   const [profileVisible, setProfileVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -52,6 +53,7 @@ export default function AdminHeader({ title }) {
     <>
       <AppHeader
         title={title}
+        onBackPress={onBackPress}
         initials={getInitials(user?.name, user?.email)}
         imageUri={user?.photoUrl}
         onProfilePress={openProfile}
@@ -115,28 +117,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   heading: {
-    color: colors.heading,
-    fontSize: 18,
-    fontWeight: '700',
+    ...typography.heading,
   },
   email: {
     marginTop: spacing.xs,
     marginBottom: spacing.lg,
-    color: colors.mutedText,
-    fontSize: 14,
+    ...typography.bodySmall,
   },
   error: {
     marginBottom: spacing.md,
     color: colors.errorText,
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 18,
   },
   cancelButton: {
     alignItems: 'center',
     paddingVertical: spacing.md,
   },
   cancelText: {
+    ...typography.label,
     color: colors.mutedText,
-    fontSize: 14,
     fontWeight: '600',
   },
 });

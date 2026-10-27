@@ -7,6 +7,7 @@ import StudentAvatar from './StudentAvatar';
 import TokenBalanceIndicator from './TokenBalanceIndicator';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { typography } from '../theme/typography';
 
 export function AppHeaderBrand({ title }) {
   return (
@@ -53,6 +54,8 @@ export function AppHeaderActions({
 
 export default function AppHeader({
   title,
+  onBackPress,
+  backAccessibilityLabel = 'Return to dashboard',
   initials,
   imageUri,
   userId,
@@ -65,7 +68,19 @@ export default function AppHeader({
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={styles.header}>
-        <AppHeaderBrand title={title} />
+        <View style={styles.leading}>
+          {onBackPress ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={backAccessibilityLabel}
+              onPress={onBackPress}
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={20} color={colors.primary} />
+            </Pressable>
+          ) : null}
+          <AppHeaderBrand title={title} />
+        </View>
         <AppHeaderActions
           initials={initials}
           imageUri={imageUri}
@@ -98,6 +113,7 @@ const styles = StyleSheet.create({
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
   },
   logo: {
     width: 28,
@@ -109,17 +125,14 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   brandName: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '700',
+    ...typography.brand,
   },
   divider: {
     color: colors.mutedText,
     marginHorizontal: spacing.xs,
   },
   title: {
-    color: colors.text,
-    fontSize: 13,
+    ...typography.navigationTitle,
     flexShrink: 1,
   },
   actions: {
@@ -127,6 +140,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     paddingRight: spacing.xs,
+  },
+  leading: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    minWidth: 0,
+  },
+  backButton: {
+    alignItems: 'center',
+    height: 44,
+    justifyContent: 'center',
+    marginRight: spacing.xs,
+    width: 40,
   },
   avatarButton: {
     width: 30,

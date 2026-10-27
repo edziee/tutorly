@@ -1,8 +1,25 @@
+import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../theme/colors';
 
-export default function StudentAvatar({ imageUri, initials, size }) {
+export default function StudentAvatar({ imageUri, initials, name, size = 40 }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const nameInitials = (typeof name === 'string' ? name : '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('');
+  const fallbackInitials = (
+    (typeof initials === 'string' && initials.trim()) || nameInitials
+  ).toUpperCase() || '?';
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUri]);
+
   return (
     <View
       style={[
@@ -14,11 +31,16 @@ export default function StudentAvatar({ imageUri, initials, size }) {
         },
       ]}
     >
-      {imageUri ? (
-        <Image source={{ uri: imageUri }} style={styles.image} />
+      {imageUri && !imageFailed ? (
+        <Image
+          source={{ uri: imageUri }}
+          resizeMode="cover"
+          style={styles.image}
+          onError={() => setImageFailed(true)}
+        />
       ) : (
         <Text style={[styles.initials, { fontSize: size * 0.38 }]}>
-          {initials}
+          {fallbackInitials}
         </Text>
       )}
     </View>
@@ -30,7 +52,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#C8CBD0',
+    backgroundColor: colors.avatarBackground,
   },
   image: {
     width: '100%',
