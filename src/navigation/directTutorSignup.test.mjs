@@ -10,6 +10,25 @@ test('direct tutor accounts are distinct from student tutor applicants', () => {
   assert.equal(hasDirectTutorAccountStatus(ROLES.STUDENT, 'pending'), false);
 });
 
+test('all tutor applicants see token balance only in the shared header', async () => {
+  const [navigator, profile, header, indicator] = await Promise.all([
+    readFile(new URL('./TutorNavigator.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../screens/tutor/TutorWorkspaceProfileScreen.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/AppHeader.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../components/TokenBalanceIndicator.jsx', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(navigator, /role={user\?\.role}/);
+  assert.match(navigator, /<TutorStackHeader/);
+  assert.match(header, /<TokenBalanceIndicator userId={userId} role={role}/);
+  assert.match(indicator, /ROLES\.STUDENT, ROLES\.TUTOR, ROLES\.PROFESSIONAL/);
+  assert.doesNotMatch(profile, /TokenBalanceIndicator|applicantWallet/);
+  assert.equal(hasDirectTutorAccountStatus(ROLES.TUTOR, 'pending'), true);
+  assert.equal(hasDirectTutorAccountStatus(ROLES.TUTOR, 'rejected'), true);
+  assert.equal(hasDirectTutorAccountStatus(ROLES.PROFESSIONAL, 'pending'), false);
+  assert.equal(hasDirectTutorAccountStatus(ROLES.STUDENT, 'pending'), false);
+});
+
 test('direct tutor accounts keep the profile screen and can open the application', async () => {
   const navigator = await readFile(new URL('./TutorNavigator.jsx', import.meta.url), 'utf8');
   const profile = await readFile(

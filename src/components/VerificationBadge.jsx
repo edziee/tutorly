@@ -2,19 +2,60 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../theme/colors';
+import { VERIFICATION_STATUS } from '../constants/statuses';
 import { radius, spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
+import { VERIFICATION_STATUS_BADGE } from './StatusBadge';
 
-export default function VerificationBadge({ label = 'Approved', align = 'start' }) {
+const toneStyles = {
+  neutral: {
+    backgroundColor: colors.divider,
+    borderColor: colors.border,
+    color: colors.mutedText,
+    icon: 'document-text-outline',
+  },
+  warning: {
+    backgroundColor: colors.paleYellow,
+    borderColor: colors.warning,
+    color: colors.warningText,
+    icon: 'time-outline',
+  },
+  success: {
+    backgroundColor: colors.mint,
+    borderColor: colors.success,
+    color: colors.successText,
+    icon: 'shield-checkmark',
+  },
+  error: {
+    backgroundColor: colors.errorBackground,
+    borderColor: colors.error,
+    color: colors.errorText,
+    icon: 'alert-circle-outline',
+  },
+};
+
+export default function VerificationBadge({
+  status = VERIFICATION_STATUS.APPROVED,
+  label,
+  align = 'start',
+}) {
+  const statusConfig = VERIFICATION_STATUS_BADGE[status];
+  const tone = toneStyles[statusConfig?.tone ?? 'neutral'];
+  const statusLabel = label ?? statusConfig?.label ?? status;
+
   return (
     <View
       accessible
       accessibilityRole="text"
-      accessibilityLabel={label}
-      style={[styles.badge, align === 'end' && styles.alignEnd]}
+      accessibilityLabel={statusLabel}
+      style={[
+        styles.badge,
+        { backgroundColor: tone.backgroundColor, borderColor: tone.borderColor },
+        align === 'end' && styles.alignEnd,
+      ]}
     >
-      <Ionicons name="shield-checkmark" size={14} color={colors.successText} />
-      <Text style={styles.label}>{label}</Text>
+      <Ionicons name={tone.icon} size={14} color={tone.color} />
+      <Text style={[styles.label, { color: tone.color }]}>{statusLabel}</Text>
     </View>
   );
 }
@@ -22,8 +63,6 @@ export default function VerificationBadge({ label = 'Approved', align = 'start' 
 const styles = StyleSheet.create({
   badge: {
     alignItems: 'center',
-    backgroundColor: colors.mint,
-    borderColor: colors.success,
     borderRadius: radius.pill,
     borderWidth: 1,
     flexDirection: 'row',
@@ -33,7 +72,6 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.badge,
-    color: colors.successText,
   },
   alignEnd: {
     alignSelf: 'flex-end',

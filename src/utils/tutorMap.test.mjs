@@ -135,11 +135,11 @@ test('both discovery views use approved public tutors regardless of location-cel
   assert.doesNotMatch(tutorService, /where\('locationCell'/);
 });
 
-test('map view offers a direct route to the scrollable tutor list on both platforms', () => {
-  assert.match(tutorsScreen, /onSwitchToList={\(\) => handleViewChange\('list'\)}/);
+test('map view omits the redundant browse button while retaining the list toggle and scrolling', () => {
+  assert.match(tutorsScreen, /accessibilityState=\{\{ selected: viewMode === 'list' \}\}/);
+  assert.match(tutorsScreen, /onPress=\{\(\) => handleViewChange\('list'\)\}/);
   for (const screen of [nativeMapScreen, webMapScreen]) {
-    assert.match(screen, /accessibilityLabel="Switch to tutor list"/);
-    assert.match(screen, /<Text style={styles\.browseButtonText}>Browse tutors<\/Text>/);
+    assert.doesNotMatch(screen, /Browse tutors|browseButton|onSwitchToList/);
     assert.match(screen, /showsVerticalScrollIndicator/);
   }
   assert.match(nativeMapScreen, /nestedScrollEnabled/);

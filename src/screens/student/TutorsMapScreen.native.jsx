@@ -148,7 +148,6 @@ export default function TutorsMapScreen({
   searchOrigin,
   searchOriginSource,
   onRequestMapRecenter,
-  onSwitchToList,
   onTutorPress,
 }) {
   const mapRef = useRef(null);
@@ -223,15 +222,6 @@ export default function TutorsMapScreen({
         <Text style={styles.headingText}>
           {nearMeActive ? `Tutors within about ${maximumDistanceKm} km` : 'Tutors nearby'}
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Switch to tutor list"
-          onPress={onSwitchToList}
-          style={styles.browseButton}
-        >
-          <Feather name="list" size={16} color={colors.primary} />
-          <Text style={styles.browseButtonText}>Browse tutors</Text>
-        </Pressable>
       </View>
       {mapRegion ? (
         <View style={styles.mapFrame}>
@@ -376,26 +366,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.xs,
   },
   headingText: {
     ...typography.sectionTitle,
     flex: 1,
-  },
-  browseButton: {
-    alignItems: 'center',
-    backgroundColor: colors.lavender,
-    borderRadius: radius.pill,
-    flexDirection: 'row',
-    gap: spacing.xs,
-    justifyContent: 'center',
-    minHeight: 40,
-    paddingHorizontal: spacing.md,
-  },
-  browseButtonText: {
-    color: colors.primary,
-    ...typography.label,
   },
   mapFrame: {
     borderColor: colors.border,

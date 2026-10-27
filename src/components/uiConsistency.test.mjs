@@ -82,17 +82,24 @@ test('token currency uses Tutorly colors in the header and wallet', async () => 
   assert.doesNotMatch(wallet, legacyTokenColors);
 });
 
-test('approved tutor statuses use the highlighted verification badge', async () => {
-  const [badge, workspace, application, reviewHistory] = await Promise.all([
+test('all verification statuses use highlighted badges wherever they are displayed', async () => {
+  const [badge, statusBadges, workspace, application, reviewHistory] = await Promise.all([
     source('./VerificationBadge.jsx'),
+    source('./StatusBadge.jsx'),
     source('../screens/tutor/TutorWorkspaceProfileScreen.jsx'),
     source('../screens/tutor/TutorProfileScreen.jsx'),
     source('../screens/admin/AdminReviewHistoryScreen.jsx'),
   ]);
 
-  assert.match(badge, /name="shield-checkmark"/);
-  assert.match(badge, /label = 'Approved'/);
-  assert.match(workspace, /<VerificationBadge/);
-  assert.match(application, /<VerificationBadge/);
-  assert.match(reviewHistory, /<VerificationBadge/);
+  assert.match(badge, /icon: 'document-text-outline'/);
+  assert.match(badge, /icon: 'time-outline'/);
+  assert.match(badge, /icon: 'shield-checkmark'/);
+  assert.match(badge, /icon: 'alert-circle-outline'/);
+  assert.match(statusBadges, /NOT_SUBMITTED\]: \{ label: 'Not submitted', tone: 'neutral' \}/);
+  assert.match(statusBadges, /PENDING\]: \{ label: 'Pending', tone: 'warning' \}/);
+  assert.match(statusBadges, /APPROVED\]: \{ label: 'Approved', tone: 'success' \}/);
+  assert.match(statusBadges, /REJECTED\]: \{ label: 'Rejected', tone: 'error' \}/);
+  assert.match(workspace, /<VerificationBadge\s+status=\{verificationStatus\}/);
+  assert.match(application, /<VerificationBadge status=\{status\} label=\{statusLabel\}/);
+  assert.match(reviewHistory, /<VerificationBadge status=\{application\.verificationStatus\}/);
 });

@@ -44,11 +44,7 @@ function ReviewCard({ application }) {
         ) : null}
       </View>
       <View style={styles.reviewStatus}>
-        {approved ? (
-          <VerificationBadge align="end" />
-        ) : (
-          <Text style={[styles.status, styles.rejected]}>Rejected</Text>
-        )}
+        <VerificationBadge status={application.verificationStatus} align="end" />
         <Text style={styles.date}>
           {formatReviewDate(application.verificationReviewedAt ?? application.updatedAt)}
         </Text>
@@ -128,8 +124,6 @@ const styles = StyleSheet.create({
   name: { color: colors.heading, fontSize: 13, fontWeight: '700' },
   detail: { marginTop: 3, color: colors.mutedText, fontSize: 11 },
   note: { marginTop: 3, color: colors.errorText, fontSize: 10 },
-  status: { color: colors.successText, fontSize: 11, fontWeight: '700', textAlign: 'right' },
-  rejected: { color: colors.errorText },
   reviewStatus: { alignItems: 'flex-end' },
   date: { marginTop: 3, color: colors.mutedText, fontSize: 10, textAlign: 'right' },
 });

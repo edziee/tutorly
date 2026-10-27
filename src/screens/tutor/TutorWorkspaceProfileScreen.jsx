@@ -21,7 +21,6 @@ import ScreenContainer from '../../components/ScreenContainer';
 import StudentAvatar from '../../components/StudentAvatar';
 import VerificationBadge from '../../components/VerificationBadge';
 import WorkspaceSwitchCard from '../../components/WorkspaceSwitchCard';
-import TokenBalanceIndicator from '../../components/TokenBalanceIndicator';
 import { openTutorApplication } from '../../navigation/studentNavigationActions';
 import { ROLES } from '../../constants/roles';
 import { ROUTES } from '../../constants/routes';
@@ -536,15 +535,6 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           <View style={styles.activeDot} />
           <Text style={styles.activeText}>Tutor workspace</Text>
         </View>
-        {!canPerformTutorOperations && [ROLES.STUDENT, ROLES.TUTOR, ROLES.PROFESSIONAL].includes(user?.role) ? (
-          <View style={styles.applicantWallet}>
-            <TokenBalanceIndicator
-              userId={uid}
-              role={user.role}
-              onBalancePress={() => navigation.navigate(ROUTES.WALLET)}
-            />
-          </View>
-        ) : null}
         {user?.role === ROLES.STUDENT ? (
           <View style={styles.workspaceActions}>
             <WorkspaceSwitchCard
@@ -584,15 +574,15 @@ export default function TutorWorkspaceProfileScreen({ navigation }) {
           </View>
           <View style={styles.rateRow}>
             <Text style={styles.rateLabel}>Verification status</Text>
-            {verificationStatus === 'approved' ? (
-              <VerificationBadge />
-            ) : (
-              <Text style={styles.rate}>
-                {isDirectTutorAccount && verificationStatus === 'pending'
-                  ? 'not verified'
+            <VerificationBadge
+              status={verificationStatus}
+              label={isDirectTutorAccount && verificationStatus === 'pending'
+                ? 'not verified'
+                : verificationStatus === 'approved'
+                  ? 'Approved'
                   : verificationStatus.replace('_', ' ')}
-              </Text>
-            )}
+              align="end"
+            />
           </View>
           <Text style={styles.profileDescription}>
             {verificationStatus === 'approved'
@@ -1272,7 +1262,6 @@ const styles = StyleSheet.create({
   paymentVerificationCard: { gap: spacing.sm, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },
   emptyRequests: { padding: spacing.md, borderRadius: radius.md, color: colors.mutedText, backgroundColor: colors.surface, fontSize: 12 },
   activeBanner: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: 999, backgroundColor: '#E6E8EA' },
-  applicantWallet: { alignItems: 'flex-end' },
   activeDot: { width: 7, height: 7, borderRadius: 4, marginRight: 6, backgroundColor: colors.secondary },
   activeText: { color: colors.text, fontSize: 11, fontWeight: '600' },
   profileCard: { padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, shadowColor: colors.black, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
