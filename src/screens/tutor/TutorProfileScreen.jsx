@@ -61,7 +61,7 @@ function FieldLabel({ children, required = false }) {
   );
 }
 
-function MentorHeader({ tutor, statusLabel, imageUri, approved }) {
+function MentorHeader({ tutor, statusLabel, imageUri, status }) {
   return (
     <View style={styles.hero}>
       <View style={styles.heroTopLine}>
@@ -71,14 +71,7 @@ function MentorHeader({ tutor, statusLabel, imageUri, approved }) {
           <Text style={styles.heroName}>{tutor.name}</Text>
           <Text style={styles.heroSubject}>{tutor.subject}</Text>
         </View>
-        {approved ? (
-          <VerificationBadge />
-        ) : (
-          <View style={styles.statusBadge}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>{statusLabel}</Text>
-          </View>
-        )}
+        <VerificationBadge status={status} label={statusLabel} align="end" />
       </View>
       <View style={styles.heroRule} />
       <Text style={styles.heroCopy}>
@@ -497,7 +490,7 @@ export default function TutorApplicationScreen() {
             tutor={tutor}
             statusLabel={statusLabel}
             imageUri={user?.photoUrl}
-            approved={applicationStatus === 'approved'}
+            status={applicationStatus}
           />
           <View style={styles.pageIntro}>
             <Text style={styles.pageTitle}>Tutor application</Text>

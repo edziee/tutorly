@@ -473,7 +473,6 @@ export const TutorsScreen = () => {
             searchOrigin={mapSearchOrigin}
             searchOriginSource={nearMeOriginSource}
             onRequestMapRecenter={handleMapRecenter}
-            onSwitchToList={() => handleViewChange('list')}
             onTutorPress={openTutor}
           />
         ) : displayedTutors.length ? (
