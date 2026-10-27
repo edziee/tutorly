@@ -77,6 +77,8 @@ test('student and tutor headers open the shared wallet screen without changing a
   assert.match(tutorNavigator, /onWalletPress=\{\(\) => navigation\.navigate\(ROUTES\.WALLET\)\}/);
   assert.match(indicator, /onPress=\{onBalancePress\}/);
   assert.match(indicator, /onPress=\{openRequestForm\}/);
+  assert.match(indicator, /getActiveWorkspace\(role,\s*workspaceMode\)/);
   assert.match(walletScreen, /subscribeToTokenTransactions/);
+  assert.match(walletScreen, /getActiveWorkspace\(role,\s*workspaceMode\)/);
   assert.match(walletScreen, /assertApprovedTutor/);
 });

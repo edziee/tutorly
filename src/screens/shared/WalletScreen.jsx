@@ -7,7 +7,7 @@ import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
 import ScreenContainer from '../../components/ScreenContainer';
 import { getTokenFormUrl } from '../../config/tokenForms';
-import { ROLES } from '../../constants/roles';
+import { isTutorRole } from '../../constants/roles';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../hooks/useSubscription';
 import { subscribeToTokenTransactions, subscribeToWallet } from '../../services/walletService';
@@ -16,6 +16,7 @@ import { colors } from '../../theme/colors';
 import { radius, spacing } from '../../theme/spacing';
 import { getErrorMessage } from '../../utils/errors';
 import { formatTokenUnits } from '../../utils/tokens';
+import { getActiveWorkspace } from '../../utils/workspace';
 
 const entryLabels = {
   admin_credit: 'Tokens added by admin',
@@ -48,7 +49,9 @@ function entryAmount(entry) {
 }
 
 export default function WalletScreen() {
-  const { user } = useAuth();
+  const { user, role, workspaceMode } = useAuth();
+  const actionRole = getActiveWorkspace(role, workspaceMode);
+  const isTutorWorkspace = isTutorRole(actionRole);
   const [openingForm, setOpeningForm] = useState(false);
   const wallet = useSubscription(
     (onData, onError) => user?.uid
@@ -65,11 +68,11 @@ export default function WalletScreen() {
 
   const openRequestForm = async () => {
     if (openingForm) return;
-    const formUrl = getTokenFormUrl(user?.role);
+    const formUrl = getTokenFormUrl(actionRole);
     if (!formUrl) {
       Alert.alert(
         'Form not configured',
-        user?.role === ROLES.STUDENT
+        !isTutorWorkspace
           ? 'The student token top-up Google Form has not been configured.'
           : 'The tutor cash-out Google Form has not been configured.',
       );
@@ -77,7 +80,7 @@ export default function WalletScreen() {
     }
     setOpeningForm(true);
     try {
-      if ([ROLES.TUTOR, ROLES.PROFESSIONAL].includes(user?.role)) {
+      if (isTutorWorkspace) {
         await assertApprovedTutor(user.uid);
       }
       await Linking.openURL(formUrl);
@@ -123,7 +126,7 @@ export default function WalletScreen() {
             {formatTokenUnits(held)} tokens currently held for bookings
           </Text>
           <AppButton
-            title={user.role === ROLES.STUDENT ? 'Request a top-up' : 'Request a cash-out'}
+            title={isTutorWorkspace ? 'Request a cash-out' : 'Request a top-up'}
             onPress={openRequestForm}
             loading={openingForm}
           />

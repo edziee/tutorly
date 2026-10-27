@@ -56,6 +56,11 @@ test('existing professional and admin routing is unchanged', () => {
   assert.equal(getActiveWorkspace(ROLES.ADMIN, WORKSPACE_MODES.TUTOR), ROLES.ADMIN);
 });
 
+test('wallet actions follow a student account’s active workspace', () => {
+  assert.equal(getActiveWorkspace(ROLES.STUDENT, WORKSPACE_MODES.STUDENT), WORKSPACE_MODES.STUDENT);
+  assert.equal(getActiveWorkspace(ROLES.STUDENT, WORKSPACE_MODES.TUTOR), WORKSPACE_MODES.TUTOR);
+});
+
 test('direct tutor signups are identifiable without treating student applicants as tutor accounts', () => {
   assert.equal(hasDirectTutorAccountStatus(ROLES.TUTOR, 'pending'), true);
   assert.equal(hasDirectTutorAccountStatus(ROLES.TUTOR, 'approved'), true);

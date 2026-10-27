@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { getTokenFormUrl } from '../config/tokenForms';
 import { ROLES } from '../constants/roles';
+import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { subscribeToWallet } from '../services/walletService';
 import { colors } from '../theme/colors';
@@ -11,8 +12,12 @@ import { spacing } from '../theme/spacing';
 import { formatTokenUnits } from '../utils/tokens';
 import { getErrorMessage } from '../utils/errors';
 import { assertApprovedTutor } from '../services/tutorService';
+import { getActiveWorkspace } from '../utils/workspace';
 
 export default function TokenBalanceIndicator({ userId, role, onBalancePress }) {
+  const { workspaceMode } = useAuth();
+  const actionRole = getActiveWorkspace(role, workspaceMode);
+  const isTutorWorkspace = actionRole === ROLES.TUTOR;
   const wallet = useSubscription(
     (onData, onError) => userId
       ? subscribeToWallet(userId, onData, onError)
@@ -27,18 +32,18 @@ export default function TokenBalanceIndicator({ userId, role, onBalancePress }) 
     : wallet.status === 'error'
       ? '!'
       : '…';
-  const actionTitle = role === ROLES.STUDENT ? 'Request token top-up' : 'Request tutor cash-out';
+  const actionTitle = isTutorWorkspace ? 'Request tutor cash-out' : 'Request token top-up';
   const openRequestForm = async () => {
     if (openingForm) return;
     if (wallet.status === 'error') {
       Alert.alert('Token balance unavailable', getErrorMessage(wallet.error));
       return;
     }
-    const formUrl = getTokenFormUrl(role);
+    const formUrl = getTokenFormUrl(actionRole);
     if (!formUrl) {
       Alert.alert(
         'Form not configured',
-        role === ROLES.STUDENT
+        !isTutorWorkspace
           ? 'The student token top-up Google Form has not been configured.'
           : 'The tutor token cash-out Google Form has not been configured.',
       );
@@ -46,7 +51,7 @@ export default function TokenBalanceIndicator({ userId, role, onBalancePress }) 
     }
     setOpeningForm(true);
     try {
-      if ([ROLES.TUTOR, ROLES.PROFESSIONAL].includes(role)) {
+      if (isTutorWorkspace) {
         await assertApprovedTutor(userId);
       }
       await Linking.openURL(formUrl);
