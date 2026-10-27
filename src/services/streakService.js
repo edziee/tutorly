@@ -4,6 +4,8 @@ import {
   calculateStudentDailyLogin,
   STREAK_MILESTONES,
 } from '../utils/studentStreak';
+import { getLocalNotificationsModule } from './localNotifications';
+import { runStreakReminderOperation } from './streakReminderErrors';
 
 const streakStorageKey = (uid) => `tutorly.studentStreak.v1.${uid}`;
 
@@ -57,27 +59,35 @@ export async function getStudentStreakReminderEnabled(uid) {
 
 function getNotificationsModule() {
   if (Platform.OS === 'web') return null;
-  return require('expo-notifications');
+  return getLocalNotificationsModule(Platform.OS);
 }
 
-export async function enableStudentStreakReminder(uid) {
+export async function enableStudentStreakReminder(uid, { requestPermission = true } = {}) {
   if (!uid) throw new Error('A signed-in student is required to enable streak reminders.');
-  const notifications = getNotificationsModule();
+  const notifications = await runStreakReminderOperation(
+    'loading local notification APIs',
+    async () => getNotificationsModule(),
+  );
   if (!notifications) return false;
 
-  const permission = await notifications.requestPermissionsAsync();
+  const permission = await runStreakReminderOperation(
+    requestPermission ? 'requesting notification permission' : 'checking notification permission',
+    () => requestPermission
+      ? notifications.requestPermissionsAsync()
+      : notifications.getPermissionsAsync(),
+  );
   if (!permission.granted) return false;
 
-  if (Platform.OS === 'android') {
-    await notifications.setNotificationChannelAsync('streak-reminders', {
-      name: 'Study streak reminders',
-      importance: notifications.AndroidImportance.DEFAULT,
-    });
-  }
-
-  const current = await readStreakState(uid);
+  const current = await runStreakReminderOperation(
+    'reading the saved reminder',
+    () => readStreakState(uid),
+  );
+  if (current.reminderEnabled && current.reminderNotificationId) return true;
   if (current.reminderNotificationId) {
-    await notifications.cancelScheduledNotificationAsync(current.reminderNotificationId);
+    await runStreakReminderOperation(
+      'canceling the previous reminder',
+      () => notifications.cancelScheduledNotificationAsync(current.reminderNotificationId),
+    );
   }
   const trigger = notifications.SchedulableTriggerInputTypes
     ? {
@@ -86,33 +96,50 @@ export async function enableStudentStreakReminder(uid) {
       minute: 0,
     }
     : { hour: 20, minute: 0, repeats: true };
-  const notificationId = await notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Keep your study streak going',
-      body: 'Study today to keep your Tutorly streak alive.',
-      data: { type: 'student_streak_reminder' },
-      ...(Platform.OS === 'android' ? { channelId: 'streak-reminders' } : {}),
-    },
-    trigger,
-  });
-  await writeStreakState(uid, {
-    reminderEnabled: true,
-    reminderNotificationId: notificationId,
-  });
+  const notificationId = await runStreakReminderOperation(
+    'scheduling the daily reminder',
+    () => notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Keep your study streak going',
+        body: 'Study today to keep your Tutorly streak alive.',
+        data: { type: 'student_streak_reminder' },
+      },
+      trigger,
+    }),
+  );
+  await runStreakReminderOperation(
+    'saving the reminder state',
+    () => writeStreakState(uid, {
+      reminderEnabled: true,
+      reminderNotificationId: notificationId,
+    }),
+  );
   return true;
 }
 
 export async function disableStudentStreakReminder(uid) {
   if (!uid) throw new Error('A signed-in student is required to disable streak reminders.');
-  const notifications = getNotificationsModule();
-  const current = await readStreakState(uid);
+  const notifications = await runStreakReminderOperation(
+    'loading local notification APIs',
+    async () => getNotificationsModule(),
+  );
+  const current = await runStreakReminderOperation(
+    'reading the saved reminder',
+    () => readStreakState(uid),
+  );
   if (notifications && current.reminderNotificationId) {
-    await notifications.cancelScheduledNotificationAsync(current.reminderNotificationId);
+    await runStreakReminderOperation(
+      'canceling the scheduled reminder',
+      () => notifications.cancelScheduledNotificationAsync(current.reminderNotificationId),
+    );
   }
-  await writeStreakState(uid, {
-    reminderEnabled: false,
-    reminderNotificationId: null,
-  });
+  await runStreakReminderOperation(
+    'saving the reminder state',
+    () => writeStreakState(uid, {
+      reminderEnabled: false,
+      reminderNotificationId: null,
+    }),
+  );
 }
 
 export async function notifyStudentStreakMilestone(uid, milestone) {

@@ -192,7 +192,7 @@ export default function ChatScreen({ navigation }) {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search tutors or messages"
+            placeholder="Search tutors or messages (e.g. CS 240)"
             placeholderTextColor={colors.mutedText}
             returnKeyType="search"
             style={styles.searchInput}
@@ -203,8 +203,6 @@ export default function ChatScreen({ navigation }) {
             color={colors.text}
           />
         </View>
-        <Text style={styles.searchHint}>(e.g. CS 240)</Text>
-
         <ScrollView
           horizontal
           contentContainerStyle={styles.filterList}
@@ -383,6 +381,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   searchInput: {
     flex: 1,
@@ -390,13 +389,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     paddingVertical: spacing.sm,
-  },
-  searchHint: {
-    color: colors.mutedText,
-    fontSize: 10,
-    marginLeft: 30,
-    marginTop: -7,
-    marginBottom: spacing.md,
   },
   filterList: {
     gap: spacing.sm,

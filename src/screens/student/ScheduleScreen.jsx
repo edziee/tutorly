@@ -32,6 +32,7 @@ import {
   submitBookingRating,
   updateBookingStatus,
 } from '../../services/bookingService';
+import { getLocalNotificationsModule } from '../../services/localNotifications';
 import { getOrCreateConversation } from '../../services/chatService';
 import { getTutorById } from '../../services/tutorService';
 import { colors } from '../../theme/colors';
@@ -51,7 +52,7 @@ const filters = [
 
 function getNotificationsModule() {
   if (Platform.OS === 'web') return null;
-  const Notifications = require('expo-notifications');
+  const Notifications = getLocalNotificationsModule(Platform.OS);
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldPlaySound: false,
@@ -695,12 +696,6 @@ export default function ScheduleScreen() {
       if (reminderDate <= new Date()) {
         Alert.alert('Reminder unavailable', 'This session starts in less than an hour.');
         return;
-      }
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('session-reminders', {
-          name: 'Session reminders',
-          importance: Notifications.AndroidImportance.DEFAULT,
-        });
       }
       const reminderId = await Notifications.scheduleNotificationAsync({
         content: {

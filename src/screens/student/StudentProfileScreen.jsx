@@ -171,8 +171,6 @@ export default function StudentProfileScreen({ navigation }) {
   const canAdvanceCalendar = calendarMonth.getFullYear() < currentMonthDate.getFullYear() ||
     (calendarMonth.getFullYear() === currentMonthDate.getFullYear() &&
       calendarMonth.getMonth() < currentMonthDate.getMonth());
-  const scholarLevel = Number(stats.scholarLevel) || 1;
-  const scholarProgress = Math.min(100, Math.max(0, Number(stats.scholarProgress) || 0));
   const subjectHonors = Array.isArray(stats.subjectHonors) ? stats.subjectHonors : [];
   const firstName = getFirstName(user);
   useEffect(() => {
@@ -181,8 +179,37 @@ export default function StudentProfileScreen({ navigation }) {
       setStreakRemindersEnabled(false);
       return undefined;
     }
-    getStudentStreakReminderEnabled(userId).then((enabled) => {
-      if (active) setStreakRemindersEnabled(enabled);
+    const storedPreference = user?.studyStreakReminderEnabled;
+    if (typeof storedPreference === 'boolean') {
+      setStreakRemindersEnabled(storedPreference);
+      const syncLocalReminder = storedPreference
+        ? enableStudentStreakReminder(userId, { requestPermission: false })
+        : disableStudentStreakReminder(userId);
+      syncLocalReminder.then((enabled) => {
+        if (active && storedPreference && !enabled) {
+          Alert.alert(
+            'Notifications not enabled on this device',
+            'Your reminder preference is saved, but this device cannot send notifications. Allow notifications in device settings, then turn the reminder off and on here.',
+          );
+        }
+      }).catch((error) => {
+        console.warn('Could not sync the study streak reminder on this device:', error);
+        if (active) {
+          Alert.alert(
+            'Reminder sync unavailable',
+            getErrorMessage(error, 'Please try again.'),
+          );
+        }
+      });
+      return () => {
+        active = false;
+      };
+    }
+
+    getStudentStreakReminderEnabled(userId).then(async (enabled) => {
+      if (!active) return;
+      setStreakRemindersEnabled(enabled);
+      await updateProfile({ studyStreakReminderEnabled: enabled });
     }).catch((error) => {
       console.warn('Could not load the streak reminder preference:', error);
       if (active) {
@@ -192,7 +219,7 @@ export default function StudentProfileScreen({ navigation }) {
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, user?.studyStreakReminderEnabled, updateProfile]);
 
   useEffect(() => {
     let active = true;
@@ -223,13 +250,28 @@ export default function StudentProfileScreen({ navigation }) {
           );
           return;
         }
-        setStreakRemindersEnabled(true);
+        try {
+          await updateProfile({ studyStreakReminderEnabled: true });
+          setStreakRemindersEnabled(true);
+        } catch (error) {
+          await disableStudentStreakReminder(userId).catch((cleanupError) => {
+            console.error('Could not cancel a reminder after its preference failed to save:', cleanupError);
+          });
+          throw error;
+        }
       } else {
+        await updateProfile({ studyStreakReminderEnabled: false });
         await disableStudentStreakReminder(userId);
         setStreakRemindersEnabled(false);
       }
     } catch (error) {
-      Alert.alert('Could not update streak reminders', getErrorMessage(error, 'Please try again.'));
+      console.error('Could not update study streak reminders:', error);
+      Alert.alert(
+        'Could not update streak reminders',
+        __DEV__ && error instanceof Error
+          ? error.message
+          : getErrorMessage(error, 'Please try again.'),
+      );
     } finally {
       setStreakReminderUpdating(false);
     }
@@ -721,13 +763,6 @@ export default function StudentProfileScreen({ navigation }) {
             )}
           </View>
 
-          <View style={styles.progressLabels}>
-            <Text style={styles.progressTitle}>Level {scholarLevel} learner</Text>
-            <Text style={styles.progressPercent}>{scholarProgress}% Complete</Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${scholarProgress}%` }]} />
-          </View>
         </View>
 
         <View style={styles.statsRow}>
@@ -1357,11 +1392,6 @@ const styles = StyleSheet.create({
   calendarDayOutsideText: { color: colors.mutedText },
   calendarHint: { ...typography.caption, marginTop: spacing.xs, fontSize: 10 },
   calendarError: { color: colors.errorText, marginTop: spacing.xs, fontSize: 11 },
-  progressLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg },
-  progressTitle: { ...typography.caption, fontSize: 11 },
-  progressPercent: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  progressTrack: { height: 8, borderRadius: 4, backgroundColor: '#E9EBEF', marginTop: spacing.xs },
-  progressFill: { height: '100%', borderRadius: 4, backgroundColor: colors.primary },
   statsRow: { flexDirection: 'row', gap: spacing.sm },
   statTile: {
     flex: 1,

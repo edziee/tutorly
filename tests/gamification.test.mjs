@@ -111,6 +111,25 @@ async function cleanUp(identities) {
   }
 }
 
+test('study streak reminder preference is student-owned and stored on the profile', async (t) => {
+  const student = await identity('student');
+  const tutor = await identity('tutor');
+  t.after(() => cleanUp([student, tutor]));
+
+  const studentProfile = doc(student.db, 'users', student.uid);
+  await updateDoc(studentProfile, { studyStreakReminderEnabled: true });
+  assert.equal((await getDoc(studentProfile)).data().studyStreakReminderEnabled, true);
+
+  await assert.rejects(
+    updateDoc(studentProfile, { studyStreakReminderEnabled: 'yes' }),
+    /permission/i,
+  );
+  await assert.rejects(
+    updateDoc(doc(tutor.db, 'users', tutor.uid), { studyStreakReminderEnabled: true }),
+    /permission/i,
+  );
+});
+
 test('student awards are optional, catalog-bound, tutor-authorized, and private', async (t) => {
   const student = await identity('student');
   const tutor = await identity('tutor', true);

@@ -45,6 +45,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `geolocationConsent`, `geolocationConsentAt` | boolean, timestamp | The student’s recorded decision and timestamp for using foreground location for Near me. Device coordinates are not persisted |
 | `photoUrl` | string | Optional instructor-approved external image URL. If empty, show initials; do not use Firebase Storage |
 | `notificationPreferences` | map of booleans | Week 3, Member 4 (for example `bookings`, `messages`, `reminders`) |
+| `studyStreakReminderEnabled` | boolean | Student-owned account preference, synced across devices. Each device schedules its own local 8:00 PM reminder when notification permission is granted; the scheduled notification ID remains on-device |
 | `tutorCompletedBookingCount`, `lastTutorCompletedBookingId` | private integer, string | Rules-guarded aggregate and last-booking marker. Updated only in the same atomic transition that confirms a completed tutoring session; clients cannot edit these through profile updates |
 | `createdAt` | timestamp | |
 
@@ -55,7 +56,7 @@ Private per-item display preferences live in owner-only subcollections:
 the immutable source award or earned achievement. Hiding does not modify the
 source record.
 
-Student progress shown on the profile screen (`streakDays`, `scholarLevel`, `scholarProgress`, `studyHours`, `completedSessions`, `subjectHonors`) can live in a `stats` map on this document. Streak activity dates are stored locally with the student's streak state. The leaderboard uses the separate public `studentLeaderboard/{uid}` record below; private profile fields are not used to rank other students. The app shows neutral empty/zero values when the corresponding data has not been saved; it must not present sample statistics as real account data. Most progress can be calculated from completed bookings instead of stored; Member 1 and Member 2 decide.
+Student progress shown on the profile screen (`streakDays`, `scholarLevel`, `scholarProgress`, `studyHours`, `completedSessions`, `subjectHonors`) can live in a `stats` map on this document. Streak activity dates and scheduled notification IDs are stored locally with the student's streak state; the reminder enabled preference is stored on the private user profile so it can sync across devices. The leaderboard uses the separate public `studentLeaderboard/{uid}` record below; private profile fields are not used to rank other students. The app shows neutral empty/zero values when the corresponding data has not been saved; it must not present sample statistics as real account data. Most progress can be calculated from completed bookings instead of stored; Member 1 and Member 2 decide.
 
 ## `studentLeaderboard/{uid}`
 

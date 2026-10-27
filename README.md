@@ -75,7 +75,8 @@ Run `npm test` to run the tests for the helpers in `src/utils` (needs Node 22 or
 
 Known limits when running:
 
-- Session reminders use `expo-notifications` and are turned off in Expo Go and on the web (the code skips them there). Test them in a development build.
+- Study-streak and session reminders use local notifications. They are supported in Expo Go on Android and iOS, subject to device notification permissions; notifications are unavailable on web. Android local reminders use the platform's default notification channel.
+- Remote push notifications are unavailable in Expo Go on Android; use a development build to test push delivery.
 - `expo-calendar` and the image and document pickers need a real device or an emulator with those apps.
 
 ### Firebase configuration (when Firebase is added)
