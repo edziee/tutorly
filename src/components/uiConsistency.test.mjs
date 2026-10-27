@@ -69,6 +69,17 @@ test('profile avatars share circular cover-cropped photos and fallback styling',
   assert.match(webMapStyles, /object-fit: cover/);
 });
 
+test('chat presence keeps active tutors while removing only the inbox count and search options icon', async () => {
+  const chatScreen = await source('../screens/shared/ChatScreen.jsx');
+
+  assert.match(chatScreen, /<Text style=\{styles\.switchSelectedText\}>Inbox<\/Text>/);
+  assert.doesNotMatch(chatScreen, /Inbox[\s\S]{0,40}messages\.length/);
+  assert.doesNotMatch(chatScreen, /name="options-outline"/);
+  assert.match(chatScreen, /filters\.map/);
+  assert.match(chatScreen, /unreadBadge/);
+  assert.match(chatScreen, /online=\{tutor\.online === true\}/);
+});
+
 test('token currency uses Tutorly colors in the header and wallet', async () => {
   const [indicator, wallet] = await Promise.all([
     source('./TokenBalanceIndicator.jsx'),

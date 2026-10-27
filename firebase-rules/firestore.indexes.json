@@ -29,6 +29,12 @@
       { "fieldPath": "participantIds", "arrayConfig": "CONTAINS" },
       { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
     ] },
+    { "collectionGroup": "tutors", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "verificationStatus", "order": "ASCENDING" },
+      { "fieldPath": "locationPrivacyVersion", "order": "ASCENDING" },
+      { "fieldPath": "publicProfileVersion", "order": "ASCENDING" },
+      { "fieldPath": "online", "order": "ASCENDING" }
+    ] },
     { "collectionGroup": "notifications", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "recipientId", "order": "ASCENDING" },
       { "fieldPath": "createdAt", "order": "DESCENDING" }

@@ -29,6 +29,12 @@ service cloud.firestore {
     }
     match /tutors/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || resource.data.verificationStatus == 'approved');
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && resource.data.verificationStatus == 'approved'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['online', 'lastSeenAt'])
+        && request.resource.data.online is bool
+        && request.resource.data.lastSeenAt == request.time;
     }
     match /conversations/{id} {
       // Reading a missing deterministic ID is needed by get-or-create's transaction.

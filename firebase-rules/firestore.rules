@@ -447,6 +447,15 @@ service cloud.firestore {
         validProfileVersion(get(tutorPath(uid)).data);
     }
 
+    function validTutorPresenceUpdate(uid) {
+      return isApprovedTutor(uid) &&
+        request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['online', 'lastSeenAt']) &&
+        request.resource.data.online is bool &&
+        request.resource.data.lastSeenAt == request.time;
+    }
+
     function isTutorApplicationOwner(uid, tutorType) {
       return signedIn() &&
         request.auth.uid == uid &&
@@ -1816,6 +1825,7 @@ service cloud.firestore {
       allow create: if validPublicApplicationCreate(uid);
       allow update: if validAdminTutorReview(uid) ||
         validAdminLocationPrivacyCleanup(uid) ||
+        validTutorPresenceUpdate(uid) ||
         validPublicApplicationUpdate(uid) ||
         validTutorBookingDetailsUpdate(uid) ||
         validTutorLocationCellUpdate(uid) ||

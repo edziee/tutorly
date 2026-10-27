@@ -90,7 +90,8 @@ included.
 | `preferredDays`, `preferredTimeSlots` | array of string | From the tutor application |
 | `formats` | array of string | Selected teaching formats from the tutor application |
 | `courseNames` | newline-separated string | Public course code/title labels only. The app derives its display list from this field; do not put grades or proof details here |
-| `online` | boolean | |
+| `online` | boolean | Set while an approved tutor is authenticated and the app is foregrounded. A client heartbeat refreshes `lastSeenAt`; chat ignores stale presence after 90 seconds |
+| `lastSeenAt` | timestamp | Updated with server time alongside `online` by the profile owner; used to expire presence after an unexpected disconnect |
 | `photoUrl` | string | Optional instructor-approved external image URL; otherwise use initials |
 | `hourlyRate` | number | The tutor's session price in tokens for one session. One token is nominally ₱1; values are limited to two decimal places. |
 | `verificationStatus` | `'not_submitted'` \| `'pending'` \| `'approved'` \| `'rejected'` | `VERIFICATION_STATUS`. Students and tutors only see `approved` tutors |

@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, doc, getDoc, getDocs, collection, setDoc, updateDoc, serverTimestamp, terminate, query, where } from 'firebase/firestore';
-import { getOrCreateConversation, sendMessage, markConversationRead, subscribeToMessages } from '../src/services/chatService.js';
+import { getOrCreateConversation, sendMessage, markConversationRead, subscribeToChatTutors, subscribeToMessages } from '../src/services/chatService.js';
 import { createNotification, subscribeToNotifications, markNotificationRead, markAllNotificationsRead } from '../src/services/notificationService.js';
 
 const projectId = 'demo-tutorly';
@@ -12,7 +12,11 @@ const restRoot = `http://127.0.0.1:8080/v1/projects/${projectId}/databases/(defa
 const choose = (identity) => { globalThis.__tutorlyTestFirebase = identity; };
 async function seed(path, values) {
   const fields = Object.fromEntries(Object.entries(values).map(([key, value]) => [key,
-    typeof value === 'boolean' ? { booleanValue: value } : { stringValue: value }]));
+    typeof value === 'boolean'
+      ? { booleanValue: value }
+      : typeof value === 'number'
+        ? { integerValue: String(value) }
+        : { stringValue: value }]));
   const response = await fetch(`${restRoot}:commit`, { method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ writes: [{ update: { name: `projects/${projectId}/databases/(default)/documents/${path}`, fields } }] }) });
   assert.equal(response.ok, true, await response.text());
 }
@@ -27,7 +31,13 @@ async function identity(role) {
   const result = await createUserWithEmailAndPassword(auth, email, password);
   const uid = result.user.uid;
   await seed(`users/${uid}`, { role, name: `Test ${role}` });
-  if (role === 'tutor') await seed(`tutors/${uid}`, { name: 'Test Tutor', tier: 'Peer Tutor', verificationStatus: 'approved' });
+  if (role === 'tutor') await seed(`tutors/${uid}`, {
+    name: 'Test Tutor',
+    tier: 'Peer Tutor',
+    verificationStatus: 'approved',
+    locationPrivacyVersion: 1,
+    publicProfileVersion: 2,
+  });
   return { app, auth, db, uid, email, password };
 }
 function firstSnapshot(subscribe, predicate) {
@@ -47,6 +57,26 @@ test('chat alerts integrate with Firestore, read state, retries, and security ru
   t.after(async () => {
     for (const item of [student, tutor, outsider]) { await terminate(item.db); await deleteApp(item.app); }
   });
+  choose(tutor);
+  await updateDoc(doc(tutor.db, 'tutors', tutor.uid), {
+    online: true,
+    lastSeenAt: serverTimestamp(),
+  });
+  const activeTutors = await firstSnapshot(
+    (next, error) => subscribeToChatTutors(next, error),
+    (items) => items.some((item) => item.id === tutor.uid),
+  );
+  assert.equal(activeTutors.some((item) => item.id === tutor.uid), true);
+  await updateDoc(doc(tutor.db, 'tutors', tutor.uid), {
+    online: false,
+    lastSeenAt: serverTimestamp(),
+  });
+  const offlineTutors = await firstSnapshot(
+    (next, error) => subscribeToChatTutors(next, error),
+    (items) => !items.some((item) => item.id === tutor.uid),
+  );
+  assert.equal(offlineTutors.some((item) => item.id === tutor.uid), false);
+
   choose(student);
   const conversationId = await getOrCreateConversation(student.uid, tutor.uid);
   assert.equal(await getOrCreateConversation(student.uid, tutor.uid), conversationId);

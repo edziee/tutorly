@@ -14,7 +14,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, Text, View } from 'react-native';
 
+import { isFirebaseConfigured } from '../config/firebase';
 import { signOut, subscribeToAuthState } from '../services/authService';
+import { watchTutorPresence } from '../services/tutorPresenceService';
 import {
   getUserProfile,
   subscribeToUserProfile,
@@ -58,6 +60,11 @@ export function AuthProvider({ children }) {
   // overwrite the result of a newer one.
   const latestEvent = useRef(0);
   const profileUnsubscribe = useRef(null);
+  const tutorPresenceStop = useRef(null);
+  const signOutCurrentUser = useCallback(async () => {
+    await tutorPresenceStop.current?.();
+    await signOut();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToAuthState(async (firebaseUser) => {
@@ -79,7 +86,7 @@ export function AuthProvider({ children }) {
           // Logged in with Firebase but no users/{uid} document, so there is no
           // role to route by. Log out instead of leaving the person stuck.
           setState(signedOut);
-          signOut().catch((error) => {
+          signOutCurrentUser().catch((error) => {
             console.warn('Could not sign out an account with no profile:', error);
           });
           return;
@@ -129,7 +136,7 @@ export function AuthProvider({ children }) {
             if (!isCurrent()) return;
             if (!updatedProfile) {
               setState(signedOut);
-              signOut().catch((error) => {
+              signOutCurrentUser().catch((error) => {
                 console.warn('Could not sign out an account with no profile:', error);
               });
               return;
@@ -157,13 +164,33 @@ export function AuthProvider({ children }) {
       profileUnsubscribe.current?.();
       unsubscribe();
     };
-  }, []);
+  }, [signOutCurrentUser]);
+
+  useEffect(() => {
+    const uid = state.user?.uid;
+    if (!isFirebaseConfigured || !uid) return undefined;
+
+    let stop;
+    try {
+      stop = watchTutorPresence(uid, (error) => {
+        console.warn('Could not update tutor presence:', error);
+      });
+      tutorPresenceStop.current = stop;
+    } catch (error) {
+      console.warn('Could not start tutor presence:', error);
+    }
+
+    return () => {
+      if (tutorPresenceStop.current === stop) tutorPresenceStop.current = null;
+      stop?.();
+    };
+  }, [state.user?.uid]);
 
   const handleSignOut = useCallback(async () => {
     const signOutEventId = ++latestEvent.current;
-    await signOut();
+    await signOutCurrentUser();
     if (latestEvent.current === signOutEventId) setState(signedOut);
-  }, []);
+  }, [signOutCurrentUser]);
 
   const handleUpdateProfile = useCallback(async (changes) => {
     const uid = state.user?.uid;

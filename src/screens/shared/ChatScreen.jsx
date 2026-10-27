@@ -178,9 +178,7 @@ export default function ChatScreen({ navigation }) {
       >
         <View style={styles.inboxSwitcher}>
           <View style={[styles.switchButton, styles.switchSelected]}>
-            <Text style={styles.switchSelectedText}>
-              Inbox{'\n'}({messages.length})
-            </Text>
+            <Text style={styles.switchSelectedText}>Inbox</Text>
           </View>
           <View style={styles.switchButton}>
             <Text style={styles.switchText}>{user?.name?.split(' ')[0] || 'You'}</Text>
@@ -196,11 +194,6 @@ export default function ChatScreen({ navigation }) {
             placeholderTextColor={colors.mutedText}
             returnKeyType="search"
             style={styles.searchInput}
-          />
-          <Ionicons
-            name="options-outline"
-            size={19}
-            color={colors.text}
           />
         </View>
         <ScrollView
@@ -272,7 +265,7 @@ export default function ChatScreen({ navigation }) {
                       <Pressable
                         key={tutor.id}
                         accessibilityRole="button"
-                        accessibilityLabel={`Message ${tutor.name}`}
+                        accessibilityLabel={`Message ${tutor.name}, active now`}
                         onPress={() => openConversation(tutor)}
                         style={styles.onlineTutor}
                       >

@@ -5,6 +5,11 @@ import {
 } from 'firebase/firestore';
 import { requireFirebase } from '../config/firebase';
 import { createNotification, markConversationNotificationsRead } from './notificationService';
+import {
+  getTutorPresenceLastSeenAt,
+  isTutorPresenceActive,
+  TUTOR_PRESENCE_TIMEOUT_MS,
+} from '../utils/tutorPresence';
 
 function signedIn() {
   const firebase = requireFirebase();
@@ -125,6 +130,41 @@ export function createMessageId(conversationId) {
 
 export function subscribeToChatTutors(callback, onError = console.error) {
   const { db } = signedIn();
-  return onSnapshot(query(collection(db, 'tutors'), where('verificationStatus', '==', 'approved')),
-    (snapshot) => callback(snapshot.docs.map((item) => ({ ...item.data(), id: item.id }))), onError);
+  let tutors = [];
+  let expiryTimer;
+
+  function publishActiveTutors() {
+    if (expiryTimer) clearTimeout(expiryTimer);
+    const now = Date.now();
+    callback(tutors.filter((tutor) => isTutorPresenceActive(tutor, now)));
+
+    const nextExpiry = tutors
+      .filter((tutor) => tutor.online === true)
+      .map((tutor) => getTutorPresenceLastSeenAt(tutor))
+      .filter((lastSeenAt) => lastSeenAt !== null)
+      .map((lastSeenAt) => lastSeenAt + TUTOR_PRESENCE_TIMEOUT_MS)
+      .filter((expiresAt) => expiresAt > now)
+      .sort((left, right) => left - right)[0];
+
+    if (nextExpiry) {
+      expiryTimer = setTimeout(publishActiveTutors, nextExpiry - now + 1);
+    }
+  }
+
+  const stop = onSnapshot(
+    query(collection(db, 'tutors'),
+      where('verificationStatus', '==', 'approved'),
+      where('locationPrivacyVersion', '==', 1),
+      where('publicProfileVersion', '==', 2),
+      where('online', '==', true)),
+    (snapshot) => {
+      tutors = snapshot.docs.map((item) => ({ ...item.data(), id: item.id }));
+      publishActiveTutors();
+    },
+    onError,
+  );
+  return () => {
+    if (expiryTimer) clearTimeout(expiryTimer);
+    stop();
+  };
 }
