@@ -44,6 +44,21 @@ import { getAuthErrorMessage, getErrorMessage } from '../../utils/errors';
 import { formatDateKey } from '../../utils/format';
 import { getFirstName, getUserId } from '../../utils/user';
 import { isHttpsUrl } from '../../utils/validation';
+import {
+  disableStudentStreakReminder,
+  enableStudentStreakReminder,
+  getStudentStreakActivityDates,
+  getStudentStreakReminderEnabled,
+} from '../../services/streakService';
+import {
+  getLocalDateKey,
+  getStudentCalendarDays,
+  STREAK_MILESTONES,
+} from '../../utils/studentStreak';
+import {
+  saveStudentLeaderboardStats,
+  subscribeToStudentLeaderboard,
+} from '../../services/studentLeaderboardService';
 
 const COMMON_CITY_SUGGESTIONS = [
   'Quezon City',
@@ -66,15 +81,31 @@ const COMMON_CITY_SUGGESTIONS = [
   'Cagayan de Oro',
 ];
 
-const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function StudentProfileScreen({ navigation }) {
-  const { user, signOut, updateProfile, loading, setWorkspaceMode, workspaceModeError } = useAuth();
+  const {
+    user,
+    signOut,
+    updateProfile,
+    loading,
+    setWorkspaceMode,
+    workspaceModeError,
+    streakDays: authStreakDays,
+  } = useAuth();
   const userId = getUserId(user);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
-  const [streakRemindersEnabled, setStreakRemindersEnabled] = useState(true);
+  const [streakRemindersEnabled, setStreakRemindersEnabled] = useState(false);
+  const [streakReminderUpdating, setStreakReminderUpdating] = useState(false);
+  const [activityDates, setActivityDates] = useState([]);
+  const [activityDatesError, setActivityDatesError] = useState('');
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [leaderboardSyncError, setLeaderboardSyncError] = useState('');
   const [meetingPreference, setMeetingPreference] = useState('campus');
   const [profile, setProfile] = useState({
     name: user?.name ?? '',
@@ -118,16 +149,91 @@ export default function StudentProfileScreen({ navigation }) {
     user?.photoUrl,
   ]);
   const stats = user?.stats ?? {};
-  const streakDays = Number(stats.streakDays) || 0;
-  const nextStreakMilestone = Number(stats.nextStreakMilestone) || streakDays + 1;
-  const weeklyActivity = Array.isArray(stats.weeklyActivity)
-    ? stats.weeklyActivity.slice(0, 7)
-    : [];
+  const streakDays = Number(authStreakDays) || Number(stats.streakDays) || 0;
+  const streakMilestone = STREAK_MILESTONES.reduce(
+    (current, milestone) => (streakDays >= milestone ? milestone : current),
+    0,
+  );
+  const streakFlameColor = streakMilestone >= 30
+    ? '#AB3FCE'
+    : streakMilestone >= 14
+      ? '#E84C3D'
+      : streakMilestone >= 7
+        ? '#F28C28'
+        : streakMilestone >= 3
+          ? '#E5A900'
+          : '#FF9C35';
+  const nextStreakMilestone = STREAK_MILESTONES.find((milestone) => milestone > streakDays);
+  const calendarDays = getStudentCalendarDays(calendarMonth);
+  const trackedActivityDates = new Set(activityDates);
+  const todayDateKey = getLocalDateKey();
+  const currentMonthDate = new Date();
+  const canAdvanceCalendar = calendarMonth.getFullYear() < currentMonthDate.getFullYear() ||
+    (calendarMonth.getFullYear() === currentMonthDate.getFullYear() &&
+      calendarMonth.getMonth() < currentMonthDate.getMonth());
   const scholarLevel = Number(stats.scholarLevel) || 1;
   const scholarProgress = Math.min(100, Math.max(0, Number(stats.scholarProgress) || 0));
-  const leaderboard = Array.isArray(stats.leaderboard) ? stats.leaderboard : [];
   const subjectHonors = Array.isArray(stats.subjectHonors) ? stats.subjectHonors : [];
   const firstName = getFirstName(user);
+  useEffect(() => {
+    let active = true;
+    if (!userId) {
+      setStreakRemindersEnabled(false);
+      return undefined;
+    }
+    getStudentStreakReminderEnabled(userId).then((enabled) => {
+      if (active) setStreakRemindersEnabled(enabled);
+    }).catch((error) => {
+      console.warn('Could not load the streak reminder preference:', error);
+      if (active) {
+        Alert.alert('Reminder setting unavailable', getErrorMessage(error, 'Please try again.'));
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    let active = true;
+    setActivityDates([]);
+    setActivityDatesError('');
+    if (!userId) return undefined;
+    getStudentStreakActivityDates(userId).then((dates) => {
+      if (active) setActivityDates(dates);
+    }).catch((error) => {
+      console.warn('Could not load student streak activity:', error);
+      if (active) setActivityDatesError('Calendar activity could not be loaded.');
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  const toggleStreakReminder = async (enabled) => {
+    if (!userId || streakReminderUpdating) return;
+    setStreakReminderUpdating(true);
+    try {
+      if (enabled) {
+        const permissionGranted = await enableStudentStreakReminder(userId);
+        if (!permissionGranted) {
+          Alert.alert(
+            'Notifications not enabled',
+            'Allow notifications in your device settings to receive streak reminders.',
+          );
+          return;
+        }
+        setStreakRemindersEnabled(true);
+      } else {
+        await disableStudentStreakReminder(userId);
+        setStreakRemindersEnabled(false);
+      }
+    } catch (error) {
+      Alert.alert('Could not update streak reminders', getErrorMessage(error, 'Please try again.'));
+    } finally {
+      setStreakReminderUpdating(false);
+    }
+  };
   const bookings = useSubscription(
     (onData, onError) => (userId
       ? subscribeToStudentBookings(userId, onData, onError)
@@ -146,6 +252,12 @@ export default function StudentProfileScreen({ navigation }) {
       : undefined),
     [userId],
   );
+  const leaderboard = useSubscription(
+    (onData, onError) => (userId
+      ? subscribeToStudentLeaderboard(onData, onError)
+      : undefined),
+    [userId],
+  );
   const [savingBadgeId, setSavingBadgeId] = useState('');
   const [badgeVisibilityError, setBadgeVisibilityError] = useState('');
   const [badgeModalVisible, setBadgeModalVisible] = useState(false);
@@ -159,6 +271,36 @@ export default function StudentProfileScreen({ navigation }) {
   );
   const visibleBadgeGroups = groupedBadgeAwards.filter((group) => group.visibleCount > 0);
   const badgePreviewGroups = visibleBadgeGroups.slice(0, 3);
+
+  useEffect(() => {
+    if (
+      !userId ||
+      typeof user?.name !== 'string' ||
+      !user.name.trim() ||
+      badgeAwards.status !== 'ready' ||
+      !Array.isArray(badgeAwards.data)
+    ) return undefined;
+    let active = true;
+    setLeaderboardSyncError('');
+    saveStudentLeaderboardStats(userId, {
+      displayName: user.name,
+      badgeCount: badgeAwards.data.length,
+      currentStreak: Math.max(0, Number(authStreakDays) || Number(stats.streakDays) || 0),
+    }).catch((error) => {
+      console.warn('Could not update student leaderboard stats:', error);
+      if (active) setLeaderboardSyncError('Your leaderboard stats could not be updated.');
+    });
+    return () => {
+      active = false;
+    };
+  }, [
+    userId,
+    user?.name,
+    badgeAwards.status,
+    badgeAwards.data,
+    authStreakDays,
+    stats.streakDays,
+  ]);
 
   const changeBadgeVisibility = async (bookingId, visible) => {
     if (savingBadgeId) return;
@@ -478,34 +620,108 @@ export default function StudentProfileScreen({ navigation }) {
 
         <View style={styles.sectionCard}>
           <View style={styles.streakHeader}>
-            <View style={styles.streakIcon}>
-              <Ionicons name="flame" size={19} color="#FF9C35" />
+            <View style={[
+              styles.streakIcon,
+              streakMilestone >= 3 && { backgroundColor: '#FFF0D8' },
+              streakMilestone >= 14 && { backgroundColor: '#FCE8F5' },
+            ]}>
+              <Ionicons name="flame" size={21} color={streakFlameColor} />
+              {streakMilestone >= 3 ? (
+                <Ionicons
+                  name="sparkles"
+                  size={12}
+                  color={streakFlameColor}
+                  style={styles.streakSparkle}
+                />
+              ) : null}
             </View>
             <View style={styles.streakTitleGroup}>
               <View style={styles.titleAndTag}>
                 <Text style={styles.streakTitle}>{streakDays}-Day Streak</Text>
                 {streakDays > 0 ? <Text style={styles.activeTag}>Active</Text> : null}
               </View>
-              <Text style={styles.mutedText}>Next milestone: {nextStreakMilestone} days</Text>
+              <Text style={styles.mutedText}>
+                {nextStreakMilestone
+                  ? `Next milestone: ${nextStreakMilestone} days`
+                  : 'All streak milestones reached!'}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.weekRow}>
-            {weekdays.map((day, index) => {
-              const isActive = weeklyActivity[index] ?? false;
-              return (
-              <View key={`${weekdays[index]}-${index}`} style={styles.weekItem}>
-                <Text style={[styles.weekday, index === 5 && styles.todayLabel]}>{day}</Text>
-                <View style={[styles.dayCircle, isActive ? styles.activeDay : styles.inactiveDay]}>
-                  <Ionicons
-                    name={isActive ? 'checkmark' : index === 5 ? 'flash' : 'ellipse'}
-                    size={isActive ? 16 : 12}
-                    color={isActive ? colors.white : index === 5 ? '#006F69' : '#D9DCE3'}
-                  />
+          <View style={styles.calendar}>
+            <View style={styles.calendarHeader}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Previous month"
+                onPress={() => setCalendarMonth((month) =>
+                  new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+                style={styles.calendarNavigation}
+              >
+                <Ionicons name="chevron-back" size={18} color={colors.primary} />
+              </Pressable>
+              <Text accessibilityRole="header" style={styles.calendarMonth}>
+                {new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' })
+                  .format(calendarMonth)}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Next month"
+                disabled={!canAdvanceCalendar}
+                onPress={() => setCalendarMonth((month) =>
+                  new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+                style={[
+                  styles.calendarNavigation,
+                  !canAdvanceCalendar && styles.calendarNavigationDisabled,
+                ]}
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={canAdvanceCalendar ? colors.primary : colors.mutedText}
+                />
+              </Pressable>
+            </View>
+            <View style={styles.calendarGrid}>
+              {weekdays.map((day) => (
+                <View key={day} style={styles.calendarWeekdayCell}>
+                  <Text style={styles.weekday}>{day}</Text>
                 </View>
-              </View>
-              );
-            })}
+              ))}
+              {calendarDays.map(({ dateKey, day, isCurrentMonth }) => {
+                const isActive = trackedActivityDates.has(dateKey);
+                const isToday = dateKey === todayDateKey;
+                return (
+                  <View
+                    key={dateKey}
+                    accessibilityLabel={`${dateKey}${isActive ? ', streak activity recorded' : ''}${isToday ? ', today' : ''}`}
+                    accessibilityRole="text"
+                    style={styles.calendarDayCell}
+                  >
+                    <View style={[
+                      styles.calendarDay,
+                      isActive && styles.calendarDayActive,
+                      isToday && styles.calendarDayToday,
+                      !isCurrentMonth && styles.calendarDayOutsideMonth,
+                    ]}>
+                      <Text style={[
+                        styles.calendarDayText,
+                        isActive && styles.calendarDayActiveText,
+                        !isCurrentMonth && styles.calendarDayOutsideText,
+                      ]}>
+                        {day}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+            {activityDatesError ? (
+              <Text accessibilityRole="alert" style={styles.calendarError}>
+                {activityDatesError}
+              </Text>
+            ) : (
+              <Text style={styles.calendarHint}>Marked days show dates recorded toward your streak.</Text>
+            )}
           </View>
 
           <View style={styles.progressLabels}>
@@ -520,7 +736,6 @@ export default function StudentProfileScreen({ navigation }) {
         <View style={styles.statsRow}>
           <StatTile icon="hourglass" label="Hours" value={Number(stats.studyHours) || 0} detail="Studied" />
           <StatTile icon="calendar" label="Sessions" value={Number(stats.completedSessions) || 0} detail="Completed" />
-          <StatTile icon="star" label="Rating" value={Number(stats.rating) || 0} detail="Peer rating" />
         </View>
 
         <View style={styles.sectionCard}>
@@ -540,36 +755,58 @@ export default function StudentProfileScreen({ navigation }) {
               </View>
               <Text style={styles.sectionTitle}>Study Leaderboard</Text>
             </View>
-            {stats.leaderboardWeek ? <Text style={styles.weekTag}>{stats.leaderboardWeek}</Text> : null}
           </View>
 
+          <Text style={styles.leaderboardHint}>Ranked by total badges, then current day streak.</Text>
           <View style={styles.leaderList}>
-            {leaderboard.map((leader) => (
-              <View key={leader.id} style={[styles.leaderRow, leader.currentUser && styles.currentLeaderRow]}>
-                <Text style={[styles.rank, leader.rank === 1 && styles.firstRank]}>
-                  {leader.rank === 1 ? '♜' : leader.rank}
-                </Text>
-                <View style={[styles.leaderAvatar, leader.currentUser && styles.currentAvatar]}>
-                  {leader.currentUser ? (
-                    <Ionicons name="person" size={23} color={colors.white} />
-                  ) : (
-                    <Text style={styles.avatarInitial}>{leader.name.charAt(0)}</Text>
-                  )}
-                </View>
-                <View style={styles.leaderDetails}>
-                  <Text style={[styles.leaderName, leader.currentUser && styles.currentLeaderName]}>
-                    {leader.currentUser ? `${profile.name} (You)` : leader.name}
+            {(leaderboard.data ?? []).map((leader) => {
+              const isCurrentUser = leader.studentId === userId;
+              return (
+                <View key={leader.studentId} style={[styles.leaderRow, isCurrentUser && styles.currentLeaderRow]}>
+                  <Text style={[styles.rank, leader.rank === 1 && styles.firstRank]}>
+                    {leader.rank}
                   </Text>
-                  <Text style={styles.leaderMeta}>{leader.hours} hrs • {leader.streak}-day streak</Text>
+                  <View style={[styles.leaderAvatar, isCurrentUser && styles.currentAvatar]}>
+                    {isCurrentUser ? (
+                      <Ionicons name="person" size={23} color={colors.white} />
+                    ) : (
+                      <Text style={styles.avatarInitial}>
+                        {(leader.displayName || 'S').charAt(0).toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.leaderDetails}>
+                    <Text style={[styles.leaderName, isCurrentUser && styles.currentLeaderName]}>
+                      {isCurrentUser ? `${leader.displayName} (You)` : leader.displayName}
+                    </Text>
+                    <Text style={styles.leaderMeta}>
+                      {leader.badgeCount} {leader.badgeCount === 1 ? 'badge' : 'badges'}
+                      {' · '}{leader.currentStreak}-day streak
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.pointsGroup}>
-                  <Text style={[styles.points, leader.currentUser && styles.currentLeaderName]}>{leader.points.toLocaleString()} pts</Text>
-                  <Text style={styles.leaderMeta}>Rank #{leader.rank}</Text>
-                </View>
+              );
+            })}
+            {leaderboard.status === 'loading' ? (
+              <Text style={styles.emptyProfileData}>Loading study rankings…</Text>
+            ) : null}
+            {leaderboard.status === 'error' ? (
+              <View>
+                <Text accessibilityRole="alert" style={styles.leaderboardError}>
+                  Study rankings could not be loaded.
+                </Text>
+                <Pressable accessibilityRole="button" onPress={leaderboard.retry}>
+                  <Text style={styles.leaderboardRetry}>Try again</Text>
+                </Pressable>
               </View>
-            ))}
-            {leaderboard.length === 0 ? (
+            ) : null}
+            {leaderboard.status === 'ready' && (leaderboard.data ?? []).length === 0 ? (
               <Text style={styles.emptyProfileData}>Your study rank isn’t available yet.</Text>
+            ) : null}
+            {leaderboardSyncError ? (
+              <Text accessibilityRole="alert" style={styles.leaderboardError}>
+                {leaderboardSyncError}
+              </Text>
             ) : null}
           </View>
 
@@ -618,11 +855,12 @@ export default function StudentProfileScreen({ navigation }) {
           <View style={styles.reminderRow}>
             <View style={styles.reminderCopy}>
               <Text style={styles.reminderTitle}>Study streak reminder</Text>
-              <Text style={styles.reminderDescription}>Reminder at 8:00 PM if your streak is at risk</Text>
+              <Text style={styles.reminderDescription}>Optional daily reminder at 8:00 PM to keep your streak going</Text>
             </View>
             <Switch
               value={streakRemindersEnabled}
-              onValueChange={setStreakRemindersEnabled}
+              onValueChange={toggleStreakReminder}
+              disabled={streakReminderUpdating}
               trackColor={{ false: '#C9CDD5', true: colors.primary }}
               thumbColor={colors.white}
             />
@@ -1076,6 +1314,7 @@ const styles = StyleSheet.create({
   emptyProfileData: { marginTop: spacing.sm, color: colors.mutedText, fontSize: 12, lineHeight: 17 },
   streakHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   streakIcon: {
+    position: 'relative',
     width: 34,
     height: 38,
     borderRadius: radius.md,
@@ -1083,6 +1322,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#633100',
   },
+  streakSparkle: { position: 'absolute', top: -3, right: -4 },
   streakTitleGroup: { flex: 1 },
   titleAndTag: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   streakTitle: { ...typography.heading, fontSize: 18, color: colors.text },
@@ -1096,21 +1336,58 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mutedText: { ...typography.caption, marginTop: 2 },
-  weekRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: colors.inputBackground,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
+  calendar: {
     marginTop: spacing.lg,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.inputBackground,
   },
-  weekItem: { alignItems: 'center', gap: spacing.xs },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  calendarNavigation: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+  },
+  calendarNavigationDisabled: { opacity: 0.45 },
+  calendarMonth: { ...typography.heading, color: colors.text, fontSize: 14 },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calendarWeekdayCell: {
+    width: '14.2857%',
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   weekday: { fontSize: 10, color: colors.mutedText, fontWeight: '600' },
-  todayLabel: { color: colors.primary },
-  dayCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  activeDay: { backgroundColor: '#37318F' },
-  inactiveDay: { backgroundColor: '#E8EAF0' },
+  calendarDayCell: {
+    width: '14.2857%',
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDay: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    borderRadius: radius.pill,
+  },
+  calendarDayActive: { backgroundColor: colors.primary },
+  calendarDayToday: { borderColor: colors.primary },
+  calendarDayOutsideMonth: { opacity: 0.42 },
+  calendarDayText: { color: colors.text, fontSize: 12, fontWeight: '500' },
+  calendarDayActiveText: { color: colors.white, fontWeight: '700' },
+  calendarDayOutsideText: { color: colors.mutedText },
+  calendarHint: { ...typography.caption, marginTop: spacing.xs, fontSize: 10 },
+  calendarError: { color: colors.errorText, marginTop: spacing.xs, fontSize: 11 },
   progressLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg },
   progressTitle: { ...typography.caption, fontSize: 11 },
   progressPercent: { color: colors.primary, fontSize: 11, fontWeight: '700' },
@@ -1144,7 +1421,6 @@ const styles = StyleSheet.create({
   nextSessionTutor: { flex: 1, color: colors.heading, fontSize: 16, fontWeight: '700' },
   nextSessionSubject: { color: colors.text, fontSize: 14 },
   nextSessionDetail: { color: colors.mutedText, fontSize: 13 },
-  weekTag: { color: colors.success, backgroundColor: colors.mint, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, fontSize: 10, fontWeight: '700' },
   courseScroller: { marginTop: spacing.md, marginBottom: spacing.md, flexGrow: 0 },
   courseChip: { paddingHorizontal: spacing.md, paddingVertical: 7, marginRight: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.inputBackground },
   selectedCourse: { backgroundColor: '#37318F' },
@@ -1162,8 +1438,9 @@ const styles = StyleSheet.create({
   leaderName: { color: colors.text, fontSize: 13, fontWeight: '600' },
   currentLeaderName: { color: colors.primary, fontWeight: '700' },
   leaderMeta: { ...typography.caption, fontSize: 10, marginTop: 2 },
-  pointsGroup: { alignItems: 'flex-end', maxWidth: 74 },
-  points: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  leaderboardHint: { ...typography.caption, marginTop: spacing.sm, marginBottom: spacing.sm, fontSize: 11 },
+  leaderboardError: { marginTop: spacing.sm, color: colors.errorText, fontSize: 12 },
+  leaderboardRetry: { marginTop: spacing.xs, color: colors.primary, fontSize: 12, fontWeight: '700' },
   subsectionLabel: { ...typography.caption, marginTop: spacing.lg, marginBottom: spacing.sm, fontSize: 10 },
   honorsRow: { flexDirection: 'row', gap: spacing.sm },
   honorTile: { flex: 1, minWidth: 0, height: 64, borderRadius: radius.md, backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, gap: 2 },

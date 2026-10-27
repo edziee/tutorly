@@ -11,6 +11,8 @@
 // All authenticated state comes from Firebase Authentication and user profiles.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import { Modal, Pressable, Text, View } from 'react-native';
 
 import { signOut, subscribeToAuthState } from '../services/authService';
 import {
@@ -25,6 +27,10 @@ import {
   withWorkspaceMode,
   WORKSPACE_MODES,
 } from '../utils/workspace';
+import {
+  notifyStudentStreakMilestone,
+  recordStudentDailyLogin,
+} from '../services/streakService';
 
 const workspaceModeKey = (uid) => `tutorly.workspaceMode.${uid}`;
 
@@ -35,6 +41,8 @@ const signedOut = {
   workspaceMode: WORKSPACE_MODES.STUDENT,
   studentProfileOnModeSwitch: false,
   workspaceModeError: null,
+  dailyLogin: null,
+  streakDays: 0,
 };
 
 const AuthContext = createContext({
@@ -76,6 +84,24 @@ export function AuthProvider({ children }) {
           });
           return;
         }
+        let dailyLogin = null;
+        let streakDays = Number(profile.stats?.streakDays) || 0;
+        if (profile.role === ROLES.STUDENT) {
+          try {
+            const streak = await recordStudentDailyLogin(firebaseUser.uid, profile);
+            streakDays = streak.streakDays;
+            if (streak.firstLoginToday) {
+              dailyLogin = { streakDays: streak.streakDays, milestone: streak.milestone };
+              if (streak.milestone) {
+                notifyStudentStreakMilestone(firebaseUser.uid, streak.milestone).catch((error) => {
+                  console.warn('Could not send the streak milestone notification:', error);
+                });
+              }
+            }
+          } catch (error) {
+            console.warn('Could not update the student streak:', error);
+          }
+        }
         let savedMode = null;
         let workspaceModeError = null;
         if (profile.role === ROLES.STUDENT) {
@@ -94,6 +120,8 @@ export function AuthProvider({ children }) {
           workspaceMode: getInitialWorkspaceMode(profile.role, savedMode),
           studentProfileOnModeSwitch: false,
           workspaceModeError,
+          dailyLogin,
+          streakDays,
         });
         profileUnsubscribe.current = subscribeToUserProfile(
           firebaseUser.uid,
@@ -192,9 +220,67 @@ export function AuthProvider({ children }) {
         signOut: handleSignOut,
         updateProfile: handleUpdateProfile,
         setWorkspaceMode: handleSetWorkspaceMode,
+        dismissDailyLogin: () => setState((current) => ({ ...current, dailyLogin: null })),
       }}
     >
       {children}
+      <Modal
+        visible={Boolean(state.dailyLogin)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setState((current) => ({ ...current, dailyLogin: null }))}
+      >
+        <View style={{
+          flex: 1,
+          justifyContent: 'center',
+          padding: 28,
+          backgroundColor: 'rgba(20, 27, 38, 0.58)',
+        }}>
+          <View style={{
+            alignItems: 'center',
+            borderRadius: 24,
+            padding: 28,
+            backgroundColor: '#FFFFFF',
+          }}>
+            <View style={{
+              width: 76,
+              height: 76,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 38,
+              backgroundColor: '#FFF1DF',
+              marginBottom: 18,
+            }}>
+              <Ionicons name="flame" size={40} color="#F28C28" />
+            </View>
+            <Text style={{ color: '#202938', fontSize: 24, fontWeight: '700', textAlign: 'center' }}>
+              Daily login
+            </Text>
+            <Text style={{ color: '#596273', fontSize: 16, lineHeight: 23, textAlign: 'center', marginTop: 10 }}>
+              You’re on a {state.dailyLogin?.streakDays}-day study streak. Keep showing up every day!
+            </Text>
+            {state.dailyLogin?.milestone ? (
+              <Text style={{ color: '#A65B00', fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 12 }}>
+                {state.dailyLogin.milestone}-day milestone unlocked!
+              </Text>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setState((current) => ({ ...current, dailyLogin: null }))}
+              style={{
+                alignSelf: 'stretch',
+                alignItems: 'center',
+                borderRadius: 12,
+                backgroundColor: '#006F69',
+                paddingVertical: 14,
+                marginTop: 24,
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>Continue</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </AuthContext.Provider>
   );
 }

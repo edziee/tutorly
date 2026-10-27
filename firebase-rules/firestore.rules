@@ -1767,6 +1767,36 @@ service cloud.firestore {
       }
     }
 
+    match /studentLeaderboard/{studentId} {
+      allow get, list: if signedIn() && isStudent();
+      allow create, update: if signedIn() &&
+        isStudent() &&
+        request.auth.uid == studentId &&
+        request.resource.data.keys().hasOnly([
+          'displayName',
+          'badgeCount',
+          'currentStreak',
+          'updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'displayName',
+          'badgeCount',
+          'currentStreak',
+          'updatedAt'
+        ]) &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() > 0 &&
+        request.resource.data.displayName.size() <= 120 &&
+        request.resource.data.displayName ==
+          get(userPath(studentId)).data.get('name', '') &&
+        request.resource.data.badgeCount is int &&
+        request.resource.data.badgeCount >= 0 &&
+        request.resource.data.currentStreak is int &&
+        request.resource.data.currentStreak >= 0 &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
     match /tutors/{uid} {
       allow get: if isAdmin() ||
         (signedIn() && request.auth.uid == uid) ||

@@ -18,6 +18,7 @@ Collection names and fixed values also exist in code: `src/constants/collections
 | `bookings/{id}` | A session between a student and a tutor, including its token hold state and optional badge award subcollection | Student creates, tutor answers |
 | `bookings/{id}/badgeAwards/award` | One immutable tutor-awarded student badge for that booking | Assigned tutor, after confirmed completion |
 | `tutorAchievements/{tutorId}_{badgeId}` | One immutable earned tutor milestone | Atomic qualifying booking-completion transaction |
+| `studentLeaderboard/{uid}` | Public student display name, total badge count, and current streak | The student profile; readable by signed-in students |
 | `conversations/{id}` | A chat between one student and one tutor | Either person in the chat |
 | `conversations/{id}/messages/{id}` | One message | Either person in the chat |
 | `notifications/{id}` | One in-app alert for one user | The app, on events |
@@ -54,7 +55,18 @@ Private per-item display preferences live in owner-only subcollections:
 the immutable source award or earned achievement. Hiding does not modify the
 source record.
 
-Student progress shown on the profile screen (`streakDays`, `weeklyActivity`, `scholarLevel`, `scholarProgress`, `studyHours`, `completedSessions`, `rating`, `subjectHonors`) can live in a `stats` map on this document. The app shows neutral empty/zero values when the corresponding data has not been saved; it must not present sample leaderboard entries or statistics as real account data. Most progress can be calculated from completed bookings instead of stored; Member 1 and Member 2 decide.
+Student progress shown on the profile screen (`streakDays`, `scholarLevel`, `scholarProgress`, `studyHours`, `completedSessions`, `subjectHonors`) can live in a `stats` map on this document. Streak activity dates are stored locally with the student's streak state. The leaderboard uses the separate public `studentLeaderboard/{uid}` record below; private profile fields are not used to rank other students. The app shows neutral empty/zero values when the corresponding data has not been saved; it must not present sample statistics as real account data. Most progress can be calculated from completed bookings instead of stored; Member 1 and Member 2 decide.
+
+## `studentLeaderboard/{uid}`
+
+This minimal public ranking record contains only `displayName` (the value from
+the owner's user profile), `badgeCount` (all awarded student badges),
+`currentStreak` (the student's current daily-login streak), and `updatedAt`.
+Only the owning student can create or update the record, and only signed-in
+students can read leaderboard records. The profile ranks students by badge
+count descending, then current streak descending, with name and uid as
+deterministic tie-breakers. Private profile fields and booking details are not
+included.
 
 ## `tutors/{uid}`
 
