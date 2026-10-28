@@ -38,6 +38,7 @@ async function identity(role) {
     locationPrivacyVersion: 1,
     publicProfileVersion: 2,
   });
+  if (role === 'tutor') await seed(`tutorApplications/${uid}`, { verificationStatus: 'approved' });
   return { app, auth, db, uid, email, password };
 }
 function firstSnapshot(subscribe, predicate) {

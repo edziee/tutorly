@@ -1,0 +1,1648 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function signedIn() {
+      return request.auth != null &&
+        (!exists(userPath(request.auth.uid)) ||
+          get(userPath(request.auth.uid)).data.get('accountStatus', 'active') == 'active');
+    }
+
+    function isAdmin() {
+      return request.auth != null &&
+        exists(userPath(request.auth.uid)) &&
+        get(userPath(request.auth.uid)).data.get('accountStatus', 'active') == 'active' &&
+        get(userPath(request.auth.uid)).data.get('role', '') == 'admin';
+    }
+
+    function accountRole(uid) {
+      return exists(userPath(uid))
+        ? get(userPath(uid)).data.get('role', '')
+        : '';
+    }
+
+    function isStudent() {
+      return signedIn() && accountRole(request.auth.uid) == 'student';
+    }
+
+    function approvedTutor(uid) {
+      return signedIn() &&
+        accountRole(uid) in ['student', 'tutor', 'professional'] &&
+        exists(/databases/$(database)/documents/tutors/$(uid)) &&
+        exists(/databases/$(database)/documents/tutorApplications/$(uid)) &&
+        get(/databases/$(database)/documents/tutors/$(uid)).data
+          .verificationStatus == 'approved' &&
+        get(/databases/$(database)/documents/tutorApplications/$(uid)).data
+          .verificationStatus == 'approved';
+    }
+
+    function bookingParticipant(booking) {
+      return signedIn() &&
+        request.auth.uid in [booking.studentId, booking.tutorId];
+    }
+
+    function bookingLedgerParticipant(entry) {
+      let bookingId = entry.get('bookingId', '');
+      let bookingPath = /databases/$(database)/documents/bookings/$(bookingId);
+      return bookingId is string &&
+        exists(bookingPath) &&
+        request.auth.uid in [
+          get(bookingPath).data.studentId,
+          get(bookingPath).data.tutorId
+        ];
+    }
+
+    function conversationPath(conversationId) {
+      return /databases/$(database)/documents/conversations/$(conversationId);
+    }
+
+    function messagePath(conversationId, messageId) {
+      return /databases/$(database)/documents/conversations/$(conversationId)/messages/$(messageId);
+    }
+
+    function isConversationParticipant(conversationId) {
+      let path = conversationPath(conversationId);
+      return signedIn() &&
+        exists(path) &&
+        request.auth.uid in get(path).data.participantIds;
+    }
+
+    function sentMessageNotification(data) {
+      let conversationId = data.data.get('conversationId', 'invalid');
+      let messageId = data.data.get('messageId', 'invalid');
+      let chatPath = conversationPath(conversationId);
+      let sentMessagePath = messagePath(conversationId, messageId);
+      return signedIn() &&
+        data.type == 'new_message' &&
+        data.data.keys().hasOnly(['conversationId', 'messageId']) &&
+        data.data.keys().hasAll(['conversationId', 'messageId']) &&
+        exists(chatPath) &&
+        exists(sentMessagePath) &&
+        request.auth.uid in get(chatPath).data.participantIds &&
+        data.recipientId in get(chatPath).data.participantIds &&
+        data.recipientId != request.auth.uid &&
+        get(sentMessagePath).data.senderId == request.auth.uid;
+    }
+
+    function validMessageNotification(data) {
+      let conversationId = data.data.get('conversationId', 'invalid');
+      let messageId = data.data.get('messageId', 'invalid');
+      let chatPath = conversationPath(conversationId);
+      let sentMessagePath = messagePath(conversationId, messageId);
+      let chat = get(chatPath).data;
+      let sentMessage = get(sentMessagePath).data;
+      let senderName = request.auth.uid == chat.studentId
+        ? chat.get('studentName', '')
+        : chat.get('tutorName', '');
+      let expectedSenderName = senderName is string && senderName.size() > 0
+        ? senderName
+        : (request.auth.uid == chat.studentId ? 'Student' : 'Tutor');
+      return signedIn() &&
+        data.keys().hasOnly([
+          'recipientId', 'type', 'title', 'message', 'data', 'read', 'createdAt'
+        ]) &&
+        data.keys().hasAll([
+          'recipientId', 'type', 'title', 'message', 'data', 'read', 'createdAt'
+        ]) &&
+        data.type == 'new_message' &&
+        data.data.keys().hasOnly(['conversationId', 'messageId']) &&
+        data.data.keys().hasAll(['conversationId', 'messageId']) &&
+        exists(chatPath) &&
+        exists(sentMessagePath) &&
+        request.auth.uid in chat.participantIds &&
+        request.auth.uid == sentMessage.senderId &&
+        data.recipientId in chat.participantIds &&
+        data.recipientId != request.auth.uid &&
+        data.title == 'New message from ' + expectedSenderName &&
+        data.message == sentMessage.text &&
+        data.read == false &&
+        data.createdAt == request.time;
+    }
+
+    function bookingCancellationNotificationFromCaller(data) {
+      let bookingId = data.data.get('bookingId', 'invalid');
+      let bookingPath = /databases/$(database)/documents/bookings/$(bookingId);
+      let booking = get(bookingPath).data;
+      return signedIn() &&
+        data.type == 'booking_cancelled' &&
+        data.keys().hasOnly([
+          'recipientId', 'type', 'title', 'message', 'data', 'read', 'createdAt'
+        ]) &&
+        data.data.keys().hasOnly(['bookingId', 'cancelledBy']) &&
+        data.data.cancelledBy == request.auth.uid &&
+        exists(bookingPath) &&
+        booking.status == 'cancelled' &&
+        booking.cancelledBy == request.auth.uid &&
+        request.auth.uid in [booking.studentId, booking.tutorId] &&
+        data.recipientId in [booking.studentId, booking.tutorId] &&
+        data.recipientId != request.auth.uid &&
+        data.title == 'Session cancelled' &&
+        data.message is string &&
+        data.message.size() > 0 &&
+        data.message.size() <= 1000;
+    }
+
+    function validStudentBadgeAwardCreate(bookingId, awardId) {
+      let bookingPath = /databases/$(database)/documents/bookings/$(bookingId);
+      let booking = get(bookingPath).data;
+      let data = request.resource.data;
+      return signedIn() &&
+        awardId == 'award' &&
+        approvedTutor(request.auth.uid) &&
+        booking.tutorId == request.auth.uid &&
+        booking.status == 'completed' &&
+        data.keys().hasOnly([
+          'badgeId', 'bookingId', 'tutorId', 'studentId', 'note', 'createdAt'
+        ]) &&
+        data.keys().hasAll([
+          'badgeId', 'bookingId', 'tutorId', 'studentId', 'createdAt'
+        ]) &&
+        data.badgeId in [
+          'curious_mind', 'prepared_learner', 'persistent_effort', 'big_step',
+          'clear_communicator', 'great_collaborator', 'creative_thinker',
+          'practice_pro', 'goal_getter', 'brave_beginner',
+          'thoughtful_reflector', 'kind_and_respectful'
+        ] &&
+        data.bookingId == bookingId &&
+        data.tutorId == request.auth.uid &&
+        data.studentId == booking.studentId &&
+        data.createdAt == request.time &&
+        (!('note' in data) ||
+          (data.note is string && data.note.size() <= 280));
+    }
+
+    function validStudentBadgeVisibility(uid, bookingId) {
+      let awardPath = /databases/$(database)/documents/bookings/$(bookingId)/badgeAwards/award;
+      let data = request.resource.data;
+      return signedIn() &&
+        request.auth.uid == uid &&
+        exists(awardPath) &&
+        get(awardPath).data.studentId == uid &&
+        data.keys().hasOnly(['visible', 'updatedAt']) &&
+        data.keys().hasAll(['visible', 'updatedAt']) &&
+        data.visible is bool &&
+        data.updatedAt == request.time;
+    }
+
+    function validTutorAchievementVisibility(uid, badgeId) {
+      let achievementPath =
+        /databases/$(database)/documents/tutorAchievements/$(uid + '_' + badgeId);
+      let data = request.resource.data;
+      return signedIn() &&
+        request.auth.uid == uid &&
+        badgeId in [
+          'first_lesson', 'steady_mentor', 'experienced_guide', 'hours_of_impact'
+        ] &&
+        exists(achievementPath) &&
+        get(achievementPath).data.tutorId == uid &&
+        data.keys().hasOnly(['visible', 'updatedAt']) &&
+        data.keys().hasAll(['visible', 'updatedAt']) &&
+        data.visible is bool &&
+        data.updatedAt == request.time;
+    }
+
+    function validBookingTokenSplit(booking) {
+      return booking.tokenAmountUnits is int &&
+        booking.tokenAmountUnits >= 5 &&
+        booking.tokenDepositUnits is int &&
+        booking.tokenDepositUnits > 0 &&
+        booking.tokenDepositUnits < booking.tokenAmountUnits &&
+        booking.tokenDepositUnits * 5 >= booking.tokenAmountUnits - 2 &&
+        booking.tokenDepositUnits * 5 <= booking.tokenAmountUnits + 2;
+    }
+
+    function validBookingCreate(bookingId) {
+      let data = request.resource.data;
+      let tutor = get(/databases/$(database)/documents/tutors/$(data.tutorId)).data;
+      let student = get(userPath(request.auth.uid)).data;
+      let wallet = get(/databases/$(database)/documents/wallets/$(request.auth.uid)).data;
+      return isStudent() &&
+        data.studentId == request.auth.uid &&
+        data.tutorId != request.auth.uid &&
+        approvedTutor(data.tutorId) &&
+        tutor.publicProfileVersion == 2 &&
+        tutor.locationPrivacyVersion == 1 &&
+        tutor.verificationStatus == 'approved' &&
+        data.studentName == student.get('name', student.get('email', 'Student')) &&
+        data.tutorName == tutor.name &&
+        data.tutorTier == tutor.tier &&
+        data.subject == tutor.subject &&
+        data.sessionMode in tutor.formats &&
+        data.keys().hasOnly([
+          'studentId', 'tutorId', 'studentName', 'tutorName', 'tutorTier',
+          'subject', 'dateKey', 'startTime', 'endTime', 'durationHours',
+          'location', 'sessionMode', 'notes', 'totalAmount',
+          'tokenAmountUnits', 'tokenDepositUnits', 'tokenStatus',
+          'tutorPhotoUrl', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'studentId', 'tutorId', 'studentName', 'tutorName', 'tutorTier',
+          'subject', 'dateKey', 'startTime', 'endTime', 'durationHours',
+          'location', 'sessionMode', 'notes', 'totalAmount',
+          'tokenAmountUnits', 'tokenDepositUnits', 'tokenStatus',
+          'tutorPhotoUrl', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.status == 'requested' &&
+        data.tokenStatus == 'pending' &&
+        data.totalAmount is number &&
+        data.totalAmount == tutor.hourlyRate &&
+        data.tokenAmountUnits is int &&
+        data.tokenAmountUnits >= 5 &&
+        data.totalAmount * 100 >= data.tokenAmountUnits - 0.000001 &&
+        data.totalAmount * 100 <= data.tokenAmountUnits + 0.000001 &&
+        validBookingTokenSplit(data) &&
+        wallet.availableUnits >= data.tokenAmountUnits &&
+        data.durationHours is int &&
+        data.durationHours >= 1 &&
+        data.durationHours <= 3 &&
+        data.dateKey is string &&
+        data.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        data.startTime is string &&
+        data.startTime.matches('^(0?[1-9]|1[0-2]):[0-5][0-9] [AP]M$') &&
+        data.endTime is string &&
+        data.endTime.matches('^(0?[1-9]|1[0-2]):[0-5][0-9] [AP]M$') &&
+        data.location is string &&
+        data.location.size() <= 200 &&
+        data.notes is string &&
+        data.notes.size() <= 500 &&
+        data.tutorPhotoUrl is string &&
+        (data.tutorPhotoUrl == '' || data.tutorPhotoUrl.matches('^https://.+')) &&
+        data.createdAt == request.time &&
+        data.updatedAt == request.time;
+    }
+
+    function validLedgerBase(transactionId, entry) {
+      let walletPath = /databases/$(database)/documents/wallets/$(entry.accountId);
+      let before = get(walletPath).data;
+      let after = getAfter(walletPath).data;
+      return entry.keys().hasOnly([
+          'type', 'accountId', 'amountUnits', 'availableDelta', 'heldDelta',
+          'actorUid', 'reason', 'formReference', 'bookingId', 'createdAt'
+        ]) &&
+        entry.keys().hasAll([
+          'type', 'accountId', 'amountUnits', 'availableDelta', 'heldDelta',
+          'actorUid', 'reason', 'formReference', 'createdAt'
+        ]) &&
+        entry.accountId is string &&
+        entry.amountUnits is int &&
+        entry.amountUnits > 0 &&
+        entry.availableDelta is int &&
+        entry.heldDelta is int &&
+        entry.actorUid == request.auth.uid &&
+        entry.reason is string &&
+        entry.reason.size() <= 300 &&
+        entry.formReference is string &&
+        entry.formReference.size() <= 200 &&
+        entry.createdAt == request.time &&
+        exists(walletPath) &&
+        existsAfter(walletPath) &&
+        after.lastTransactionId == transactionId &&
+        after.availableUnits - before.availableUnits == entry.availableDelta &&
+        after.heldUnits - before.heldUnits == entry.heldDelta;
+    }
+
+    function validWalletUpdate(uid) {
+      let data = request.resource.data;
+      let changes = data.diff(resource.data).affectedKeys();
+      let entry = getAfter(
+        /databases/$(database)/documents/tokenTransactions/$(data.lastTransactionId)
+      ).data;
+      return signedIn() &&
+        data.keys().hasOnly([
+          'availableUnits', 'heldUnits', 'createdAt', 'updatedAt', 'lastTransactionId'
+        ]) &&
+        data.keys().hasAll(['availableUnits', 'heldUnits', 'createdAt', 'updatedAt']) &&
+        data.availableUnits is int &&
+        data.availableUnits >= 0 &&
+        data.heldUnits is int &&
+        data.heldUnits >= 0 &&
+        data.createdAt == resource.data.createdAt &&
+        data.updatedAt == request.time &&
+        data.lastTransactionId is string &&
+        changes.hasOnly(['availableUnits', 'heldUnits', 'updatedAt', 'lastTransactionId']) &&
+        existsAfter(/databases/$(database)/documents/tokenTransactions/$(data.lastTransactionId)) &&
+        entry.accountId == uid &&
+        entry.actorUid == request.auth.uid &&
+        data.availableUnits - resource.data.availableUnits == entry.availableDelta &&
+        data.heldUnits - resource.data.heldUnits == entry.heldDelta;
+    }
+
+    function validTokenTransactionCreate(transactionId) {
+      let entry = request.resource.data;
+      let bookingId = entry.get('bookingId', 'invalid');
+      let bookingPath = /databases/$(database)/documents/bookings/$(bookingId);
+      let bookingBefore = get(bookingPath).data;
+      let bookingAfter = getAfter(bookingPath).data;
+      let isSplit = 'tokenDepositUnits' in bookingBefore;
+      let isBookingParticipant = entry.bookingId is string &&
+        exists(bookingPath) &&
+        request.auth.uid in [bookingBefore.studentId, bookingBefore.tutorId];
+      let bookingLedgerValid =
+        bookingId is string &&
+        exists(bookingPath) &&
+        existsAfter(bookingPath) &&
+        entry.type in [
+          'booking_acceptance', 'booking_deposit_hold', 'booking_refund',
+          'booking_deposit_refund', 'booking_settlement_debit',
+          'booking_settlement_credit'
+        ] &&
+        isBookingParticipant &&
+        entry.formReference == '' &&
+        ((entry.type == 'booking_acceptance' &&
+            transactionId == entry.bookingId + '_acceptance' &&
+            bookingBefore.status == 'requested' &&
+            bookingBefore.tokenStatus == 'pending' &&
+            bookingAfter.status == 'upcoming' &&
+            bookingAfter.tokenStatus == 'reserved' &&
+            request.auth.uid == bookingBefore.tutorId &&
+            entry.accountId == bookingBefore.studentId &&
+            entry.amountUnits == bookingBefore.tokenAmountUnits &&
+            entry.availableDelta == -bookingBefore.tokenAmountUnits &&
+            entry.heldDelta == bookingBefore.tokenAmountUnits - bookingBefore.tokenDepositUnits &&
+            isSplit &&
+            getAfter(/databases/$(database)/documents/tokenTransactions/$(entry.bookingId + '_deposit_hold')).data.type
+              == 'booking_deposit_hold') ||
+          (entry.type == 'booking_deposit_hold' &&
+            transactionId == entry.bookingId + '_deposit_hold' &&
+            bookingBefore.status == 'requested' &&
+            bookingBefore.tokenStatus == 'pending' &&
+            bookingAfter.status == 'upcoming' &&
+            bookingAfter.tokenStatus == 'reserved' &&
+            request.auth.uid == bookingBefore.tutorId &&
+            entry.accountId == bookingBefore.tutorId &&
+            entry.amountUnits == bookingBefore.tokenDepositUnits &&
+            entry.availableDelta == 0 &&
+            entry.heldDelta == bookingBefore.tokenDepositUnits &&
+            isSplit &&
+            getAfter(/databases/$(database)/documents/tokenTransactions/$(entry.bookingId + '_acceptance')).data.type
+              == 'booking_acceptance') ||
+          (entry.type == 'booking_refund' &&
+            transactionId == entry.bookingId + '_refund' &&
+            bookingAfter.status in ['rejected', 'cancelled'] &&
+            bookingAfter.tokenStatus == 'refunded' &&
+            entry.accountId == bookingBefore.studentId &&
+            entry.amountUnits == bookingBefore.tokenAmountUnits &&
+            entry.availableDelta == bookingBefore.tokenAmountUnits &&
+            ((isSplit &&
+                bookingBefore.status == 'upcoming' &&
+                bookingBefore.tokenStatus == 'reserved' &&
+                bookingAfter.status == 'cancelled' &&
+                entry.heldDelta == -(bookingBefore.tokenAmountUnits - bookingBefore.tokenDepositUnits) &&
+                getAfter(/databases/$(database)/documents/tokenTransactions/$(entry.bookingId + '_deposit_refund')).data.type
+                  == 'booking_deposit_refund') ||
+              (!isSplit &&
+                bookingBefore.tokenStatus == 'reserved' &&
+                entry.heldDelta == -bookingBefore.tokenAmountUnits))) ||
+          (entry.type == 'booking_deposit_refund' &&
+            transactionId == entry.bookingId + '_deposit_refund' &&
+            isSplit &&
+            bookingBefore.status == 'upcoming' &&
+            bookingBefore.tokenStatus == 'reserved' &&
+            bookingAfter.status == 'cancelled' &&
+            bookingAfter.tokenStatus == 'refunded' &&
+            entry.accountId == bookingBefore.tutorId &&
+            entry.amountUnits == bookingBefore.tokenDepositUnits &&
+            entry.availableDelta == 0 &&
+            entry.heldDelta == -bookingBefore.tokenDepositUnits &&
+            getAfter(/databases/$(database)/documents/tokenTransactions/$(entry.bookingId + '_refund')).data.type
+              == 'booking_refund') ||
+          (entry.type == 'booking_settlement_debit' &&
+            transactionId == entry.bookingId + '_settlement_debit' &&
+            bookingBefore.status == 'upcoming' &&
+            bookingBefore.tokenStatus == 'reserved' &&
+            bookingAfter.status == 'completed' &&
+            bookingAfter.tokenStatus == 'settled' &&
+            request.auth.uid == bookingBefore.tutorId &&
+            entry.accountId == bookingBefore.studentId &&
+            entry.amountUnits ==
+              (isSplit
+                ? bookingBefore.tokenAmountUnits - bookingBefore.tokenDepositUnits
+                : bookingBefore.tokenAmountUnits) &&
+            entry.availableDelta == 0 &&
+            entry.heldDelta == -entry.amountUnits &&
+            getAfter(/databases/$(database)/documents/tokenTransactions/$(entry.bookingId + '_settlement_credit')).data.type
+              == 'booking_settlement_credit') ||
+          (entry.type == 'booking_settlement_credit' &&
+            transactionId == entry.bookingId + '_settlement_credit' &&
+            bookingBefore.status == 'upcoming' &&
+            bookingBefore.tokenStatus == 'reserved' &&
+            bookingAfter.status == 'completed' &&
+            bookingAfter.tokenStatus == 'settled' &&
+            request.auth.uid == bookingBefore.tutorId &&
+            entry.accountId == bookingBefore.tutorId &&
+            entry.availableDelta == bookingBefore.tokenAmountUnits &&
+            entry.amountUnits == bookingBefore.tokenAmountUnits &&
+            entry.heldDelta ==
+              (isSplit ? -bookingBefore.tokenDepositUnits : 0) &&
+            getAfter(/databases/$(database)/documents/tokenTransactions/$(entry.bookingId + '_settlement_debit')).data.type
+              == 'booking_settlement_debit'));
+      let adminLedgerValid =
+        isAdmin() &&
+        accountRole(entry.accountId) in ['student', 'tutor', 'professional'] &&
+        entry.type in ['admin_credit', 'admin_debit'] &&
+        entry.get('bookingId', null) == null &&
+        entry.formReference is string &&
+        entry.formReference.size() > 0 &&
+        entry.heldDelta == 0 &&
+        ((entry.type == 'admin_credit' &&
+            entry.availableDelta == entry.amountUnits) ||
+          (entry.type == 'admin_debit' &&
+            entry.availableDelta == -entry.amountUnits));
+      return signedIn() &&
+        (bookingLedgerValid ? validLedgerBase(transactionId, entry) :
+          (adminLedgerValid && validLedgerBase(transactionId, entry)));
+    }
+
+    function validBookingAcceptanceApplied(bookingId, booking) {
+      let studentBefore = get(/databases/$(database)/documents/wallets/$(booking.studentId)).data;
+      let studentAfter = getAfter(/databases/$(database)/documents/wallets/$(booking.studentId)).data;
+      let tutorBefore = get(/databases/$(database)/documents/wallets/$(booking.tutorId)).data;
+      let tutorAfter = getAfter(/databases/$(database)/documents/wallets/$(booking.tutorId)).data;
+      let acceptance = getAfter(
+        /databases/$(database)/documents/tokenTransactions/$(bookingId + '_acceptance')
+      ).data;
+      let deposit = getAfter(
+        /databases/$(database)/documents/tokenTransactions/$(bookingId + '_deposit_hold')
+      ).data;
+      let remainder = booking.tokenAmountUnits - booking.tokenDepositUnits;
+      return validBookingTokenSplit(booking) &&
+        booking.tokenStatus == 'reserved' &&
+        studentAfter.availableUnits == studentBefore.availableUnits - booking.tokenAmountUnits &&
+        studentAfter.heldUnits == studentBefore.heldUnits + remainder &&
+        studentAfter.lastTransactionId == bookingId + '_acceptance' &&
+        tutorAfter.availableUnits == tutorBefore.availableUnits &&
+        tutorAfter.heldUnits == tutorBefore.heldUnits + booking.tokenDepositUnits &&
+        tutorAfter.lastTransactionId == bookingId + '_deposit_hold' &&
+        acceptance.accountId == booking.studentId &&
+        acceptance.amountUnits == booking.tokenAmountUnits &&
+        acceptance.availableDelta == -booking.tokenAmountUnits &&
+        acceptance.heldDelta == remainder &&
+        deposit.accountId == booking.tutorId &&
+        deposit.amountUnits == booking.tokenDepositUnits &&
+        deposit.heldDelta == booking.tokenDepositUnits;
+    }
+
+    function validBookingRefundApplied(bookingId, booking) {
+      let before = get(/databases/$(database)/documents/wallets/$(booking.studentId)).data;
+      let after = getAfter(/databases/$(database)/documents/wallets/$(booking.studentId)).data;
+      let refund = getAfter(
+        /databases/$(database)/documents/tokenTransactions/$(bookingId + '_refund')
+      ).data;
+      return booking.tokenStatus == 'refunded' &&
+        refund.accountId == booking.studentId &&
+        refund.amountUnits == booking.tokenAmountUnits &&
+        refund.availableDelta == booking.tokenAmountUnits &&
+        after.availableUnits == before.availableUnits + booking.tokenAmountUnits &&
+        after.lastTransactionId == bookingId + '_refund' &&
+        (('tokenDepositUnits' in booking)
+          ? (validBookingTokenSplit(booking) &&
+              booking.status == 'cancelled' &&
+              refund.heldDelta == -(booking.tokenAmountUnits - booking.tokenDepositUnits) &&
+              after.heldUnits == before.heldUnits -
+                (booking.tokenAmountUnits - booking.tokenDepositUnits) &&
+              getAfter(/databases/$(database)/documents/tokenTransactions/$(bookingId + '_deposit_refund')).data.accountId
+                == booking.tutorId)
+          : (refund.heldDelta == -booking.tokenAmountUnits &&
+              after.heldUnits == before.heldUnits - booking.tokenAmountUnits));
+    }
+
+    function validBookingSettlementApplied(bookingId, booking) {
+      let studentBefore = get(/databases/$(database)/documents/wallets/$(booking.studentId)).data;
+      let studentAfter = getAfter(/databases/$(database)/documents/wallets/$(booking.studentId)).data;
+      let tutorBefore = get(/databases/$(database)/documents/wallets/$(booking.tutorId)).data;
+      let tutorAfter = getAfter(/databases/$(database)/documents/wallets/$(booking.tutorId)).data;
+      let debit = getAfter(
+        /databases/$(database)/documents/tokenTransactions/$(bookingId + '_settlement_debit')
+      ).data;
+      let credit = getAfter(
+        /databases/$(database)/documents/tokenTransactions/$(bookingId + '_settlement_credit')
+      ).data;
+      return booking.tokenStatus == 'settled' &&
+        debit.accountId == booking.studentId &&
+        debit.availableDelta == 0 &&
+        credit.accountId == booking.tutorId &&
+        credit.amountUnits == booking.tokenAmountUnits &&
+        credit.availableDelta == booking.tokenAmountUnits &&
+        studentAfter.availableUnits == studentBefore.availableUnits &&
+        studentAfter.lastTransactionId == bookingId + '_settlement_debit' &&
+        tutorAfter.availableUnits == tutorBefore.availableUnits + booking.tokenAmountUnits &&
+        tutorAfter.lastTransactionId == bookingId + '_settlement_credit' &&
+        (('tokenDepositUnits' in booking)
+          ? (validBookingTokenSplit(booking) &&
+              debit.amountUnits == booking.tokenAmountUnits - booking.tokenDepositUnits &&
+              debit.heldDelta == -(booking.tokenAmountUnits - booking.tokenDepositUnits) &&
+              credit.heldDelta == -booking.tokenDepositUnits &&
+              studentAfter.heldUnits == studentBefore.heldUnits -
+                (booking.tokenAmountUnits - booking.tokenDepositUnits) &&
+              tutorAfter.heldUnits == tutorBefore.heldUnits - booking.tokenDepositUnits)
+          : (debit.amountUnits == booking.tokenAmountUnits &&
+              debit.heldDelta == -booking.tokenAmountUnits &&
+              credit.heldDelta == 0 &&
+              studentAfter.heldUnits == studentBefore.heldUnits - booking.tokenAmountUnits &&
+              tutorAfter.heldUnits == tutorBefore.heldUnits));
+    }
+
+    function validTutorBookingResponse(bookingId) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let changes = after.diff(before).affectedKeys();
+      return approvedTutor(request.auth.uid) &&
+        before.tutorId == request.auth.uid &&
+        before.status == 'requested' &&
+        after.updatedAt == request.time &&
+        ((('tokenStatus' in before) &&
+            before.tokenStatus == 'pending' &&
+            after.status == 'upcoming' &&
+            after.tokenStatus == 'reserved' &&
+            changes.hasOnly(['status', 'tokenStatus', 'updatedAt']) &&
+            validBookingAcceptanceApplied(bookingId, after)) ||
+          (('tokenStatus' in before) &&
+            before.tokenStatus == 'pending' &&
+            after.status == 'rejected' &&
+            after.tokenStatus == 'not_charged' &&
+            after.cancelledBy == request.auth.uid &&
+            changes.hasOnly(['status', 'tokenStatus', 'cancelledBy', 'updatedAt'])) ||
+          (!('tokenStatus' in before) &&
+            changes.hasOnly(['status', 'paymentStatus', 'tutorPhotoUrl', 'updatedAt']) &&
+            ((after.status == 'upcoming' &&
+                after.paymentStatus == 'awaiting_payment') ||
+              (after.status == 'rejected' &&
+                after.paymentStatus == 'not_applicable'))));
+    }
+
+    function validBookingCancellation(bookingId) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let changes = after.diff(before).affectedKeys();
+      return bookingParticipant(before) &&
+        before.status in ['requested', 'upcoming'] &&
+        after.status == 'cancelled' &&
+        after.cancelledBy == request.auth.uid &&
+        after.updatedAt == request.time &&
+        ((('tokenStatus' in before) &&
+            before.tokenStatus == 'pending' &&
+            after.tokenStatus == 'not_charged' &&
+            changes.hasOnly(['status', 'tokenStatus', 'cancelledBy', 'updatedAt'])) ||
+          (('tokenStatus' in before) &&
+            before.tokenStatus == 'reserved' &&
+            after.tokenStatus == 'refunded' &&
+            changes.hasOnly(['status', 'tokenStatus', 'cancelledBy', 'updatedAt']) &&
+            validBookingRefundApplied(bookingId, after)) ||
+          (!('tokenStatus' in before) &&
+            !(before.get('paymentStatus', '') in ['pending_verification', 'settled']) &&
+            after.paymentStatus == 'not_applicable' &&
+            changes.hasOnly(['status', 'paymentStatus', 'cancelledBy', 'updatedAt'])));
+    }
+
+    function validBookingCompletion(bookingId) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let changes = after.diff(before).affectedKeys();
+      return approvedTutor(request.auth.uid) &&
+        before.tutorId == request.auth.uid &&
+        before.status == 'upcoming' &&
+        before.get('timerStatus', '') == 'stopped' &&
+        before.get('accumulatedDurationSeconds', 0) is int &&
+        before.accumulatedDurationSeconds > 0 &&
+        after.status == 'completed' &&
+        after.updatedAt == request.time &&
+        ((('tokenStatus' in before) &&
+            before.tokenStatus == 'reserved' &&
+            after.tokenStatus == 'settled' &&
+            changes.hasOnly(['status', 'tokenStatus', 'updatedAt']) &&
+            validBookingSettlementApplied(bookingId, after)) ||
+          (!('tokenStatus' in before) &&
+            changes.hasOnly(['status', 'updatedAt'])));
+    }
+
+    function validBookingTimerUpdate() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let oldStatus = before.get('timerStatus', 'idle');
+      let newStatus = after.get('timerStatus', '');
+      let action = after.get('timerLastAction', '');
+      let changes = after.diff(before).affectedKeys();
+      return approvedTutor(request.auth.uid) &&
+        before.tutorId == request.auth.uid &&
+        before.status == 'upcoming' &&
+        after.status == before.status &&
+        after.get('tokenStatus', '') == before.get('tokenStatus', '') &&
+        after.updatedAt == request.time &&
+        after.timerLastActionAt == request.time &&
+        action in ['start', 'pause', 'resume', 'stop'] &&
+        newStatus in ['running', 'paused', 'stopped'] &&
+        after.accumulatedDurationSeconds is int &&
+        after.accumulatedDurationSeconds >= before.get('accumulatedDurationSeconds', 0) &&
+        after.timerActionHistory is list &&
+        after.timerActionHistory.size() <= 50 &&
+        changes.hasOnly([
+          'timerStatus', 'accumulatedDurationSeconds', 'timerStartedAt',
+          'timerPausedAt', 'timerStoppedAt', 'timerLastAction',
+          'timerLastActionAt', 'timerActionHistory', 'updatedAt'
+        ]) &&
+        ((oldStatus == 'idle' && action == 'start' && newStatus == 'running') ||
+          (oldStatus == 'running' && action == 'pause' && newStatus == 'paused') ||
+          (oldStatus == 'paused' && action == 'resume' && newStatus == 'running') ||
+          (oldStatus in ['running', 'paused'] && action == 'stop' && newStatus == 'stopped')) &&
+        ((newStatus == 'running' && after.timerStartedAt == request.time) ||
+          (newStatus == 'paused' && after.timerPausedAt == request.time) ||
+          (newStatus == 'stopped' && after.timerStoppedAt == request.time));
+    }
+
+    function validBookingReschedule() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return signedIn() &&
+        before.studentId == request.auth.uid &&
+        before.status == 'upcoming' &&
+        ((('tokenStatus' in before) && before.tokenStatus == 'reserved') ||
+          (!('tokenStatus' in before) &&
+            before.get('paymentStatus', '') == 'awaiting_payment')) &&
+        after.dateKey is string &&
+        after.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        after.startTime is string &&
+        after.endTime is string &&
+        after.durationHours is int &&
+        after.durationHours >= 1 &&
+        after.durationHours <= 3 &&
+        after.diff(before).affectedKeys().hasOnly([
+          'dateKey', 'startTime', 'endTime', 'durationHours', 'updatedAt'
+        ]) &&
+        after.updatedAt == request.time;
+    }
+
+    function validBookingCheckIn() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let coordinates = after.checkInCoordinates;
+      return signedIn() &&
+        before.studentId == request.auth.uid &&
+        before.status == 'upcoming' &&
+        !('checkedInAt' in before) &&
+        after.checkedInAt == request.time &&
+        coordinates is map &&
+        coordinates.keys().hasOnly(['latitude', 'longitude']) &&
+        coordinates.keys().hasAll(['latitude', 'longitude']) &&
+        coordinates.latitude is number &&
+        coordinates.latitude >= -90 &&
+        coordinates.latitude <= 90 &&
+        coordinates.longitude is number &&
+        coordinates.longitude >= -180 &&
+        coordinates.longitude <= 180 &&
+        after.diff(before).affectedKeys()
+          .hasOnly(['checkedInAt', 'checkInCoordinates', 'updatedAt']) &&
+        after.updatedAt == request.time;
+    }
+
+    function validBookingRating() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return isStudent() &&
+        before.studentId == request.auth.uid &&
+        before.status == 'completed' &&
+        !('rating' in before) &&
+        after.rating is int &&
+        after.rating >= 0 &&
+        after.rating <= 5 &&
+        after.review is string &&
+        after.review.size() <= 1000 &&
+        after.ratingIsAnonymous is bool &&
+        after.ratingAuthor == (after.ratingIsAnonymous ? 'Anonymous' : before.studentName) &&
+        after.ratingCreatedAt == request.time &&
+        after.updatedAt == request.time &&
+        after.diff(before).affectedKeys().hasOnly([
+          'rating', 'review', 'ratingIsAnonymous', 'ratingAuthor',
+          'ratingCreatedAt', 'updatedAt'
+        ]);
+    }
+
+    function validLeaderboardEntry(uid) {
+      let data = request.resource.data;
+      return isStudent() &&
+        request.auth.uid == uid &&
+        data.keys().hasOnly([
+          'displayName', 'badgeCount', 'currentStreak', 'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'displayName', 'badgeCount', 'currentStreak', 'updatedAt'
+        ]) &&
+        data.displayName is string &&
+        data.displayName.size() > 0 &&
+        data.displayName.size() <= 120 &&
+        data.displayName == get(userPath(uid)).data.get('name', '') &&
+        data.badgeCount is int &&
+        data.badgeCount >= 0 &&
+        data.currentStreak is int &&
+        data.currentStreak >= 0 &&
+        data.updatedAt == request.time;
+    }
+
+    function validBookingUpdate(bookingId) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      let nextStatus = request.resource.data.get('status', '');
+      return changes.hasAny([
+          'timerStatus', 'timerLastAction', 'timerLastActionAt',
+          'timerActionHistory', 'accumulatedDurationSeconds'
+        ])
+        ? validBookingTimerUpdate()
+        : (changes.hasAny(['checkedInAt', 'checkInCoordinates'])
+          ? validBookingCheckIn()
+          : (changes.hasAny([
+              'rating', 'review', 'ratingIsAnonymous', 'ratingAuthor', 'ratingCreatedAt'
+            ])
+            ? validBookingRating()
+            : (changes.hasAny(['dateKey', 'startTime', 'endTime', 'durationHours'])
+              ? validBookingReschedule()
+              : (nextStatus == 'completed'
+                ? validBookingCompletion(bookingId)
+                : (nextStatus == 'cancelled'
+                  ? validBookingCancellation(bookingId)
+                  : (nextStatus in ['upcoming', 'rejected']
+                    ? validTutorBookingResponse(bookingId)
+                      : false))))));
+    }
+
+    function validWalletInitialization(uid) {
+      return signedIn() &&
+        request.resource.data.keys().hasOnly([
+          'availableUnits', 'heldUnits', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'availableUnits', 'heldUnits', 'createdAt', 'updatedAt'
+        ]) &&
+        request.resource.data.availableUnits == 0 &&
+        request.resource.data.heldUnits == 0 &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        existsAfter(userPath(uid)) &&
+        getAfter(userPath(uid)).data.get('role', '') in
+          ['student', 'tutor', 'professional'] &&
+        ((request.auth.uid == uid) || isAdmin());
+    }
+
+    function validTutorCompletionAggregate(uid) {
+      let bookingId = request.resource.data.get('lastTeachingBookingId', '');
+      let bookingBefore = get(
+        /databases/$(database)/documents/bookings/$(bookingId)
+      ).data;
+      let bookingAfter = getAfter(
+        /databases/$(database)/documents/bookings/$(bookingId)
+      ).data;
+      let oldSeconds = resource.data.get('totalRecordedTeachingSeconds', 0);
+      return signedIn() &&
+        request.auth.uid == uid &&
+        bookingBefore.tutorId == uid &&
+        bookingBefore.status == 'upcoming' &&
+        bookingBefore.get('timerStatus', '') == 'stopped' &&
+        bookingBefore.get('accumulatedDurationSeconds', 0) is int &&
+        bookingBefore.accumulatedDurationSeconds > 0 &&
+        bookingAfter.status == 'completed' &&
+        oldSeconds is int &&
+        oldSeconds >= 0 &&
+        request.resource.data.totalRecordedTeachingSeconds ==
+          oldSeconds + bookingBefore.accumulatedDurationSeconds &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'totalRecordedTeachingSeconds', 'lastTeachingBookingId', 'updatedAt'
+        ]);
+    }
+
+    function validTutorRatingAggregate(uid) {
+      let bookingId = request.resource.data.get('lastRatingBookingId', '');
+      let bookingBefore = get(
+        /databases/$(database)/documents/bookings/$(bookingId)
+      ).data;
+      let bookingAfter = getAfter(
+        /databases/$(database)/documents/bookings/$(bookingId)
+      ).data;
+      let oldCount = resource.data.get('reviewCount', 0);
+      return isStudent() &&
+        bookingBefore.studentId == request.auth.uid &&
+        bookingBefore.tutorId == uid &&
+        bookingBefore.status == 'completed' &&
+        !('rating' in bookingBefore) &&
+        bookingAfter.status == 'completed' &&
+        bookingAfter.rating is int &&
+        bookingAfter.rating >= 0 &&
+        bookingAfter.rating <= 5 &&
+        bookingAfter.review is string &&
+        bookingAfter.review.size() <= 1000 &&
+        bookingAfter.ratingIsAnonymous is bool &&
+        bookingAfter.ratingAuthor is string &&
+        bookingAfter.ratingCreatedAt == request.time &&
+        oldCount is int &&
+        oldCount >= 0 &&
+        request.resource.data.reviewCount == oldCount + 1 &&
+        (oldCount == 0
+          ? request.resource.data.rating == bookingAfter.rating
+          : request.resource.data.rating ==
+            ((resource.data.rating * oldCount + bookingAfter.rating) / (oldCount + 1))) &&
+        request.resource.data.lastRatingBookingId == bookingId &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'rating', 'reviewCount', 'lastRatingBookingId', 'updatedAt'
+        ]);
+    }
+
+    function validTutorCompletedBookingCount(uid) {
+      let bookingId = request.resource.data.get('lastTutorCompletedBookingId', '');
+      let bookingBefore = get(
+        /databases/$(database)/documents/bookings/$(bookingId)
+      ).data;
+      let bookingAfter = getAfter(
+        /databases/$(database)/documents/bookings/$(bookingId)
+      ).data;
+      let oldCount = resource.data.get('tutorCompletedBookingCount', 0);
+      return signedIn() &&
+        request.auth.uid == uid &&
+        bookingBefore.tutorId == uid &&
+        bookingBefore.status == 'upcoming' &&
+        bookingBefore.get('timerStatus', '') == 'stopped' &&
+        bookingBefore.get('accumulatedDurationSeconds', 0) is int &&
+        bookingBefore.accumulatedDurationSeconds > 0 &&
+        bookingAfter.status == 'completed' &&
+        oldCount is int &&
+        oldCount >= 0 &&
+        request.resource.data.tutorCompletedBookingCount == oldCount + 1 &&
+        request.resource.data.lastTutorCompletedBookingId == bookingId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'tutorCompletedBookingCount', 'lastTutorCompletedBookingId'
+        ]);
+    }
+
+    function validAdminWalletInitialization(uid) {
+      return isAdmin() &&
+        accountRole(uid) in ['student', 'tutor', 'professional'] &&
+        request.resource.data.availableUnits == 0 &&
+        request.resource.data.heldUnits == 0 &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.keys().hasOnly([
+          'availableUnits', 'heldUnits', 'createdAt', 'updatedAt'
+        ]);
+    }
+
+    function tutorApplicationOwner(uid, tutorType) {
+      let role = accountRole(uid);
+      return signedIn() &&
+        request.auth.uid == uid &&
+        ((role == 'student' && tutorType == 'peer') ||
+          (role == 'tutor' &&
+            get(userPath(uid)).data.get('tutorType', '') == tutorType) ||
+          (role == 'professional' && tutorType == 'professional'));
+    }
+
+    function publicTutorShape(data) {
+      return data.keys().hasOnly([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courseNames',
+          'teachingPhilosophy',
+          'formats',
+          'verificationStatus',
+          'verificationNote',
+          'publicProfileVersion',
+          'locationPrivacyVersion',
+          'createdAt',
+          'updatedAt',
+          'photoUrl',
+          'location',
+          'locationCell',
+          'locationCellVersion',
+          'availability',
+          'online',
+          'lastSeenAt',
+          'rating',
+          'reviewCount',
+          'lastRatingBookingId',
+          'totalRecordedTeachingSeconds',
+          'lastTeachingBookingId',
+          'hourlyRate',
+          'bio',
+          'subject'
+        ]) &&
+        data.keys().hasAll([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courseNames',
+          'teachingPhilosophy',
+          'formats',
+          'verificationStatus',
+          'verificationNote',
+          'publicProfileVersion',
+          'locationPrivacyVersion',
+          'createdAt',
+          'updatedAt',
+          'subject'
+        ]) &&
+        data.name is string &&
+        data.tutorType in ['peer', 'professional'] &&
+        ((data.tutorType == 'peer' && data.tier == 'Peer Tutor') ||
+          (data.tutorType == 'professional' && data.tier in ['Alumni', 'Professor'])) &&
+        data.credentials is string &&
+        data.preferredDays is list &&
+        data.preferredTimeSlots is list &&
+        data.courseNames is string &&
+        data.courseNames.size() <= 2000 &&
+        data.teachingPhilosophy is string &&
+        data.formats is list &&
+        data.verificationStatus in ['pending', 'approved', 'rejected'] &&
+        data.verificationNote is string &&
+        data.publicProfileVersion == 2 &&
+        data.locationPrivacyVersion == 1 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        (!('photoUrl' in data) ||
+          data.photoUrl == '' ||
+          data.photoUrl.matches('^https://.+')) &&
+        data.subject is string &&
+        (!('location' in data) || data.location is string) &&
+        validTutorLocationCell(data) &&
+        (!('locationCellVersion' in data) ||
+          (data.locationCellVersion == 1 && 'locationCell' in data)) &&
+        (!('online' in data) || data.online is bool);
+    }
+
+    function applicationShape(data) {
+      return data.keys().hasOnly([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courses',
+          'applicationProofName',
+          'applicationProofUrl',
+          'teachingPhilosophy',
+          'formats',
+          'paymentQrUrl',
+          'verificationStatus',
+          'verificationNote',
+          'verificationReviewedBy',
+          'verificationReviewedAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courses',
+          'teachingPhilosophy',
+          'formats',
+          'verificationStatus',
+          'verificationNote',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.name is string &&
+        data.tutorType in ['peer', 'professional'] &&
+        ((data.tutorType == 'peer' && data.tier == 'Peer Tutor') ||
+          (data.tutorType == 'professional' && data.tier in ['Alumni', 'Professor'])) &&
+        data.credentials is string &&
+        data.preferredDays is list &&
+        data.preferredTimeSlots is list &&
+        data.courses is list &&
+        data.courses.size() > 0 &&
+        data.courses.size() <= 30 &&
+        data.teachingPhilosophy is string &&
+        data.formats is list &&
+        data.verificationStatus in ['pending', 'approved', 'rejected'] &&
+        data.verificationNote is string &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        (!('paymentQrUrl' in data) ||
+          data.paymentQrUrl == '' ||
+          data.paymentQrUrl.matches('^https://.+')) &&
+        (data.tutorType != 'professional' ||
+          (data.applicationProofName is string &&
+            data.applicationProofUrl is string &&
+            data.applicationProofUrl.matches('^https://.+')));
+    }
+
+    function validTutorLocationCell(data) {
+      return !('locationCell' in data) ||
+        (data.locationCell is map &&
+          data.locationCell.keys().hasOnly(['latitudeCell', 'longitudeCell']) &&
+          data.locationCell.keys().hasAll(['latitudeCell', 'longitudeCell']) &&
+          data.locationCell.latitudeCell is int &&
+          data.locationCell.latitudeCell >= -9000 &&
+          data.locationCell.latitudeCell <= 9000 &&
+          data.locationCell.longitudeCell is int &&
+          data.locationCell.longitudeCell >= -18000 &&
+          data.locationCell.longitudeCell <= 18000);
+    }
+
+    function tutorApplicationSubmission(uid) {
+      let data = request.resource.data;
+      return tutorApplicationOwner(uid, data.tutorType) &&
+        data.verificationStatus == 'pending' &&
+        data.verificationNote == '' &&
+        !('verificationReviewedBy' in data) &&
+        !('verificationReviewedAt' in data) &&
+        data.createdAt == request.time &&
+        data.updatedAt == request.time &&
+        getAfter(/databases/$(database)/documents/tutors/$(uid)).data
+          .verificationStatus == 'pending' &&
+        applicationShape(data);
+    }
+
+    function adminApplicationReview(uid) {
+      let data = request.resource.data;
+      let changes = data.diff(resource.data).affectedKeys();
+      return isAdmin() &&
+        resource.data.verificationStatus == 'pending' &&
+        data.verificationStatus in ['approved', 'rejected'] &&
+        data.verificationNote is string &&
+        (data.verificationStatus != 'rejected' || data.verificationNote.size() > 0) &&
+        data.verificationReviewedBy == request.auth.uid &&
+        data.verificationReviewedAt == request.time &&
+        data.updatedAt == request.time &&
+        changes.hasOnly([
+          'verificationStatus',
+          'verificationNote',
+          'verificationReviewedBy',
+          'verificationReviewedAt',
+          'updatedAt'
+        ]);
+    }
+
+    function adminLegacyApplicationReview(uid) {
+      let data = request.resource.data;
+      return isAdmin() &&
+        exists(/databases/$(database)/documents/tutors/$(uid)) &&
+        get(/databases/$(database)/documents/tutors/$(uid)).data
+          .verificationStatus == 'pending' &&
+        data.verificationStatus in ['approved', 'rejected'] &&
+        data.verificationNote is string &&
+        (data.verificationStatus != 'rejected' || data.verificationNote.size() > 0) &&
+        data.verificationReviewedBy == request.auth.uid &&
+        data.verificationReviewedAt == request.time &&
+        data.updatedAt == request.time &&
+        data.createdAt is timestamp &&
+        getAfter(/databases/$(database)/documents/tutors/$(uid)).data
+          .verificationStatus == data.verificationStatus &&
+        applicationShape(data);
+    }
+
+    function adminTutorReview(uid) {
+      let data = request.resource.data;
+      let changes = data.diff(resource.data).affectedKeys();
+      return resource.data.verificationStatus == 'pending' &&
+        data.verificationStatus in ['approved', 'rejected'] &&
+        data.verificationNote is string &&
+        (data.verificationStatus != 'rejected' || data.verificationNote.size() > 0) &&
+        getAfter(/databases/$(database)/documents/tutorApplications/$(uid)).data
+          .verificationStatus == data.verificationStatus &&
+        data.updatedAt == request.time &&
+        publicTutorShape(data) &&
+        changes.hasOnly([
+          'name',
+          'tutorType',
+          'tier',
+          'credentials',
+          'preferredDays',
+          'preferredTimeSlots',
+          'courseNames',
+          'subject',
+          'teachingPhilosophy',
+          'formats',
+          'verificationStatus',
+          'verificationNote',
+          'publicProfileVersion',
+          'locationPrivacyVersion',
+          'createdAt',
+          'updatedAt',
+          'photoUrl',
+          'location',
+          'locationCell',
+          'locationCellVersion',
+          'availability',
+          'online',
+          'lastSeenAt',
+          'rating',
+          'reviewCount',
+          'lastRatingBookingId',
+          'totalRecordedTeachingSeconds',
+          'lastTeachingBookingId',
+          'hourlyRate',
+          'bio'
+        ]);
+    }
+
+    function ownerTutorSubmission(uid) {
+      return tutorApplicationOwner(uid, request.resource.data.tutorType) &&
+        resource.data.verificationStatus in ['pending', 'rejected'] &&
+        request.resource.data.verificationStatus == 'pending' &&
+        request.resource.data.verificationNote == '' &&
+        getAfter(/databases/$(database)/documents/tutorApplications/$(uid)).data
+          .verificationStatus == 'pending' &&
+        publicTutorShape(request.resource.data);
+    }
+
+    function tutorProfileUpdate(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      return isAdmin()
+        ? adminTutorReview(uid)
+        : (changes.hasAny(['online', 'lastSeenAt'])
+          ? tutorPresenceUpdate(uid)
+          : (changes.hasAny(['location', 'locationCell', 'locationCellVersion'])
+            ? tutorLocationUpdate(uid)
+            : (changes.hasAny(['hourlyRate'])
+              ? tutorRateUpdate(uid)
+              : (changes.hasAny(['rating', 'reviewCount', 'lastRatingBookingId'])
+                ? validTutorRatingAggregate(uid)
+                : (changes.hasAny([
+                    'totalRecordedTeachingSeconds', 'lastTeachingBookingId'
+                  ])
+                  ? validTutorCompletionAggregate(uid)
+                  : ownerTutorSubmission(uid))))));
+    }
+
+    function tutorPresenceUpdate(uid) {
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      let application = get(/databases/$(database)/documents/tutorApplications/$(uid)).data;
+      return signedIn() &&
+        request.auth.uid == uid &&
+        resource.data.verificationStatus == 'approved' &&
+        application.verificationStatus == 'approved' &&
+        changes.hasOnly(['online', 'lastSeenAt']) &&
+        request.resource.data.online is bool &&
+        request.resource.data.lastSeenAt == request.time;
+    }
+
+    function tutorLocationUpdate(uid) {
+      let application = get(/databases/$(database)/documents/tutorApplications/$(uid)).data;
+      let changes = request.resource.data.diff(resource.data).affectedKeys();
+      return signedIn() &&
+        request.auth.uid == uid &&
+        application.verificationStatus == resource.data.verificationStatus &&
+        resource.data.verificationStatus in ['pending', 'approved', 'rejected'] &&
+        changes.hasOnly([
+          'location',
+          'locationCell',
+          'locationCellVersion',
+          'updatedAt'
+        ]) &&
+        request.resource.data.updatedAt == request.time &&
+        publicTutorShape(request.resource.data) &&
+        (!('location' in request.resource.data) ||
+          (request.resource.data.location is string &&
+            request.resource.data.location.size() <= 200));
+    }
+
+    function tutorRateUpdate(uid) {
+      let application = get(/databases/$(database)/documents/tutorApplications/$(uid)).data;
+      let tutorType = application.get('tutorType', '');
+      let price = request.resource.data.get('hourlyRate', 0);
+      let fraction = (price * 100) % 1;
+      return signedIn() &&
+        request.auth.uid == uid &&
+        application.verificationStatus in ['pending', 'approved'] &&
+        request.resource.data.verificationStatus == application.verificationStatus &&
+        request.resource.data.publicProfileVersion == 2 &&
+        request.resource.data.tutorType == tutorType &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['hourlyRate', 'updatedAt']) &&
+        price is number &&
+        price > 0 &&
+        (fraction <= 0.000001 || fraction >= 0.999999) &&
+        ((tutorType == 'peer' && price >= 200) ||
+          (tutorType == 'professional' && price >= 300)) &&
+        request.resource.data.updatedAt == request.time;
+    }
+
+    function qualifyingAchievementCreate(achievementId) {
+      let data = request.resource.data;
+      let bookingPath = /databases/$(database)/documents/bookings/$(data.qualifyingBookingId);
+      let booking = getAfter(bookingPath).data;
+      let completedCount = getAfter(userPath(data.tutorId)).data
+        .get('tutorCompletedBookingCount', 0);
+      let teachingSeconds = getAfter(
+        /databases/$(database)/documents/tutors/$(data.tutorId)
+      ).data.get('totalRecordedTeachingSeconds', 0);
+      return signedIn() &&
+        request.auth.uid == data.tutorId &&
+        achievementId == data.tutorId + '_' + data.badgeId &&
+        data.badgeId in [
+          'first_lesson', 'steady_mentor', 'experienced_guide', 'hours_of_impact'
+        ] &&
+        data.qualifyingBookingId is string &&
+        exists(bookingPath) &&
+        booking.tutorId == data.tutorId &&
+        booking.status == 'completed' &&
+        data.criterionVersion == 1 &&
+        data.createdAt == request.time &&
+        ((data.badgeId == 'first_lesson' && completedCount == 1) ||
+          (data.badgeId == 'steady_mentor' && completedCount == 10) ||
+          (data.badgeId == 'experienced_guide' && completedCount == 25) ||
+          (data.badgeId == 'hours_of_impact' && teachingSeconds >= 36000));
+    }
+
+    function validAccountCreate(uid) {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'uid',
+          'email',
+          'role',
+          'name',
+          'campusId',
+          'tutorType',
+          'tutorVerificationStatus',
+          'createdAt'
+        ]) &&
+        data.keys().hasAll([
+          'uid',
+          'email',
+          'role',
+          'name',
+          'campusId',
+          'createdAt'
+        ]) &&
+        data.uid == uid &&
+        data.email == request.auth.token.email &&
+        data.role in ['student', 'tutor'] &&
+        data.name is string &&
+        data.name.size() <= 120 &&
+        data.campusId is string &&
+        data.campusId.size() <= 120 &&
+        data.createdAt == request.time &&
+        (data.role == 'student'
+          ? (!('tutorType' in data) && !('tutorVerificationStatus' in data))
+          : (data.tutorType in ['peer', 'professional'] &&
+              data.tutorVerificationStatus == 'pending'));
+    }
+
+    function validCoordinateMap(value) {
+      return value is map &&
+        value.keys().hasOnly(['latitude', 'longitude']) &&
+        value.keys().hasAll(['latitude', 'longitude']) &&
+        value.latitude is number &&
+        value.latitude >= -90 &&
+        value.latitude <= 90 &&
+        value.longitude is number &&
+        value.longitude >= -180 &&
+        value.longitude <= 180;
+    }
+
+    function validProfileUpdate(uid) {
+      let data = request.resource.data;
+      let changes = data.diff(resource.data).affectedKeys();
+      return changes.hasOnly([
+          'name',
+          'phone',
+          'age',
+          'location',
+          'homeAddress',
+          'homeAddressCoordinates',
+          'homeAddressGeocodeKey',
+          'locationAreaCoordinates',
+          'locationAreaGeocodeKey',
+          'geolocationConsent',
+          'geolocationConsentAt',
+          'year',
+          'campus',
+          'campusAddress',
+          'photoUrl',
+          'campusId',
+          'notificationPreferences',
+          'studyStreakReminderEnabled',
+          'uid'
+        ]) &&
+        (!('uid' in data) || data.uid == uid) &&
+        (!('studyStreakReminderEnabled' in data) ||
+          data.studyStreakReminderEnabled is bool) &&
+        (!('name' in data) || (data.name is string && data.name.size() <= 120)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 40)) &&
+        (!('age' in data) ||
+          (data.age is string && data.age.matches('^[1-9][0-9]{0,2}$'))) &&
+        (!('location' in data) ||
+          (data.location is string && data.location.size() <= 200)) &&
+        (!('homeAddress' in data) ||
+          (data.homeAddress is string && data.homeAddress.size() <= 300)) &&
+        (!changes.hasAny(['location', 'homeAddress']) ||
+          (!('homeAddressCoordinates' in data) &&
+            !('homeAddressGeocodeKey' in data))) &&
+        (!changes.hasAny(['location']) ||
+          (!('locationAreaCoordinates' in data) &&
+            !('locationAreaGeocodeKey' in data))) &&
+        (!('homeAddressCoordinates' in data) ||
+          validCoordinateMap(data.homeAddressCoordinates)) &&
+        (!('locationAreaCoordinates' in data) ||
+          validCoordinateMap(data.locationAreaCoordinates)) &&
+        (!('homeAddressGeocodeKey' in data) ||
+          (data.homeAddressGeocodeKey is string &&
+            data.homeAddressGeocodeKey.size() <= 500)) &&
+        (!('locationAreaGeocodeKey' in data) ||
+          (data.locationAreaGeocodeKey is string &&
+            data.locationAreaGeocodeKey.size() <= 500)) &&
+        (!('geolocationConsent' in data) || data.geolocationConsent is bool) &&
+        (!changes.hasAny(['geolocationConsent']) ||
+          data.get('geolocationConsentAt', null) == request.time) &&
+        (!('geolocationConsentAt' in data) || data.geolocationConsentAt is timestamp) &&
+        (!('year' in data) || (data.year is string && data.year.size() <= 40)) &&
+        (!('campus' in data) || (data.campus is string && data.campus.size() <= 120)) &&
+        (!('campusAddress' in data) ||
+          (data.campusAddress is string && data.campusAddress.size() <= 300)) &&
+        (!('campusId' in data) ||
+          (data.campusId is string && data.campusId.size() <= 120)) &&
+        (!('photoUrl' in data) ||
+          data.photoUrl == '' ||
+          (data.photoUrl is string && data.photoUrl.matches('^https://.+'))) &&
+        (!('notificationPreferences' in data) ||
+          data.notificationPreferences is map);
+    }
+
+    function validAccountStatusUpdate(uid) {
+      let data = request.resource.data;
+      let changes = data.diff(resource.data).affectedKeys();
+      return isAdmin() &&
+        request.auth.uid != uid &&
+        resource.data.get('role', '') != 'admin' &&
+        data.get('accountStatus', '') in ['active', 'suspended'] &&
+        data.accountStatusUpdatedAt == request.time &&
+        data.accountStatusUpdatedBy == request.auth.uid &&
+        changes.hasOnly([
+          'accountStatus',
+          'accountStatusUpdatedAt',
+          'accountStatusUpdatedBy'
+        ]);
+    }
+
+    match /users/{uid} {
+      allow get: if request.auth != null &&
+        (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() &&
+        request.auth.uid == uid &&
+        validAccountCreate(uid);
+      allow update: if validAccountStatusUpdate(uid) ||
+        validTutorCompletedBookingCount(uid) ||
+        (isAdmin() &&
+          request.auth.uid != uid &&
+          resource.data.get('role', '') == 'tutor' &&
+          resource.data.get('tutorVerificationStatus', '') == 'pending' &&
+          request.resource.data.get('tutorVerificationStatus', '') in
+            ['approved', 'rejected'] &&
+          request.resource.data.tutorVerificationNote is string &&
+          request.resource.data.tutorVerificationReviewedBy == request.auth.uid &&
+          request.resource.data.tutorVerificationReviewedAt == request.time &&
+          request.resource.data.updatedAt == request.time &&
+          getAfter(/databases/$(database)/documents/tutorApplications/$(uid)).data
+            .verificationStatus == request.resource.data.tutorVerificationStatus &&
+          getAfter(/databases/$(database)/documents/tutors/$(uid)).data
+            .verificationStatus == request.resource.data.tutorVerificationStatus &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'tutorVerificationStatus',
+            'tutorVerificationNote',
+            'tutorVerificationReviewedBy',
+            'tutorVerificationReviewedAt',
+            'updatedAt'
+          ])) ||
+        (signedIn() &&
+          request.auth.uid == uid &&
+          validProfileUpdate(uid));
+      allow delete: if false;
+
+      match /studentBadgeVisibility/{bookingId} {
+        allow get, list: if signedIn() && request.auth.uid == uid;
+        allow create, update: if validStudentBadgeVisibility(uid, bookingId);
+        allow delete: if false;
+      }
+
+      match /tutorAchievementVisibility/{badgeId} {
+        allow get, list: if signedIn() && request.auth.uid == uid;
+        allow create, update: if validTutorAchievementVisibility(uid, badgeId);
+        allow delete: if false;
+      }
+    }
+
+    match /tutorAchievements/{achievementId} {
+      allow get: if isAdmin() ||
+        (signedIn() &&
+          ((resource == null &&
+              achievementId.matches('^' + request.auth.uid + '_.*$')) ||
+            resource.data.tutorId == request.auth.uid));
+      allow list: if signedIn() &&
+        resource.data.tutorId == request.auth.uid;
+      allow create: if qualifyingAchievementCreate(achievementId);
+      allow update, delete: if false;
+    }
+
+    match /{path=**}/badgeAwards/{awardId} {
+      allow get: if signedIn() &&
+        (resource.data.studentId == request.auth.uid ||
+          resource.data.tutorId == request.auth.uid);
+      allow list: if signedIn() &&
+        (resource.data.studentId == request.auth.uid ||
+          resource.data.tutorId == request.auth.uid);
+    }
+
+    match /tutors/{uid} {
+      allow get: if isAdmin() ||
+        (signedIn() && request.auth.uid == uid) ||
+        (signedIn() &&
+          resource.data.verificationStatus == 'approved' &&
+          resource.data.publicProfileVersion == 2 &&
+          resource.data.locationPrivacyVersion == 1 &&
+          publicTutorShape(resource.data));
+      // The app's discovery query can prove these filters, not the profile's key set.
+      // Migrate approved legacy profiles before enabling this list rule.
+      allow list: if isAdmin() ||
+        (signedIn() &&
+          accountRole(request.auth.uid) in ['student', 'tutor', 'professional'] &&
+          resource.data.verificationStatus == 'approved' &&
+          resource.data.publicProfileVersion == 2 &&
+          resource.data.locationPrivacyVersion == 1);
+      allow create: if tutorApplicationOwner(uid, request.resource.data.tutorType) &&
+        request.resource.data.verificationStatus == 'pending' &&
+        getAfter(/databases/$(database)/documents/tutorApplications/$(uid)).data
+          .verificationStatus == 'pending' &&
+        publicTutorShape(request.resource.data);
+      allow update: if tutorProfileUpdate(uid);
+      allow delete: if false;
+    }
+
+    match /tutorApplications/{uid} {
+      allow get: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow list: if isAdmin();
+      allow create: if tutorApplicationSubmission(uid) ||
+        adminLegacyApplicationReview(uid);
+      allow update: if isAdmin()
+        ? adminApplicationReview(uid)
+        : (request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['paymentQrUrl', 'updatedAt'])
+          ? (signedIn() &&
+              request.auth.uid == uid &&
+              resource.data.verificationStatus == 'approved' &&
+              request.resource.data.verificationStatus == 'approved' &&
+              request.resource.data.updatedAt == request.time &&
+              (request.resource.data.paymentQrUrl == '' ||
+                request.resource.data.paymentQrUrl.matches('^https://.+')))
+          : (tutorApplicationOwner(uid, request.resource.data.tutorType) &&
+              resource.data.verificationStatus in ['pending', 'rejected'] &&
+              request.resource.data.verificationStatus == 'pending' &&
+              request.resource.data.verificationNote == '' &&
+              request.resource.data.createdAt ==
+                resource.data.get('createdAt', request.time) &&
+              request.resource.data.updatedAt == request.time &&
+              getAfter(/databases/$(database)/documents/tutors/$(uid)).data
+                .verificationStatus == 'pending' &&
+              applicationShape(request.resource.data)));
+      allow delete: if false;
+    }
+
+    match /studentLeaderboard/{uid} {
+      allow get, list: if signedIn() && isStudent();
+      allow create, update: if validLeaderboardEntry(uid);
+      allow delete: if false;
+    }
+
+    match /conversations/{conversationId} {
+      allow get: if signedIn() &&
+        (resource == null ||
+          request.auth.uid in resource.data.participantIds);
+      allow list: if signedIn() &&
+        request.auth.uid in resource.data.participantIds;
+      allow create: if isStudent() &&
+        request.resource.data.studentId == request.auth.uid &&
+        request.resource.data.studentId is string &&
+        request.resource.data.tutorId is string &&
+        request.resource.data.studentId != request.resource.data.tutorId &&
+        request.resource.data.participantIds == [
+          request.resource.data.studentId,
+          request.resource.data.tutorId
+        ] &&
+        approvedTutor(request.resource.data.tutorId) &&
+        request.resource.data.keys().hasOnly([
+          'studentId', 'tutorId', 'participantIds', 'studentName', 'tutorName',
+          'tutorTier', 'lastMessage', 'lastMessageAt', 'unreadBy'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'studentId', 'tutorId', 'participantIds', 'studentName', 'tutorName',
+          'tutorTier', 'lastMessage', 'lastMessageAt', 'unreadBy'
+        ]) &&
+        request.resource.data.studentName is string &&
+        request.resource.data.studentName.size() <= 120 &&
+        request.resource.data.tutorName is string &&
+        request.resource.data.tutorName.size() <= 120 &&
+        request.resource.data.tutorTier in ['Peer Tutor', 'Alumni', 'Professor'] &&
+        request.resource.data.lastMessage == '' &&
+        request.resource.data.lastMessageAt == request.time &&
+        request.resource.data.unreadBy == [];
+      allow update: if isConversationParticipant(conversationId) && (
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadBy']) &&
+          request.resource.data.unreadBy ==
+            resource.data.unreadBy.removeAll([request.auth.uid])) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'lastMessage', 'lastMessageAt', 'unreadBy'
+          ]) &&
+          request.resource.data.lastMessage is string &&
+          request.resource.data.lastMessage.size() > 0 &&
+          request.resource.data.lastMessage.size() <= 4000 &&
+          request.resource.data.lastMessageAt == request.time &&
+          request.resource.data.unreadBy ==
+            resource.data.participantIds.removeAll([request.auth.uid]))
+      );
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isConversationParticipant(conversationId);
+        allow create: if isConversationParticipant(conversationId) &&
+          request.resource.data.keys().hasOnly(['senderId', 'text', 'createdAt']) &&
+          request.resource.data.keys().hasAll(['senderId', 'text', 'createdAt']) &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 4000 &&
+          request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if signedIn() &&
+        (resource == null ||
+          resource.data.recipientId == request.auth.uid ||
+          sentMessageNotification(resource.data) ||
+          bookingCancellationNotificationFromCaller(resource.data));
+      allow list: if signedIn() &&
+        resource.data.recipientId == request.auth.uid;
+      allow create: if (validMessageNotification(request.resource.data) ||
+          bookingCancellationNotificationFromCaller(request.resource.data)) &&
+        request.resource.data.read == false &&
+        request.resource.data.createdAt == request.time;
+      allow update: if signedIn() &&
+        resource.data.recipientId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']) &&
+        request.resource.data.read == true;
+      allow delete: if false;
+    }
+
+    match /wallets/{uid} {
+      allow get: if signedIn();
+      allow list: if isAdmin();
+      allow create: if validWalletInitialization(uid) ||
+        validAdminWalletInitialization(uid);
+      allow update: if validWalletUpdate(uid);
+      allow delete: if false;
+    }
+
+    match /tokenTransactions/{transactionId} {
+      allow get: if isAdmin() ||
+        (signedIn() &&
+          (resource == null ||
+            resource.data.accountId == request.auth.uid ||
+            bookingLedgerParticipant(resource.data)));
+      allow list: if isAdmin() ||
+        (signedIn() && resource.data.accountId == request.auth.uid);
+      allow create: if validTokenTransactionCreate(transactionId);
+      allow update, delete: if false;
+    }
+
+    match /bookings/{bookingId} {
+      allow get: if isAdmin() ||
+        (signedIn() &&
+          request.auth.uid in [resource.data.studentId, resource.data.tutorId]);
+      allow list: if isAdmin() ||
+        (signedIn() &&
+          (resource.data.studentId == request.auth.uid ||
+            (resource.data.tutorId == request.auth.uid &&
+              approvedTutor(request.auth.uid))));
+      allow create: if validBookingCreate(bookingId);
+      allow update: if validBookingUpdate(bookingId);
+      allow delete: if false;
+
+      match /badgeAwards/{awardId} {
+        allow get: if signedIn() &&
+          (exists(/databases/$(database)/documents/bookings/$(bookingId)) &&
+            request.auth.uid in [
+              get(/databases/$(database)/documents/bookings/$(bookingId)).data.studentId,
+              get(/databases/$(database)/documents/bookings/$(bookingId)).data.tutorId
+            ]);
+        allow create: if validStudentBadgeAwardCreate(bookingId, awardId);
+        allow update, delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

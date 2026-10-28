@@ -29,3 +29,10 @@ export function getLocalNotificationsModule(platform) {
   };
   return createLocalNotificationsModule(platform, dependencies);
 }
+
+export function createDateNotificationTrigger(date, triggerTypes) {
+  return {
+    type: triggerTypes.DATE,
+    date,
+  };
+}

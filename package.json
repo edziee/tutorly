@@ -36,6 +36,7 @@
     "emulators:badges": "npx --yes firebase-tools emulators:start --config firebase.badges-test.json --only auth,firestore,storage --project demo-tutorly-badges",
     "seed:badges": "node scripts/seed-badge-demo.mjs",
     "test": "node --test \"src/**/*.test.mjs\"",
+    "test:rules-accounts": "npx --yes firebase-tools emulators:exec --config firebase-accounts-draft-test.json --only auth,firestore --project demo-tutorly-accounts-draft \"node --loader ./tests/firebase-loader.mjs --test tests/firestore-accounts-draft.test.mjs tests/firestore-tutor-draft.test.mjs\"",
     "test:chat": "node --loader ./tests/firebase-loader.mjs --test tests/chat-notifications.test.mjs",
     "test:gamification": "node --loader ./tests/firebase-loader.mjs --test tests/gamification.test.mjs"
   },

@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createLocalNotificationsModule } from './localNotifications.js';
+import {
+  createDateNotificationTrigger,
+  createLocalNotificationsModule,
+} from './localNotifications.js';
 
-test('local notifications load only the modules needed by local scheduling', () => {
+test('local notifications expose the platform scheduling and permission APIs', () => {
   let handlerLoaded = false;
   const permissions = {
     getPermissionsAsync: () => 'current permission',
@@ -30,24 +33,25 @@ test('local notifications load only the modules needed by local scheduling', () 
   assert.equal(handlerLoaded, true);
 });
 
-test('local notification adapter does not depend on Android channel creation', () => {
+test('session reminder trigger uses the SDK date trigger shape', () => {
+  const date = new Date('2026-11-07T17:00:00.000Z');
+  assert.deepEqual(
+    createDateNotificationTrigger(date, { DATE: 'date' }),
+    { type: 'date', date },
+  );
+});
+
+test('local notifications expose the same scheduling APIs on iOS', () => {
   const notifications = createLocalNotificationsModule('ios', {
-    permissions: {},
-    scheduler: {},
+    permissions: { requestPermissionsAsync: () => 'permission' },
+    scheduler: { scheduleNotificationAsync: () => 'scheduled' },
     cancel: {},
     triggerTypes: {},
     loadHandler: () => ({}),
   });
 
-  assert.equal('setNotificationChannelAsync' in notifications, false);
-  assert.equal('AndroidImportance' in notifications, false);
-  assert.equal('setNotificationChannelAsync' in createLocalNotificationsModule('android', {
-    permissions: {},
-    scheduler: {},
-    cancel: {},
-    triggerTypes: {},
-    loadHandler: () => ({}),
-  }), false);
+  assert.equal(notifications.requestPermissionsAsync(), 'permission');
+  assert.equal(notifications.scheduleNotificationAsync(), 'scheduled');
 });
 
 test('web does not load native notification modules', () => {
@@ -60,5 +64,6 @@ test('notification adapter uses leaf modules rather than the package barrel', as
 
   assert.match(source, /expo-notifications\/build\/NotificationPermissions/);
   assert.match(source, /expo-notifications\/build\/scheduleNotificationAsync/);
+  assert.doesNotMatch(source, /setNotificationChannelAsync/);
   assert.doesNotMatch(source, /require\(['"]expo-notifications['"]\)/);
 });

@@ -32,7 +32,10 @@ import {
   submitBookingRating,
   updateBookingStatus,
 } from '../../services/bookingService';
-import { getLocalNotificationsModule } from '../../services/localNotifications';
+import {
+  createDateNotificationTrigger,
+  getLocalNotificationsModule,
+} from '../../services/localNotifications';
 import { getOrCreateConversation } from '../../services/chatService';
 import { getTutorById } from '../../services/tutorService';
 import { colors } from '../../theme/colors';
@@ -703,7 +706,10 @@ export default function ScheduleScreen() {
           body: `${session.subject} with ${session.tutorName} starts in one hour.`,
           data: { sessionId: session.id },
         },
-        trigger: reminderDate,
+        trigger: createDateNotificationTrigger(
+          reminderDate,
+          Notifications.SchedulableTriggerInputTypes,
+        ),
       });
       setReminderIds((current) => ({ ...current, [session.id]: reminderId }));
       Alert.alert('Reminder set', 'We’ll remind you one hour before this session.');
@@ -715,7 +721,9 @@ export default function ScheduleScreen() {
         missingNativeModule ? 'Reminders unavailable' : 'Couldn’t update reminder',
         missingNativeModule
           ? 'The installed app is missing a compatible native notifications module. Update Expo Go to the project’s SDK version, or rebuild the development app, then try again.'
-          : errorMessage,
+          : (__DEV__ && error instanceof Error
+            ? error.message
+            : getErrorMessage(error, 'Could not set the reminder. Check notification permission in device settings and try again.')),
       );
     }
   }
