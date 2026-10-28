@@ -6,10 +6,11 @@ import { ROUTES } from '../../constants/routes';
 import { getUserId } from '../../utils/user';
 import { isStudentWorkspace } from '../../utils/workspace';
 import { timeAgo } from '../../utils/format';
+import { getConversationCounterparty } from '../../utils/chat';
 import EmptyState from '../../components/EmptyState';
 import ErrorState from '../../components/ErrorState';
 import LoadingState from '../../components/LoadingState';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -27,6 +28,7 @@ import { spacing } from '../../theme/spacing';
 import StudentAvatar from '../../components/StudentAvatar';
 
 const filters = ['All Messages', 'Active Tutors', 'Faculty / Profs'];
+const studentFilters = ['All Messages', 'Students'];
 const accent = colors.secondary;
 
 function Avatar({ initials, image, size = 46, online = false }) {
@@ -96,13 +98,23 @@ export default function ChatScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All Messages');
 
+  const availableFilters = showStudentTutorDiscovery
+    ? filters
+    : studentFilters;
   const messages = (conversations.data || []).map((chat) => ({
-    ...chat, name: uid === chat.studentId ? chat.tutorName : chat.studentName,
-    role: chat.tutorTier, roleColor: colors.mint, course: '', preview: chat.lastMessage || 'Say your first message!',
-    time: timeAgo(chat.lastMessageAt), unread: chat.unreadBy?.includes(uid),
-    category: chat.tutorTier === 'Professor' ? 'Faculty / Profs' : 'Active Tutors',
+    ...chat,
+    ...getConversationCounterparty(chat, uid),
+    roleColor: colors.mint,
+    course: '',
+    preview: chat.lastMessage || 'Say your first message!',
+    time: timeAgo(chat.lastMessageAt),
+    unread: chat.unreadBy?.includes(uid),
   }));
   const onlineTutors = showStudentTutorDiscovery ? (availableTutors.data || []) : [];
+
+  useEffect(() => {
+    if (!availableFilters.includes(activeFilter)) setActiveFilter('All Messages');
+  }, [activeFilter, availableFilters]);
 
   const visibleMessages = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -201,7 +213,7 @@ export default function ChatScreen({ navigation }) {
           contentContainerStyle={styles.filterList}
           showsHorizontalScrollIndicator={false}
         >
-          {filters.map((filter) => {
+          {availableFilters.map((filter) => {
             const selected = activeFilter === filter;
 
             return (

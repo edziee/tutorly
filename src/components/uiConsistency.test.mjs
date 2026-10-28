@@ -33,6 +33,15 @@ test('tutor schedule message action opens chat without opening session details',
   assert.match(chatService, /A tutor can start a conversation only from one of their bookings/);
 });
 
+test('chat inbox displays the other participant role and filters for each workspace', async () => {
+  const chatScreen = await source('../screens/shared/ChatScreen.jsx');
+
+  assert.match(chatScreen, /getConversationCounterparty\(chat, uid\)/);
+  assert.match(chatScreen, /const studentFilters = \['All Messages', 'Students'\]/);
+  assert.match(chatScreen, /showStudentTutorDiscovery\s*\?\s*filters\s*:\s*studentFilters/);
+  assert.match(chatScreen, /\{availableFilters\.map\(\(filter\) =>/);
+});
+
 test('profile avatars share circular cover-cropped photos and fallback styling', async () => {
   const [
     avatar,
@@ -87,7 +96,7 @@ test('chat presence keeps active tutors while removing only the inbox count and 
   assert.match(chatScreen, /<Text style=\{styles\.switchSelectedText\}>Inbox<\/Text>/);
   assert.doesNotMatch(chatScreen, /Inbox[\s\S]{0,40}messages\.length/);
   assert.doesNotMatch(chatScreen, /name="options-outline"/);
-  assert.match(chatScreen, /filters\.map/);
+  assert.match(chatScreen, /availableFilters\.map/);
   assert.match(chatScreen, /unreadBadge/);
   assert.match(chatScreen, /online=\{tutor\.online === true\}/);
 });
