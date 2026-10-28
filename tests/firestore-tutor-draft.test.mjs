@@ -286,6 +286,21 @@ test('tutor draft supports private applications, public approved profiles, and s
   });
   console.log('booking-created');
   assert.equal((await getBookingById(bookingId)).status, 'requested');
+  setCurrentIdentity(student);
+  const tutorStartedConversation = await getOrCreateConversation(
+    other.uid,
+    student.uid,
+    { bookingId },
+  );
+  assert.equal(
+    (await getDoc(doc(student.db, 'conversations', tutorStartedConversation))).data().bookingId,
+    bookingId,
+  );
+  setCurrentIdentity(other);
+  assert.equal(
+    await getOrCreateConversation(other.uid, student.uid),
+    tutorStartedConversation,
+  );
 
   const studentBookingQuery = query(
     collection(other.db, 'bookings'),

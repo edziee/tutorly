@@ -21,6 +21,18 @@ test('authenticated stack routes use the branded Tutorly header', async () => {
   assert.match(adminNavigator, /<AdminHeader/);
 });
 
+test('tutor schedule message action opens chat without opening session details', async () => {
+  const [schedule, chatService] = await Promise.all([
+    source('../screens/tutor/TutorScheduleScreen.jsx'),
+    source('../services/chatService.js'),
+  ]);
+
+  assert.match(schedule, /onPress=\{\(event\) => \{\s*event\.stopPropagation\(\);\s*onMessage\(\);/);
+  assert.match(schedule, /getOrCreateConversation\(\s*session\.studentId,\s*user\.uid,\s*\{ bookingId: session\.bookingId \}/);
+  assert.match(schedule, /navigation\.navigate\(ROUTES\.CONVERSATION, \{ conversationId \}\)/);
+  assert.match(chatService, /A tutor can start a conversation only from one of their bookings/);
+});
+
 test('profile avatars share circular cover-cropped photos and fallback styling', async () => {
   const [
     avatar,

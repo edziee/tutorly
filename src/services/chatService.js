@@ -10,6 +10,7 @@ import {
   isTutorPresenceActive,
   TUTOR_PRESENCE_TIMEOUT_MS,
 } from '../utils/tutorPresence';
+import { BOOKING_STATUS } from '../constants/statuses';
 
 function signedIn() {
   const firebase = requireFirebase();
@@ -32,7 +33,7 @@ export function subscribeToMessages(conversationId, callback, onError = console.
   (snapshot) => callback(snapshot.docs.map((item) => ({ ...item.data(), id: item.id }))), onError);
 }
 
-export async function getOrCreateConversation(studentId, tutorId) {
+export async function getOrCreateConversation(studentId, tutorId, { bookingId } = {}) {
   const { auth, db, uid } = signedIn();
   if (!studentId || !tutorId || studentId === tutorId || ![studentId, tutorId].includes(uid)) {
     throw new Error('Choose a student and a different tutor for this chat.');
@@ -42,15 +43,46 @@ export async function getOrCreateConversation(studentId, tutorId) {
   await runTransaction(db, async (transaction) => {
     const existing = await transaction.get(ref);
     if (existing.exists()) return;
-    if (uid !== studentId) throw new Error('A student must start a new conversation.');
-    const [tutor, student] = await Promise.all([
-      transaction.get(doc(db, 'tutors', tutorId)), transaction.get(doc(db, 'users', studentId)),
-    ]);
-    if (!tutor.exists()) throw new Error('This tutor profile is not available.');
+    let conversation;
+    if (uid === studentId) {
+      const [tutor, student] = await Promise.all([
+        transaction.get(doc(db, 'tutors', tutorId)),
+        transaction.get(doc(db, 'users', studentId)),
+      ]);
+      if (!tutor.exists()) throw new Error('This tutor profile is not available.');
+      conversation = {
+        studentName: student.data()?.name || auth.currentUser.displayName || 'Student',
+        tutorName: tutor.data().name || 'Tutor',
+        tutorTier: tutor.data().tier || 'Peer Tutor',
+      };
+    } else {
+      if (typeof bookingId !== 'string' || !bookingId) {
+        throw new Error('A tutor can start a conversation only from one of their bookings.');
+      }
+      const bookingSnapshot = await transaction.get(doc(db, 'bookings', bookingId));
+      if (!bookingSnapshot.exists()) throw new Error('This booking is no longer available.');
+      const booking = bookingSnapshot.data();
+      if (
+        booking.studentId !== studentId ||
+        booking.tutorId !== tutorId ||
+        ![
+          BOOKING_STATUS.REQUESTED,
+          BOOKING_STATUS.UPCOMING,
+          BOOKING_STATUS.COMPLETED,
+        ].includes(booking.status)
+      ) {
+        throw new Error('This booking cannot be used to start a conversation.');
+      }
+      conversation = {
+        studentName: booking.studentName || 'Student',
+        tutorName: booking.tutorName || 'Tutor',
+        tutorTier: booking.tutorTier || 'Peer Tutor',
+        bookingId,
+      };
+    }
     transaction.set(ref, {
       studentId, tutorId, participantIds: [studentId, tutorId],
-      studentName: student.data()?.name || auth.currentUser.displayName || 'Student',
-      tutorName: tutor.data().name || 'Tutor', tutorTier: tutor.data().tier || 'Peer Tutor',
+      ...conversation,
       lastMessage: '', lastMessageAt: serverTimestamp(), unreadBy: [],
     });
   });

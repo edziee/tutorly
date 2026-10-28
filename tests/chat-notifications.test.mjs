@@ -82,6 +82,30 @@ test('chat alerts integrate with Firestore, read state, retries, and security ru
   const conversationId = await getOrCreateConversation(student.uid, tutor.uid);
   assert.equal(await getOrCreateConversation(student.uid, tutor.uid), conversationId);
 
+  choose(tutor);
+  await seed('bookings/tutor-started-conversation', {
+    studentId: outsider.uid,
+    tutorId: tutor.uid,
+    status: 'upcoming',
+    studentName: 'Test student',
+    tutorName: 'Test Tutor',
+    tutorTier: 'Peer Tutor',
+  });
+  await assert.rejects(
+    getOrCreateConversation(outsider.uid, tutor.uid),
+    /A tutor can start a conversation only from one of their bookings/,
+  );
+  const tutorStartedConversationId = await getOrCreateConversation(
+    outsider.uid,
+    tutor.uid,
+    { bookingId: 'tutor-started-conversation' },
+  );
+  assert.equal(
+    (await getDoc(doc(tutor.db, 'conversations', tutorStartedConversationId))).data().bookingId,
+    'tutor-started-conversation',
+  );
+
+  choose(student);
   const sent = await sendMessage(conversationId, { senderId: student.uid, text: 'Hello tutor', messageId: 'first-message' });
   assert.equal(sent.notificationError, null);
   choose(tutor);

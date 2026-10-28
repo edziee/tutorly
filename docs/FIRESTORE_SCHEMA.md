@@ -244,6 +244,7 @@ recorded.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `studentId`, `tutorId` | string | |
+| `bookingId` | string, optional | Included when an approved tutor starts a conversation from a matching requested, upcoming, or completed booking |
 | `participantIds` | array of string | Both ids, so one query finds all of a user's chats |
 | `studentName`, `tutorName`, `tutorTier` | string | Copied for the list |
 | `lastMessage` | string | The preview |

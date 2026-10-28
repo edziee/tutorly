@@ -36,22 +36,34 @@ service cloud.firestore {
         && request.resource.data.online is bool
         && request.resource.data.lastSeenAt == request.time;
     }
+    match /bookings/{id} {
+      allow get: if signedIn() &&
+        request.auth.uid in [resource.data.studentId, resource.data.tutorId];
+    }
     match /conversations/{id} {
       // Reading a missing deterministic ID is needed by get-or-create's transaction.
       allow get: if signedIn() && (!exists(/databases/$(database)/documents/conversations/$(id)) || request.auth.uid in resource.data.participantIds);
       allow list: if signedIn() && request.auth.uid in resource.data.participantIds;
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['studentId', 'tutorId', 'participantIds', 'studentName', 'tutorName', 'tutorTier', 'lastMessage', 'lastMessageAt', 'unreadBy'])
-        && request.auth.uid == request.resource.data.studentId
+        && request.resource.data.keys().hasOnly(['studentId', 'tutorId', 'participantIds', 'studentName', 'tutorName', 'tutorTier', 'lastMessage', 'lastMessageAt', 'unreadBy', 'bookingId'])
         && request.resource.data.studentId != request.resource.data.tutorId
         && request.resource.data.participantIds == [request.resource.data.studentId, request.resource.data.tutorId]
-        && get(/databases/$(database)/documents/users/$(request.resource.data.studentId)).data.role == 'student'
-        && get(/databases/$(database)/documents/users/$(request.resource.data.tutorId)).data.role in ['tutor', 'professional']
         && get(/databases/$(database)/documents/tutors/$(request.resource.data.tutorId)).data.verificationStatus == 'approved'
         && request.resource.data.studentName is string && request.resource.data.tutorName is string
         && request.resource.data.tutorTier in ['Peer Tutor', 'Alumni', 'Professor']
         && request.resource.data.lastMessage == '' && request.resource.data.lastMessageAt == request.time
-        && request.resource.data.unreadBy == [];
+        && request.resource.data.unreadBy == []
+        && (
+          (request.auth.uid == request.resource.data.studentId
+            && !('bookingId' in request.resource.data)
+            && get(/databases/$(database)/documents/users/$(request.resource.data.studentId)).data.role == 'student'
+            && get(/databases/$(database)/documents/users/$(request.resource.data.tutorId)).data.role in ['tutor', 'professional'])
+          || (request.auth.uid == request.resource.data.tutorId
+            && request.resource.data.bookingId is string
+            && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.studentId == request.resource.data.studentId
+            && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.tutorId == request.resource.data.tutorId
+            && get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.status in ['requested', 'upcoming', 'completed'])
+        );
       allow update: if signedIn() && request.auth.uid in resource.data.participantIds && (
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadBy'])
           && request.resource.data.unreadBy == resource.data.unreadBy.removeAll([request.auth.uid]))

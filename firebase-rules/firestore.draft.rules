@@ -71,6 +71,50 @@ service cloud.firestore {
         request.auth.uid in get(path).data.participantIds;
     }
 
+    function validTutorConversationCreate(data) {
+      let bookingId = data.get('bookingId', '');
+      let bookingPath = /databases/$(database)/documents/bookings/$(bookingId);
+      return request.auth.uid == data.tutorId &&
+        bookingId is string &&
+        exists(bookingPath) &&
+        get(bookingPath).data.studentId == data.studentId &&
+        get(bookingPath).data.tutorId == data.tutorId &&
+        get(bookingPath).data.status in ['requested', 'upcoming', 'completed'];
+    }
+
+    function validConversationCreate() {
+      let data = request.resource.data;
+      return signedIn() &&
+        data.keys().hasOnly([
+          'studentId', 'tutorId', 'participantIds', 'studentName', 'tutorName',
+          'tutorTier', 'lastMessage', 'lastMessageAt', 'unreadBy', 'bookingId'
+        ]) &&
+        data.keys().hasAll([
+          'studentId', 'tutorId', 'participantIds', 'studentName', 'tutorName',
+          'tutorTier', 'lastMessage', 'lastMessageAt', 'unreadBy'
+        ]) &&
+        data.studentId is string &&
+        data.tutorId is string &&
+        data.studentId != data.tutorId &&
+        data.participantIds == [data.studentId, data.tutorId] &&
+        data.studentName is string &&
+        data.studentName.size() <= 120 &&
+        data.tutorName is string &&
+        data.tutorName.size() <= 120 &&
+        data.tutorTier in ['Peer Tutor', 'Alumni', 'Professor'] &&
+        data.lastMessage == '' &&
+        data.lastMessageAt == request.time &&
+        data.unreadBy == [] &&
+        (
+          (isStudent() &&
+            request.auth.uid == data.studentId &&
+            !('bookingId' in data) &&
+            approvedTutor(data.tutorId)) ||
+          (approvedTutor(data.tutorId) &&
+            validTutorConversationCreate(data))
+        );
+    }
+
     function sentMessageNotification(data) {
       let conversationId = data.data.get('conversationId', 'invalid');
       let messageId = data.data.get('messageId', 'invalid');
@@ -1520,32 +1564,7 @@ service cloud.firestore {
           request.auth.uid in resource.data.participantIds);
       allow list: if signedIn() &&
         request.auth.uid in resource.data.participantIds;
-      allow create: if isStudent() &&
-        request.resource.data.studentId == request.auth.uid &&
-        request.resource.data.studentId is string &&
-        request.resource.data.tutorId is string &&
-        request.resource.data.studentId != request.resource.data.tutorId &&
-        request.resource.data.participantIds == [
-          request.resource.data.studentId,
-          request.resource.data.tutorId
-        ] &&
-        approvedTutor(request.resource.data.tutorId) &&
-        request.resource.data.keys().hasOnly([
-          'studentId', 'tutorId', 'participantIds', 'studentName', 'tutorName',
-          'tutorTier', 'lastMessage', 'lastMessageAt', 'unreadBy'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'studentId', 'tutorId', 'participantIds', 'studentName', 'tutorName',
-          'tutorTier', 'lastMessage', 'lastMessageAt', 'unreadBy'
-        ]) &&
-        request.resource.data.studentName is string &&
-        request.resource.data.studentName.size() <= 120 &&
-        request.resource.data.tutorName is string &&
-        request.resource.data.tutorName.size() <= 120 &&
-        request.resource.data.tutorTier in ['Peer Tutor', 'Alumni', 'Professor'] &&
-        request.resource.data.lastMessage == '' &&
-        request.resource.data.lastMessageAt == request.time &&
-        request.resource.data.unreadBy == [];
+      allow create: if validConversationCreate();
       allow update: if isConversationParticipant(conversationId) && (
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadBy']) &&
           request.resource.data.unreadBy ==

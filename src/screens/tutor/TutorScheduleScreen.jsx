@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import LoadingState from '../../components/LoadingState';
 import EmptyState from '../../components/EmptyState';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,10 +26,12 @@ import {
 } from '../../constants/statuses';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../hooks/useSubscription';
+import { ROUTES } from '../../constants/routes';
 import {
   subscribeToTutorBookings,
   updateBookingStatus,
 } from '../../services/bookingService';
+import { getOrCreateConversation } from '../../services/chatService';
 import {
   createDateNotificationTrigger,
   getLocalNotificationsModule,
@@ -287,7 +290,7 @@ function cancellationIsBlocked(session) {
   ].includes(session.paymentStatusCode));
 }
 
-function SessionCard({ session, onPress, onCancel, onReminder }) {
+function SessionCard({ session, onPress, onCancel, onReminder, onMessage }) {
   return (
     <Pressable onPress={onPress} style={[styles.sessionCard, session.status === 'completed' ? styles.completedCard : styles.upcomingCard]}>
       <View style={styles.sessionTopRow}>
@@ -322,7 +325,18 @@ function SessionCard({ session, onPress, onCancel, onReminder }) {
           <>
             <Pressable style={styles.cancelAction} onPress={(event) => { event.stopPropagation(); onCancel(); }}><Ionicons name="close-circle-outline" size={15} color={colors.error} /><Text style={styles.cancelActionText}>Cancel</Text></Pressable>
             <Pressable style={styles.reminderAction} onPress={(event) => { event.stopPropagation(); onReminder(); }}><Ionicons name={session.reminderEnabled ? 'notifications' : 'notifications-outline'} size={15} color={colors.success} /><Text style={styles.reminderActionText}>{session.reminderEnabled ? 'Reminder On' : 'Set Reminder'}</Text></Pressable>
-            <Pressable style={styles.primaryAction} disabled><Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.white} /><Text style={styles.primaryActionText}>Message {session.studentName.split(' ')[0]}</Text></Pressable>
+            <Pressable
+              accessibilityLabel={`Message ${session.studentName}`}
+              accessibilityRole="button"
+              style={styles.primaryAction}
+              onPress={(event) => {
+                event.stopPropagation();
+                onMessage();
+              }}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.white} />
+              <Text style={styles.primaryActionText}>Message {session.studentName.split(' ')[0]}</Text>
+            </Pressable>
           </>
         ) : null}
       </View>
@@ -330,7 +344,7 @@ function SessionCard({ session, onPress, onCancel, onReminder }) {
   );
 }
 
-function WeekAgenda({ sessions, onSelect, onCancel, onReminder }) {
+function WeekAgenda({ sessions, onSelect, onCancel, onReminder, onMessage }) {
   const groupedSessions = sessions.reduce((groups, session) => {
     if (!groups[session.dateKey]) groups[session.dateKey] = [];
     groups[session.dateKey].push(session);
@@ -340,12 +354,13 @@ function WeekAgenda({ sessions, onSelect, onCancel, onReminder }) {
   return Object.entries(groupedSessions).sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate)).map(([key, daySessions]) => (
     <View key={key}>
       <Text style={styles.dayGroupTitle}>{formatSessionDate(daySessions[0].dateKey)}</Text>
-      {daySessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => onSelect(session)} onCancel={() => onCancel(session)} onReminder={() => onReminder(session)} />)}
+      {daySessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => onSelect(session)} onCancel={() => onCancel(session)} onReminder={() => onReminder(session)} onMessage={() => onMessage(session)} />)}
     </View>
   ));
 }
 
 export default function ScheduleScreen() {
+  const navigation = useNavigation();
   const { user } = useAuth();
   const bookingResults = useSubscription(
     (onData, onError) => (
@@ -509,6 +524,19 @@ export default function ScheduleScreen() {
     : view === 'week'
       ? selectedWeekSessions
       : selectedDateSessions;
+
+  async function messageStudent(session) {
+    try {
+      const conversationId = await getOrCreateConversation(
+        session.studentId,
+        user.uid,
+        { bookingId: session.bookingId },
+      );
+      navigation.navigate(ROUTES.CONVERSATION, { conversationId });
+    } catch (error) {
+      Alert.alert('Couldn’t open chat', getErrorMessage(error, 'Could not open this conversation.'));
+    }
+  }
   const upcomingSessions = displayedSessions.filter((session) => session.status === 'upcoming');
   const completedSessions = displayedSessions.filter((session) => session.status === 'completed');
 
@@ -754,11 +782,11 @@ export default function ScheduleScreen() {
           <Text style={styles.selectedDateText}>{formatShortDate(selectedDate)} • {view === 'agenda' ? 'Agenda' : `${view.charAt(0).toUpperCase()}${view.slice(1)} view`}</Text>
         </View>
         <FilterBar filter={filter} onChange={changeFilter} sessions={allSessions} />
-        {view === 'week' && displayedSessions.length ? <WeekAgenda sessions={displayedSessions} onSelect={openScheduleModal} onCancel={cancelSession} onReminder={toggleReminder} /> : null}
+        {view === 'week' && displayedSessions.length ? <WeekAgenda sessions={displayedSessions} onSelect={openScheduleModal} onCancel={cancelSession} onReminder={toggleReminder} onMessage={messageStudent} /> : null}
         {view !== 'week' && upcomingSessions.length ? (
           <View>
             <View style={styles.sectionHeading}><Ionicons name="calendar-outline" size={20} color={colors.success} /><Text style={styles.sectionHeadingText}>Upcoming Agenda</Text><Text style={styles.sessionCount}>{upcomingSessions.length} Sessions</Text></View>
-            {upcomingSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session)} onCancel={() => cancelSession(session)} onReminder={() => toggleReminder(session)} />)}
+            {upcomingSessions.map((session) => <SessionCard key={session.id} session={session} onPress={() => openScheduleModal(session)} onCancel={() => cancelSession(session)} onReminder={() => toggleReminder(session)} onMessage={() => messageStudent(session)} />)}
           </View>
         ) : null}
         {view !== 'week' && completedSessions.length ? (
