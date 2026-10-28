@@ -329,8 +329,8 @@ export async function saveTutorApplication(uid, application) {
     verificationNote: '',
     publicProfileVersion: 2,
     locationPrivacyVersion: 1,
+    createdAt: existingTutorData?.createdAt ?? now,
     updatedAt: now,
-    ...(!existingTutorData?.createdAt ? { createdAt: now } : {}),
   };
   [
     'photoUrl',
