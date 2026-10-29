@@ -17,6 +17,14 @@
       ],
       "expo-font",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false
+          }
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow Tutorly to use your location to show tutors near you and to check you in at campus."
