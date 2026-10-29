@@ -11,7 +11,7 @@ export default function SplashScreen() {
 
       <View style={styles.content}>
         <Image
-          source={require('../../../assets/tutorly-logo.png')}
+          source={require('../../../assets/tutorly-logo-transparent.png')}
           style={{ width: logoSize, height: logoSize }}
           resizeMode="contain"
           accessibilityLabel="Tutorly logo"

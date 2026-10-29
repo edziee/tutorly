@@ -17,7 +17,7 @@ export default function AuthHeader({ subtitle, onLogoLongPress }) {
         style={styles.logoTile}
       >
         <Image
-          source={require('../../assets/tutorly-logo.png')}
+          source={require('../../assets/tutorly-logo-transparent.png')}
           style={styles.logo}
           resizeMode="contain"
           accessibilityLabel="Tutorly logo"

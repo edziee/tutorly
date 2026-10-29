@@ -36,6 +36,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.group1.tutorly",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -45,6 +46,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b242d547-3231-4ac9-8c2e-291e9e91874a"
+      }
     }
   }
 }
