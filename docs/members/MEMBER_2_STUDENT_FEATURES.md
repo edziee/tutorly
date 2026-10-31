@@ -40,13 +40,13 @@ Statuses live in [PROJECT_PLAN](../PROJECT_PLAN.md). Change them in the same pul
 
 ## Map library
 
-Tutor discovery uses `react-native-maps` on iOS/Android, which is included in Expo Go for SDK 58. The web build uses Leaflet with OpenStreetMap tiles because `react-native-maps` does not support Expo Web. Standalone Android app binaries need a Google Maps API key and a rebuilt native binary. Set `GOOGLE_MAPS_API_KEY` in the local/build environment; `app.config.js` passes it to the map config plugin. Do not commit the key. Expo Go does not require this key.
+Tutor discovery uses MapLibre React Native with the OpenFreeMap Fiord style (`https://tiles.openfreemap.org/styles/fiord`) on iOS and Android. The web build continues to use Leaflet with OpenStreetMap tiles. OpenFreeMap's public style does not require an API key; keep its map attribution visible. Its public service has no SLA. MapLibre includes native code and is not available in Expo Go, so native changes require a development or preview build. No Google Maps API key is used.
 
 The list and map share the same tutor search and filters. Near me is available only in map mode. It filters mapped tutors to within approximately 10 km, ordered nearest first, using straight-line distance from the student’s search origin to the coarse `locationCell` derived from each approved tutor’s saved city/area. This is an estimate, not driving distance. Tutors without a usable location remain visible in a clearly labeled section. Tutor home addresses are never used for public pins or distances. Student device coordinates are used in memory; if the student taps the recenter control, only a rounded approximate map location is sent to the map provider to load tiles, after the location-use disclosure is accepted. Admin Verifications → **Update approved tutor records** backfills existing approved tutors from their private saved city/area. Legacy cells without the city-area marker are ignored until that migration runs.
 
 Near me uses a device fix only when its reported accuracy is within 1 km and its timestamp is no more than 2 minutes old. Otherwise, it uses the student's saved private address when available and explains why the device fix was not used.
 
-Docs: [react-native-maps](https://docs.expo.dev/versions/v58.0.0/sdk/map-view/), [expo-location](https://docs.expo.dev/versions/v58.0.0/sdk/location/).
+Docs: [MapLibre React Native](https://maplibre.org/maplibre-react-native/docs/setup/getting-started), [OpenFreeMap](https://openfreemap.org/), [expo-location](https://docs.expo.dev/versions/v58.0.0/sdk/location/).
 
 ## Runtime data sources
 

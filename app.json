@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "tutorly",
+    "name": "Tutorly",
     "slug": "tutorly",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,6 +16,7 @@
         }
       ],
       "expo-font",
+      "@maplibre/maplibre-react-native",
       [
         "expo-build-properties",
         {
@@ -47,7 +48,7 @@
       "package": "com.group1.tutorly",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
+        "foregroundImage": "./assets/tutorly-logo-transparent.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       }

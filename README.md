@@ -42,7 +42,7 @@ The app has Firebase-backed authentication and data flows for bookings, tutor pr
 | Booking flow and payment | Not built. Placeholder screens and the `bookingService` function list are in place |
 | Firebase | The `firebase` package and the connection file `src/config/firebase.js` are in, but not connected: the Firebase project and `.env.local` are not set up yet (Member 1, Week 1) |
 | In-app notifications | Not wired up. The bell in the header shows a placeholder alert. `NotificationCard` is built but no screen uses it yet |
-| Geolocation and map | Foreground-only Near me search and tutor map are implemented. `react-native-maps` is used on iOS/Android, Leaflet/OpenStreetMap on web; standalone Android maps require `GOOGLE_MAPS_API_KEY` |
+| Geolocation and map | Foreground-only Near me search and tutor map are implemented. MapLibre with OpenFreeMap Fiord is used on iOS/Android; Leaflet/OpenStreetMap is used on web |
 
 Runtime demo datasets and fallback identities have been removed. The remaining test/seed fixtures and the cleanup scope are documented in [`docs/MOCK_DATA_INVENTORY.md`](docs/MOCK_DATA_INVENTORY.md).
 
@@ -50,7 +50,7 @@ Runtime demo datasets and fallback identities have been removed. The remaining t
 
 - [Expo](https://docs.expo.dev/versions/v58.0.0/) SDK 58 with React Native 0.88 and React 19.3
 - React Navigation (bottom tabs and native stack)
-- Expo modules in use: `expo-calendar`, `expo-document-picker`, `expo-image-picker`, `expo-notifications`, `expo-font`, `expo-location`, `react-native-maps`
+- Expo modules in use: `expo-calendar`, `expo-document-picker`, `expo-image-picker`, `expo-notifications`, `expo-font`, `expo-location`, `@maplibre/maplibre-react-native`
 - Web map: Leaflet with OpenStreetMap tiles
 - `@react-native-async-storage/async-storage` for data kept on the device
 - Firebase JS SDK (`firebase` 12) for Authentication and Firestore. It runs in Expo Go
@@ -68,10 +68,12 @@ npm install
 npm start
 ```
 
-Then press `a` for Android, `i` for iOS, or `w` for the web, or scan the QR code with Expo Go. The same can be started directly with `npm run android`, `npm run ios` or `npm run web`.
-create a new branch when creating something new
+Use `npm run web` to start the web app. Native iOS/Android builds use MapLibre, which is not included in Expo Go; test native maps in a development or preview build.
+Create a new branch when creating something new.
 
 Run `npm test` to run the tests for the helpers in `src/utils` (needs Node 22 or newer).
+
+The native tutor map uses MapLibre and is not included in Expo Go. To test the native app, use an EAS development/preview build or a locally built native app. The web map remains available through Expo web.
 
 Known limits when running:
 

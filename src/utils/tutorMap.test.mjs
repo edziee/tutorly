@@ -20,6 +20,14 @@ const webMapScreen = await readFile(
   new URL('../screens/student/TutorsMapScreen.web.jsx', import.meta.url),
   'utf8',
 );
+const appConfig = JSON.parse(await readFile(
+  new URL('../../app.json', import.meta.url),
+  'utf8',
+));
+const packageManifest = JSON.parse(await readFile(
+  new URL('../../package.json', import.meta.url),
+  'utf8',
+));
 
 test('map data uses only coarse public cells and keeps tutors without a cell visible', () => {
   const tutors = [
@@ -85,7 +93,7 @@ test('map pins use coarse tutor cells; the rounded search origin is also marked'
   assert.match(nativeMapScreen, /<Modal[\s\S]*?visible=\{mapExpanded && Boolean\(mapRegion\)\}/);
   assert.match(nativeMapScreen, /right: spacing\.md,[\s\S]*?top: spacing\.md/);
   assert.match(nativeMapScreen, /nearMeActive && searchOrigin && searchOriginSource/);
-  assert.match(nativeMapScreen, /coordinate=\{searchOrigin\}/);
+  assert.match(nativeMapScreen, /lngLat=\{\[searchOrigin\.longitude, searchOrigin\.latitude\]\}/);
   assert.match(nativeMapScreen, /You \(approximate location\)/);
   assert.match(nativeMapScreen, /Saved address \(approximate\)/);
   assert.match(nativeMapScreen, /recenterOnSearchOrigin/);
@@ -106,7 +114,7 @@ test('map pins use coarse tutor cells; the rounded search origin is also marked'
   assert.match(webMapScreen, /latitudeDelta: 0\.02, longitudeDelta: 0\.02/);
   assert.match(webMapScreen, /:\$\{recenterRequest\}/);
   assert.match(webMapScreen, /map\.setView\(\[region\.latitude, region\.longitude\], zoom, \{ animate: true \}\)/);
-  assert.match(nativeMapScreen, /coordinate=\{searchOrigin\}/);
+  assert.match(nativeMapScreen, /lngLat=\{\[searchOrigin\.longitude, searchOrigin\.latitude\]\}/);
   assert.match(webMapScreen, /position=\{\[searchOrigin\.latitude, searchOrigin\.longitude\]\}/);
 });
 
@@ -145,9 +153,22 @@ test('map view omits the redundant browse button while retaining the list toggle
   assert.match(nativeMapScreen, /nestedScrollEnabled/);
 });
 
-test('web uses Leaflet instead of importing native map codegen modules', () => {
+test('native maps use MapLibre and OpenFreeMap Fiord without Google Maps dependencies', () => {
+  assert.match(nativeMapScreen, /from '@maplibre\/maplibre-react-native'/);
+  assert.match(nativeMapScreen, /FIORD_MAP_STYLE = 'https:\/\/tiles\.openfreemap\.org\/styles\/fiord'/);
+  assert.match(
+    nativeMapScreen,
+    /lngLat=\{\[tutor\.mapCoordinates\.longitude, tutor\.mapCoordinates\.latitude\]\}/,
+  );
+  assert.doesNotMatch(nativeMapScreen, /react-native-maps/);
+  assert.ok(packageManifest.dependencies['@maplibre/maplibre-react-native']);
+  assert.equal(packageManifest.dependencies['react-native-maps'], undefined);
+  assert.ok(appConfig.expo.plugins.includes('@maplibre/maplibre-react-native'));
+});
+
+test('web uses Leaflet independently of the native MapLibre renderer', () => {
   assert.match(webMapScreen, /import \{\s*MapContainer,[\s\S]*?\} from 'react-leaflet'/);
-  assert.doesNotMatch(webMapScreen, /from 'react-native-maps'/);
-  assert.match(nativeMapScreen, /from 'react-native-maps'/);
+  assert.doesNotMatch(webMapScreen, /@maplibre\/maplibre-react-native/);
+  assert.match(nativeMapScreen, /from '@maplibre\/maplibre-react-native'/);
   assert.match(webMapScreen, /<MapContainer[\s\S]*?key=\{`\$\{expanded \? 'expanded-map' : 'inline-map'\}:\$\{recenterRequest\}`\}/);
 });

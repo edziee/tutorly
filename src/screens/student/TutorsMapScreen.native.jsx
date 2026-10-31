@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
-import MapView, { Marker } from 'react-native-maps';
+import { Camera, Map as MapLibreMap, Marker } from '@maplibre/maplibre-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import TutorCard from '../../components/TutorCard';
@@ -19,8 +19,10 @@ import { typography } from '../../theme/typography';
 import { formatApproximateDistance } from '../../utils/geolocation';
 import { getTutorMapRegion, splitTutorsByMapLocation } from '../../utils/tutorMap';
 
+const FIORD_MAP_STYLE = 'https://tiles.openfreemap.org/styles/fiord';
+
 function MapCanvas({
-  mapRef,
+  cameraRef,
   mapRegion,
   recenterRequest,
   initialZoom,
@@ -44,21 +46,29 @@ function MapCanvas({
 }) {
   return (
     <>
-      <MapView
+      <MapLibreMap
         key={`${mapRegion.latitude.toFixed(4)}:${mapRegion.longitude.toFixed(4)}:${mapRegion.latitudeDelta.toFixed(4)}:${mapRegion.longitudeDelta.toFixed(4)}:${expanded}:${recenterRequest}`}
-        ref={mapRef}
-        initialRegion={mapRegion}
-        onMapReady={onMapReady}
+        mapStyle={FIORD_MAP_STYLE}
+        attribution
+        onDidFinishLoadingMap={onMapReady}
         style={styles.map}
       >
-        {locatedTutors.map((tutor, index) => {
+        <Camera
+          ref={cameraRef}
+          initialViewState={{
+            center: [mapRegion.longitude, mapRegion.latitude],
+            zoom: initialZoom,
+          }}
+          minZoom={4}
+          maxZoom={19}
+        />
+        {locatedTutors.map((tutor) => {
           const isSelected = tutor.id === selectedTutor?.id;
           return (
             <Marker
               key={tutor.id}
-              coordinate={tutor.mapCoordinates}
-              title={tutor.name || 'Tutor'}
-              description="Approximate tutor location"
+              id={tutor.id}
+              lngLat={[tutor.mapCoordinates.longitude, tutor.mapCoordinates.latitude]}
               onPress={() => onSelectTutor(tutor.id)}
             >
               <View
@@ -76,9 +86,8 @@ function MapCanvas({
         })}
         {nearMeActive && searchOrigin && searchOriginSource ? (
           <Marker
-            coordinate={searchOrigin}
-            title={searchOriginMarkerLabel}
-            description="Approximate search origin"
+            id="search-origin"
+            lngLat={[searchOrigin.longitude, searchOrigin.latitude]}
           >
             <View
               accessibilityLabel={searchOriginMarkerLabel}
@@ -88,7 +97,7 @@ function MapCanvas({
             </View>
           </Marker>
         ) : null}
-      </MapView>
+      </MapLibreMap>
       <View style={styles.mapControls}>
         <Pressable
           accessibilityRole="button"
@@ -150,7 +159,7 @@ export default function TutorsMapScreen({
   onRequestMapRecenter,
   onTutorPress,
 }) {
-  const mapRef = useRef(null);
+  const mapCameraRef = useRef(null);
   const expandedMapRef = useRef(null);
   const [selectedTutorId, setSelectedTutorId] = useState(null);
   const [zoom, setZoom] = useState(13);
@@ -186,19 +195,23 @@ export default function TutorsMapScreen({
     ? 'You (approximate location)'
     : 'Saved address (approximate)';
   const searchOriginMarkerText = searchOriginSource === 'device' ? 'You' : 'Address';
-  const activeMapRef = mapExpanded ? expandedMapRef : mapRef;
+  const activeCameraRef = mapExpanded ? expandedMapRef : mapCameraRef;
 
   const adjustZoom = (amount) => {
     const nextZoom = Math.min(19, Math.max(4, zoom + amount));
     setZoom(nextZoom);
-    activeMapRef.current?.animateCamera({ zoom: nextZoom });
+    activeCameraRef.current?.zoomTo(nextZoom, { duration: 200 });
   };
 
   const recenter = () => {
     if (!region) return;
     setSearchOriginCenterRequest(0);
     setZoom(tutorRegionZoom);
-    activeMapRef.current?.animateToRegion(region, 350);
+    activeCameraRef.current?.easeTo({
+      center: [region.longitude, region.latitude],
+      zoom: tutorRegionZoom,
+      duration: 350,
+    });
   };
 
   const recenterOnSearchOrigin = () => {
@@ -227,7 +240,7 @@ export default function TutorsMapScreen({
         <View style={styles.mapFrame}>
           {!mapExpanded ? (
             <MapCanvas
-              mapRef={mapRef}
+              cameraRef={mapCameraRef}
               mapRegion={mapRegion}
               recenterRequest={searchOriginCenterRequest}
               initialZoom={initialZoom}
@@ -325,7 +338,7 @@ export default function TutorsMapScreen({
         <SafeAreaView edges={['top', 'bottom']} style={styles.expandedMapContainer}>
           <View style={styles.expandedMapFrame}>
             <MapCanvas
-              mapRef={expandedMapRef}
+              cameraRef={expandedMapRef}
               mapRegion={mapRegion}
               recenterRequest={searchOriginCenterRequest}
               initialZoom={initialZoom}
